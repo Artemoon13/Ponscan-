@@ -130,6 +130,29 @@ CREATE TABLE IF NOT EXISTS quote_assets (
   decimals INTEGER NOT NULL
 ) STRICT;
 
+-- What the tool claimed, written before the outcome existed.
+--
+-- Offline validation answers "this would have worked on data we already had". Only a log written
+-- ahead of the fact answers "this works", and only if it cannot be revised afterwards: the primary
+-- key is the token and inserts never update, so the first claim made about a launch is the one that
+-- gets graded. model_id fingerprints the model file, so a retrain starts a new era in the numbers
+-- instead of quietly mixing into the old one.
+CREATE TABLE IF NOT EXISTS predictions (
+  token        TEXT PRIMARY KEY,
+  launch_ts    INTEGER NOT NULL,
+  scored_at    INTEGER NOT NULL,
+  age_at_score INTEGER NOT NULL,
+  probability  REAL NOT NULL,
+  rank         INTEGER NOT NULL,
+  of           INTEGER NOT NULL,
+  model_id     TEXT NOT NULL,
+  reasons_json TEXT NOT NULL,
+  graded_at    INTEGER,
+  label        INTEGER
+) STRICT;
+CREATE INDEX IF NOT EXISTS ix_pred_pending ON predictions(graded_at, launch_ts);
+CREATE INDEX IF NOT EXISTS ix_pred_model   ON predictions(model_id, probability DESC);
+
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
