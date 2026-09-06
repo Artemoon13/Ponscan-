@@ -69,9 +69,23 @@ export async function runLive(db: DB, ev: LiveEvents = {}): Promise<void> {
     setMeta(db, "live_seen_at", String(Math.floor(now / 1000)));
   };
 
+  /**
+   * A floor on how often the log endpoint is asked anything.
+   *
+   * The socket reports a new head about ten times a second, and every one of those used to become an
+   * eth_getLogs. Launches arrive roughly once every three seconds, so nine in ten of those requests
+   * could only ever return nothing — and the endpoint answers the excess with 429, which stalls the
+   * watcher completely. Waiting a second between reads costs at most a second of latency on a signal
+   * whose median outcome takes 108 seconds to resolve, and keeps the watcher inside its budget.
+   */
+  const MIN_READ_GAP_MS = 1000;
+  let lastRead = 0;
+
   const catchUp = async (head: number): Promise<void> => {
     beat(head);
     if (busy || head <= cursor) return;
+    if (Date.now() - lastRead < MIN_READ_GAP_MS) return;
+    lastRead = Date.now();
     busy = true;
     try {
       // A restart after a long pause must not ask for a million blocks in one call.

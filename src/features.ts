@@ -63,9 +63,9 @@ export const normaliseName = (s: string | null): string =>
 
 type LaunchRow = {
   token: string; deployer: string; launch_sender: string | null; pair_token: string;
-  graduation_threshold_eth: number; block: number; ts: number;
+  graduation_threshold_wei: string; block: number; ts: number;
   creator_fee_recipient: string | null; creator_tax_bps: number | null; buyback_enabled: number | null;
-  initial_buy_eth: number | null; exempt_count: number | null;
+  initial_buy_wei: string | null; quote_decimals: number | null; exempt_count: number | null;
   /** Only lengths are ever features, so the text itself never leaves SQLite. On 170,000 launches
    *  pulling full descriptions costs more than every other column put together. */
   symbol_len: number; desc_len: number;
@@ -103,12 +103,14 @@ export function buildDataset(db: DB, opts: { labelHorizonSec?: number; since?: n
 
   const detail = new Map<string, LaunchRow>();
   for (const d of db.prepare(`
-    SELECT l.token, l.deployer, l.launch_sender, l.pair_token, l.graduation_threshold_eth, l.block, l.ts,
-           l.creator_fee_recipient, l.creator_tax_bps, l.buyback_enabled, l.initial_buy_eth,
+    SELECT l.token, l.deployer, l.launch_sender, l.pair_token, l.graduation_threshold_wei, l.block, l.ts,
+           l.creator_fee_recipient, l.creator_tax_bps, l.buyback_enabled, l.initial_buy_wei,
+           q.decimals AS quote_decimals,
            l.exempt_count, l.socials_json, g.ts AS grad_ts,
            coalesce(length(l.symbol), 0)      AS symbol_len,
            coalesce(length(l.description), 0) AS desc_len
     FROM launches l LEFT JOIN graduations g USING(token)
+    LEFT JOIN quote_assets q ON q.address = l.pair_token
     WHERE l.enriched_at IS NOT NULL AND l.ts >= ?
     ORDER BY l.block ASC, l.log_index ASC`).all(since) as LaunchRow[]) detail.set(d.token, d);
 
@@ -178,8 +180,15 @@ export function buildDataset(db: DB, opts: { labelHorizonSec?: number; since?: n
     // the creator's declared intent is simply unknown. Folding that into "bought nothing" and
     // "exempted nobody" would poison the two strongest signals, so absence is its own feature and
     // the derived flags only fire when the value was actually observed.
-    const decoded = r.initial_buy_eth !== null;
-    const buy = r.initial_buy_eth ?? 0;
+    // Amounts must be scaled by the quote asset's own decimals, not by 1e18. Nearly half of
+    // launches are quoted in a token rather than ETH, and USDG uses six decimals where NVDA uses
+    // eighteen: dividing both by 1e18 makes two economically identical self-buys differ by a factor
+    // of a trillion, inside the feature the model leans on third-hardest.
+    const dec = r.pair_token === ZERO_ADDR ? 18 : (r.quote_decimals ?? 18);
+    const scale = 10 ** dec;
+    const decoded = r.initial_buy_wei !== null;
+    const buy = decoded ? Number(r.initial_buy_wei) / scale : 0;
+    const threshold = Number(r.graduation_threshold_wei) / scale;
     const x = new Float64Array(FEATURES.length);
     let i = 0;
     x[i++] = decoded ? 1 : 0;
@@ -195,7 +204,7 @@ export function buildDataset(db: DB, opts: { labelHorizonSec?: number; since?: n
     x[i++] = r.creator_fee_recipient && r.launch_sender && r.creator_fee_recipient !== r.launch_sender ? 1 : 0;
     x[i++] = r.launch_sender && r.launch_sender !== r.deployer ? 1 : 0;
     x[i++] = r.pair_token === ZERO_ADDR ? 1 : 0;
-    x[i++] = log1p(r.graduation_threshold_eth);
+    x[i++] = log1p(threshold);
     x[i++] = Math.min(500, r.desc_len);
     x[i++] = r.symbol_len;
     x[i++] = priorL;

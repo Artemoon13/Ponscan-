@@ -18,9 +18,14 @@ const PHRASE: Record<FeatureName, Phrase> = {
   calldata_decoded: (v) => (v === 0 ? "launched outside the pons router, so the creator's declared terms are unreadable" : null),
   exempt_count: (v) => (v > 0 ? `creator waived the opening tax for ${v} wallet${v === 1 ? "" : "s"}` : null),
   exempt_is_zero: (v) => (v === 1 ? "no wallets were exempted from the opening tax" : null),
+  // The amount is in the launch's own quote asset, which is ETH for barely half of launches and a
+  // tokenised stock or a stablecoin for the rest. Naming ETH here printed "0.0000 ETH" next to a
+  // card that correctly read "1429.7496 USDG"; the unit is left to the card, which knows it.
   log_initial_buy: (v) => {
-    const eth = (Math.expm1(v) / 1000);
-    return eth > 0 ? `creator bought ${eth < 0.01 ? eth.toFixed(4) : eth.toFixed(3)} ETH of their own launch` : null;
+    const amount = Math.expm1(v) / 1000;
+    if (amount <= 0) return null;
+    const shown = amount < 0.01 ? amount.toFixed(4) : amount < 1000 ? amount.toFixed(3) : Math.round(amount).toLocaleString();
+    return `creator bought ${shown} of the quote asset in their own launch`;
   },
   initial_buy_is_zero: (v) => (v === 1 ? "creator bought none of their own launch" : null),
   creator_tax_bps: (v) => (v > 0 ? `creator set a ${(v / 100).toFixed(2)}% ongoing tax` : "creator set no ongoing tax"),

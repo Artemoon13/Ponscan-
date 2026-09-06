@@ -1,4 +1,4 @@
-import { logsClient, withRetry } from "./chain.ts";
+import { logsClient, stateClient, withRetry } from "./chain.ts";
 
 /**
  * Wall-clock time for a block, without one eth_getBlockByNumber per log.
@@ -20,11 +20,31 @@ export class BlockClock {
     this.#maxGap = maxGap;
   }
 
+  /**
+   * A block header is a state read, so it goes to the state endpoint.
+   *
+   * The two public endpoints do not agree on the head: publicnode runs a few blocks ahead of the
+   * official RPC, which is normal and harmless until something asks the slower one for a block the
+   * faster one has just reported. The live watcher does exactly that — it takes the head from the
+   * state endpoint and then anchors the clock at it — and the result was a watcher that logged
+   * "block N not found" on every tick and never advanced. Reading headers from the endpoint that
+   * reported the head removes the disagreement rather than papering over it; the official RPC stays
+   * the fallback because it is the one that must serve the logs anyway.
+   */
   async #fetch(block: number): Promise<number> {
-    const b = (await withRetry(() =>
-      logsClient.request({ method: "eth_getBlockByNumber", params: [`0x${block.toString(16)}`, false] } as never),
-    )) as { timestamp: `0x${string}` } | null;
-    if (!b) throw new Error(`block ${block} not found`);
+    const read = async (client: typeof stateClient): Promise<{ timestamp: `0x${string}` } | null> =>
+      (await client.request({
+        method: "eth_getBlockByNumber", params: [`0x${block.toString(16)}`, false],
+      } as never)) as { timestamp: `0x${string}` } | null;
+
+    let b: { timestamp: `0x${string}` } | null = null;
+    try {
+      b = await withRetry(() => read(stateClient));
+    } catch {
+      b = null;
+    }
+    if (!b) b = await withRetry(() => read(logsClient));
+    if (!b) throw new Error(`block ${block} not found on either endpoint`);
     const ts = Number(BigInt(b.timestamp));
     this.#anchors.set(block, ts);
     this.#sorted = [...this.#anchors.keys()].sort((x, y) => x - y);
