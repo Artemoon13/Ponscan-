@@ -1,5 +1,6 @@
 import { EXPLORER } from "./config.ts";
 import { formatUnits, quoteFromCache } from "./quote.ts";
+import { curveStats, type CurveStats } from "./curve.ts";
 import type { DB } from "./db.ts";
 
 /**
@@ -51,6 +52,20 @@ export type Card = {
     siblings: Array<{ token: string; symbol: string | null; ts: number; graduated: boolean; sameCreator: boolean; url: string }>;
   };
   exemptions: Array<{ address: string; url: string; seenInOtherLaunches: number }>;
+  /**
+   * Trading on the bonding curve. Empty until this token's curve has been indexed, which happens on
+   * demand: curve events live on each curve's own address and there are tens of thousands a day, so
+   * they are pulled when a card is opened rather than streamed continuously.
+   */
+  trading: {
+    indexed: boolean;
+    buys: number; sells: number;
+    buyersFirstMinute: number; buyersTotal: number;
+    coBuyers: Array<{ address: string; amount: string; url: string }>;
+    snipers: Array<{ address: string; tax: string; bought: string; blocksAfterLaunch: number; onExemptList: boolean; url: string }>;
+    snipeTaxTotal: string;
+    topWallets: Array<{ address: string; inAmount: string; outAmount: string; multiple: number | null; url: string }>;
+  };
   outcome: { phase: number; graduated: boolean; graduationTx: string | null; graduationTxUrl: string | null; secondsToGraduate: number | null };
   creatorHistory: {
     priorLaunches: number; priorGraduations: number;
@@ -115,6 +130,8 @@ export function buildCard(db: DB, token: string): Card | null {
   // Amounts are denominated in the launch's quote asset, which is often a 6-decimal stablecoin or a
   // tokenised stock rather than ETH. Formatting them all as 1e18 prints 0.0000 for real values.
   const quote = quoteFromCache(db, String(l.pair_token));
+  const cs: CurveStats = curveStats(db, t, Number(l.block));
+  const fq = (wei: string): string => formatUnits(BigInt(wei), quote.decimals);
 
   return {
     token: t,
@@ -159,6 +176,21 @@ export function buildCard(db: DB, token: string): Card | null {
           graduated: Boolean(c.graduated), sameCreator: c.deployer === deployer,
           url: EXPLORER.token(c.token),
         })),
+    },
+    trading: {
+      indexed: cs.indexed,
+      buys: cs.buys, sells: cs.sells,
+      buyersFirstMinute: cs.buyersFirstMinute, buyersTotal: cs.buyersTotal,
+      coBuyers: cs.coBuyersInLaunchTx.map((b) => ({ address: b.address, amount: fq(b.quoteWei), url: EXPLORER.address(b.address) })),
+      snipers: cs.snipers.map((x) => ({
+        address: x.address, tax: fq(x.taxWei), bought: fq(x.boughtWei),
+        blocksAfterLaunch: x.blocksAfterLaunch, onExemptList: x.wasExempt, url: EXPLORER.address(x.address),
+      })),
+      snipeTaxTotal: fq(cs.snipeTaxTotalWei),
+      topWallets: cs.positions.slice(0, 10).map((p) => ({
+        address: p.address, inAmount: fq(p.boughtWei), outAmount: fq(p.soldWei),
+        multiple: p.multiple, url: EXPLORER.address(p.address),
+      })),
     },
     exemptions: exemptRows.map((e) => ({
       address: e.address,

@@ -7,6 +7,8 @@ import { datasetAgeSec, loadModel, scoreOne, scoreRecent, type FeedOrder } from 
 import { getMeta, openDb } from "./db.ts";
 import { BLOCKS_PER_DAY } from "./config.ts";
 import { CFG } from "./config.ts";
+import { indexCurve } from "./curve.ts";
+import { logsClient } from "./chain.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -71,7 +73,7 @@ const json = (res: import("node:http").ServerResponse, body: unknown, code = 200
   res.end(s);
 };
 
-const server = createServer((req, res) => {
+const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://localhost:${CFG.boardPort}`);
 
   if (url.pathname.startsWith("/api/") && overLimit(req)) {
@@ -95,9 +97,12 @@ const server = createServer((req, res) => {
     const order: FeedOrder = url.searchParams.get("sort") === "new" ? "new" : "score";
     const rows = model ? scoreRecent(db, model, hours, 150, order) : [];
     const meta = db.prepare(`
-      SELECT token, symbol, name, ts, exempt_count, initial_buy_eth, phase,
-             (token IN (SELECT token FROM graduations)) AS graduated
-      FROM launches WHERE ts >= ?`).all(Math.floor(Date.now() / 1000) - hours * 3600) as Array<Record<string, unknown>>;
+      SELECT l.token, l.symbol, l.name, l.ts, l.exempt_count, l.initial_buy_eth, l.phase,
+             (l.token IN (SELECT token FROM graduations)) AS graduated,
+             (SELECT count(*) FROM launches x WHERE x.symbol_key = l.symbol_key) AS cluster_total,
+             (SELECT count(*) FROM launches x JOIN graduations g2 ON g2.token = x.token
+                WHERE x.symbol_key = l.symbol_key) AS cluster_grad
+      FROM launches l WHERE l.ts >= ?`).all(Math.floor(Date.now() / 1000) - hours * 3600) as Array<Record<string, unknown>>;
     const byToken = new Map(meta.map((m) => [m.token as string, m]));
 
     json(res, {
@@ -119,6 +124,23 @@ const server = createServer((req, res) => {
 
   if (url.pathname.startsWith("/api/token/")) {
     const token = url.pathname.slice("/api/token/".length).toLowerCase();
+    const row = db.prepare("SELECT curve, block FROM launches WHERE token = ?").get(token) as
+      | { curve: string; block: number } | undefined;
+    if (!row) { json(res, { error: "unknown token" }, 404); return; }
+
+    // Curve trades are pulled the first time a card is opened, then cached. One eth_getLogs covers
+    // the whole life of a launch, so this costs a single call and never repeats for the same token.
+    const done = db.prepare("SELECT to_block FROM curve_indexed WHERE token = ?").get(token) as
+      | { to_block: number } | undefined;
+    try {
+      const head = Number(await logsClient.getBlockNumber());
+      const from = done ? done.to_block + 1 : row.block;
+      const to = Math.min(head, row.block + 900_000); // about a day of blocks after launch
+      if (to > from) await indexCurve(db, token, row.curve, from, to);
+    } catch {
+      // A card is still worth showing without its trades; the section says so.
+    }
+
     const card = buildCard(db, token);
     if (!card) { json(res, { error: "unknown token" }, 404); return; }
     json(res, { card, score: model ? scoreOne(db, model, token) : null });

@@ -96,6 +96,29 @@ CREATE TABLE IF NOT EXISTS curve_trades (
 CREATE INDEX IF NOT EXISTS ix_trades_token ON curve_trades(token, block);
 CREATE INDEX IF NOT EXISTS ix_trades_actor ON curve_trades(recipient);
 
+-- Wallets that bought inside the 3-second opening window and were charged for it. Separate from
+-- curve_trades because the tax field on CurveBuy is the creator's standing tax, identical on every
+-- trade; only a racer appears here, and only a handful per launch do.
+CREATE TABLE IF NOT EXISTS snipe_tax (
+  token     TEXT NOT NULL,
+  tx        TEXT NOT NULL,
+  log_index INTEGER NOT NULL,
+  payer     TEXT NOT NULL,
+  amount_wei TEXT NOT NULL,
+  block     INTEGER NOT NULL,
+  PRIMARY KEY (tx, log_index)
+) STRICT;
+CREATE INDEX IF NOT EXISTS ix_snipe_token ON snipe_tax(token);
+CREATE INDEX IF NOT EXISTS ix_snipe_payer ON snipe_tax(payer);
+
+-- Per-token indexing state: curve logs are fetched on demand, so we record how far each token got.
+CREATE TABLE IF NOT EXISTS curve_indexed (
+  token      TEXT PRIMARY KEY,
+  to_block   INTEGER NOT NULL,
+  trades     INTEGER NOT NULL,
+  indexed_at INTEGER NOT NULL
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS fee_events (
   tx        TEXT NOT NULL,
   log_index INTEGER NOT NULL,

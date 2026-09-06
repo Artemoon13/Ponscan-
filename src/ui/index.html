@@ -138,6 +138,7 @@ const age = (ts) => {
 const pct = (p) => (100 * p).toFixed(1) + "%";
 const shortAddr = (a) => a ? a.slice(0, 8) + "…" + a.slice(-6) : "—";
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const EXP_ADDR = "https://robinhoodchain.blockscout.com/address/";
 const colour = (p) => p >= 0.06 ? "var(--up)" : p >= 0.03 ? "var(--down)" : "var(--dim)";
 
 /**
@@ -214,7 +215,8 @@ async function loadFeed() {
       `<td class="p" style="color:${colour(it.probability)}">${pct(it.probability)}</td>` +
       `<td class="rank">#${it.rank}</td>` +
       `<td><span class="sym">${esc(m.symbol || "?")}</span> <span class="nm">${esc((m.name || "").slice(0, 30))}</span>` +
-      (m.graduated ? ' <span class="tag good">graduated</span>' : "") +
+      (m.graduated ? ' <span class="tag good">pool</span>' : "") +
+      (m.cluster_total > 1 ? ` <span class="tag" title="launches sharing this ticker (how many reached the pool)">${m.cluster_total} (${m.cluster_grad})</span>` : "") +
       `<ul class="reasons">${it.reasons.map((x) => `<li class="${x.direction === "up" ? "up" : "down"}">${esc(x.text)}</li>`).join("")}</ul></td>` +
       `<td class="rank">${m.ts ? age(m.ts) : ""}</td>`;
     tb.appendChild(tr);
@@ -282,6 +284,29 @@ async function openCard(token) {
         (sb.sameCreator ? ' <span class="tag warn">same creator</span>' : "") + "</li>").join("")}</ul>
     </section>` : "";
 
+  const T = k.trading;
+  const wallet = (a) => txLink(EXP_ADDR + a, shortAddr(a));
+  const tradingBlock = !T.indexed ? `
+    <section><h3>trading on the curve</h3><div class="muted">not indexed yet — reopen this card in a moment</div></section>`
+   : `
+    <section><h3>trading on the curve</h3>
+      <dl>
+        ${row("trades", `${T.buys} buys · ${T.sells} sells`)}
+        ${row("distinct buyers", `${T.buyersTotal} total, <b>${T.buyersFirstMinute}</b> in the first minute`)}
+        ${row("opening tax paid", T.snipers.length ? `${esc(T.snipeTaxTotal)} ${esc(L.quoteSymbol)} by ${new Set(T.snipers.map(s=>s.address)).size} wallet(s)` : '<span class="muted">nobody raced the window</span>')}
+      </dl>
+      ${T.coBuyers.length ? `<div style="margin-top:12px" class="muted">bought inside the launch transaction itself:</div>
+        <ul class="plain">${T.coBuyers.map((b)=>`<li>${wallet(b.address)} <span class="muted">${esc(b.amount)} ${esc(L.quoteSymbol)}</span></li>`).join("")}</ul>` : ""}
+      ${T.snipers.length ? `<div style="margin-top:12px" class="muted">raced the opening tax window:</div>
+        <ul class="plain">${T.snipers.slice(0,10).map((x)=>
+          `<li>${wallet(x.address)} <span class="muted">+${x.blocksAfterLaunch} blocks · paid ${esc(x.tax)} tax</span>` +
+          (x.onExemptList ? ' <span class="tag warn">was on the exempt list</span>' : "") + `</li>`).join("")}</ul>` : ""}
+      ${T.topWallets.length ? `<div style="margin-top:12px" class="muted">biggest wallets, by money put in:</div>
+        <ul class="plain">${T.topWallets.map((p)=>
+          `<li>${wallet(p.address)} <span class="muted">in ${esc(p.inAmount)} · out ${esc(p.outAmount)}</span>` +
+          (p.multiple !== null ? ` <span class="tag ${p.multiple>=1?"good":"warn"}">×${p.multiple.toFixed(2)}</span>` : "") + `</li>`).join("")}</ul>` : ""}
+    </section>`;
+
   const feeChanges = k.fees.changes.length
     ? `<ul class="plain">${k.fees.changes.map((c) =>
         `<li>${shortAddr(c.prev)} → ${shortAddr(c.next)} ${txLink(c.txUrl, "tx")}</li>`).join("")}</ul>`
@@ -323,6 +348,8 @@ async function openCard(token) {
       ${row("creator fees go to", k.fees.recipient ? txLink(k.fees.recipientUrl, shortAddr(k.fees.recipient)) : '<span class="muted">unknown</span>')}
       ${k.fees.redirected ? row("", '<span class="tag warn">routed away from the launching wallet</span>') : ""}
     </dl>${feeChanges}</section>
+
+    ${tradingBlock}
 
     ${clusterBlock}
 

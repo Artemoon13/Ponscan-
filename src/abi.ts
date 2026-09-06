@@ -38,6 +38,9 @@ export const curveAbi = parseAbi([
   "event CurveBuy(address indexed buyer, address indexed recipient, uint256 quoteIn, uint256 tokensOut, uint256 fee, uint256 tax)",
   "event CurveSell(address indexed seller, address indexed recipient, uint256 tokensIn, uint256 quoteOut, uint256 fee, uint256 tax)",
   "event CurveCompleted()",
+  // The opening tax has its own event. CurveBuy's `tax` field is the creator's standing tax and is
+  // the same on every trade; only wallets that actually raced the 3-second window appear here.
+  "event SnipeTaxCharged(address indexed payer, uint256 amount)",
 ]);
 
 export const tokenAbi = parseAbi([
@@ -73,6 +76,7 @@ export const TOPIC = {
   creatorFeeRecipientUpdated: toEventSelector("CreatorFeeRecipientUpdated(address,address,address)"),
   curveBuy: toEventSelector("CurveBuy(address,address,uint256,uint256,uint256,uint256)"),
   curveSell: toEventSelector("CurveSell(address,address,uint256,uint256,uint256,uint256)"),
+  snipeTaxCharged: toEventSelector("SnipeTaxCharged(address,uint256)"),
   credited: toEventSelector("Credited(address,address,uint256)"),
   claimed: toEventSelector("Claimed(address,uint256)"),
 } as const;

@@ -48,13 +48,28 @@ export function quoteFromCache(db: DB, address: string): QuoteAsset {
   return hit ?? { address: a, symbol: "?", decimals: 18 };
 }
 
-/** Exact wei-to-decimal formatting; no float rounding on the number a trader is checking. */
+/**
+ * Exact wei-to-decimal formatting; no float rounding on the number a trader is checking.
+ *
+ * The place count grows for small values rather than truncating them: an opening-tax charge of
+ * 0.000078 rendered at four places reads "0", which is not a rounding artefact but a false
+ * statement about whether a wallet paid anything at all.
+ */
 export function formatUnits(wei: bigint, decimals: number, places = 4): string {
   const neg = wei < 0n;
   const v = neg ? -wei : wei;
   const base = 10n ** BigInt(decimals);
   const whole = v / base;
-  const frac = (v % base).toString().padStart(decimals, "0").slice(0, places).replace(/0+$/, "");
+  const rem = v % base;
+
+  let p = places;
+  if (whole === 0n && rem > 0n) {
+    // Extend until two significant digits are visible, capped at the asset's own precision.
+    const digits = rem.toString().padStart(decimals, "0");
+    const firstSig = digits.search(/[1-9]/);
+    if (firstSig >= 0) p = Math.min(decimals, Math.max(places, firstSig + 2));
+  }
+  const frac = rem.toString().padStart(decimals, "0").slice(0, p).replace(/0+$/, "");
   return `${neg ? "-" : ""}${whole}${frac ? "." + frac : ""}`;
 }
 
