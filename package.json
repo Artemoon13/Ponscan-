@@ -21,6 +21,7 @@
     "watch": "node --no-warnings src/cli/watch.ts",
     "stats": "node --no-warnings src/cli/stats.ts",
     "nightly": "node --no-warnings src/cli/nightly.ts",
+    "names": "node --no-warnings src/cli/names.ts",
     "scoreboard": "node --no-warnings src/cli/scoreboard.ts",
     "verify": "node --no-warnings src/cli/verify.ts"
   },

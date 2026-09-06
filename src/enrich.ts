@@ -1,4 +1,4 @@
-import { decodeEventLog, decodeFunctionData } from "viem";
+import { decodeEventLog, decodeFunctionData, parseAbi } from "viem";
 import { curveAbi, routerAbi, TOPIC } from "./abi.ts";
 import { ADDR } from "./config.ts";
 import { stateClient, withRetry } from "./chain.ts";
@@ -28,6 +28,35 @@ export type LaunchDetail = {
   exemptions: string[];
   coBuyers: Array<{ recipient: string; quoteWei: bigint; taxWei: bigint }>;
 };
+
+const erc20 = parseAbi([
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+]);
+
+/**
+ * Name and ticker straight from the token contract.
+ *
+ * Roughly half of launches do not go through the pons router, so the creator's declared parameters
+ * cannot be read out of the calldata — and that is where the name used to come from, which left
+ * half the board reading "?". The contract itself always knows: these are plain ERC-20 getters, and
+ * the state client batches concurrent reads into one multicall.
+ *
+ * This is a display fact only. It is deliberately not fed to the model: a name readable here but not
+ * in the calldata would be knowable at different times for different launches, which is exactly the
+ * kind of asymmetry that quietly leaks.
+ */
+export async function readTokenIdentity(token: string): Promise<{ name?: string; symbol?: string }> {
+  const address = token as `0x${string}`;
+  const [n, s] = await Promise.allSettled([
+    withRetry(() => stateClient.readContract({ address, abi: erc20, functionName: "name" })),
+    withRetry(() => stateClient.readContract({ address, abi: erc20, functionName: "symbol" })),
+  ]);
+  return {
+    name: n.status === "fulfilled" ? String(n.value).slice(0, 128) : undefined,
+    symbol: s.status === "fulfilled" ? String(s.value).slice(0, 32) : undefined,
+  };
+}
 
 export async function fetchLaunchDetail(token: string, txHash: string, deep = true): Promise<LaunchDetail> {
   // Both reads go to the state endpoint on purpose. Only the other endpoint serves eth_getLogs, and
@@ -65,6 +94,15 @@ export async function fetchLaunchDetail(token: string, txHash: string, deep = tr
     }
   } catch {
     // Not a router call we can decode; the sender and log-derived facts still stand.
+  }
+
+  // Launches outside the router carry no declared name, so ask the contract rather than showing "?".
+  if (detail.symbol === undefined) {
+    try {
+      const id = await readTokenIdentity(token);
+      detail.name = id.name;
+      detail.symbol = id.symbol;
+    } catch { /* an unreadable token keeps its unknown name */ }
   }
 
   if (deep) {
