@@ -9,6 +9,7 @@
     "node": ">=22.6"
   },
   "scripts": {
+    "test": "node --no-warnings --test",
     "doctor": "node --no-warnings src/cli/doctor.ts",
     "backfill": "node --no-warnings src/cli/backfill.ts",
     "enrich-window": "node --no-warnings src/cli/enrich-window.ts",
