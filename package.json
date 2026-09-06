@@ -1,0 +1,27 @@
+{
+  "name": "ponscan",
+  "version": "0.1.0",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "description": "Local, open-source scanner for pons v2 launches on Robinhood Chain. Scores a fresh launch's chance of graduating to the pool, and shows every fact behind it.",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "doctor": "node --no-warnings src/cli/doctor.ts",
+    "backfill": "node --no-warnings src/cli/backfill.ts",
+    "enrich-window": "node --no-warnings src/cli/enrich-window.ts",
+    "enrich": "node --no-warnings src/cli/enrich.ts",
+    "quotes": "node --no-warnings src/cli/quotes.ts",
+    "train": "node --no-warnings src/cli/train.ts",
+    "validate": "node --no-warnings src/cli/validate.ts",
+    "board": "node --no-warnings src/board.ts",
+    "watch": "node --no-warnings src/cli/watch.ts",
+    "stats": "node --no-warnings src/cli/stats.ts",
+    "nightly": "node --no-warnings src/cli/nightly.ts"
+  },
+  "dependencies": {
+    "viem": "^2.56.3"
+  }
+}

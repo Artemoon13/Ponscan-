@@ -1,0 +1,12 @@
+node_modules/
+
+# Collected data and the model fitted from it. Both are regenerated locally:
+#   npm run backfill && npm run enrich-window && npm run train
+# Shipping them would push a stale model and tens of megabytes of one machine's history.
+data/*.db
+data/*.db-*
+data/model.json
+
+.env
+*.log
+.gstack/
