@@ -126,6 +126,20 @@ sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd
 systemctl restart ssh
 ```
 
+**Дать `ponscan` право на sudo — обязательно, и обязательно до того, как закроется эта root-сессия.**
+Вход root по SSH только что выключен, а у нового пользователя пароля нет вообще. Если сейчас закрыть
+окно, рута на машине больше не будет ни у кого:
+
+```bash
+usermod -aG sudo ponscan
+echo "ponscan ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ponscan
+chmod 440 /etc/sudoers.d/ponscan
+visudo -c
+```
+
+`NOPASSWD` тут не послабление: у пользователя нет пароля в принципе, вход только по ключу, поэтому
+sudo с паролем не сработал бы никогда.
+
 Файрвол — наружу только SSH и веб:
 
 ```bash
@@ -138,15 +152,30 @@ ufw --force enable
 ufw status
 ```
 
-**Проверка.** Не закрывая текущую сессию, открыть новое окно терминала:
+**Проверка.** Не закрывая root-сессию, открыть новое окно терминала:
 
 ```bash
-ssh ponscan@СЕРВЕР_IP "whoami && sudo -n true 2>&1 | head -1"
+ssh ponscan@СЕРВЕР_IP "whoami && sudo -n whoami"
 ```
 
-Должно вывести `ponscan`. Порт 4663 снаружи должен быть закрыт — проверим на шаге 8.
+Должно вывести `ponscan` и `root`. Только после этого root-окно можно закрывать.
 
-Если новая сессия не пускает — **не закрывать старую**, чинить из неё.
+Если новая сессия не пускает или sudo просит пароль — **не закрывать старую**, чинить из неё.
+
+### Чтобы не набирать адрес каждый раз
+
+`[локально]`, в `~/.ssh/config`:
+
+```
+Host ponscan
+    HostName СЕРВЕР_IP
+    User ponscan
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+```
+
+Дальше везде ниже вместо `ponscan@СЕРВЕР_IP` можно писать просто `ponscan`.
 
 ---
 
