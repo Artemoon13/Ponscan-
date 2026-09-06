@@ -13,12 +13,22 @@ import { join } from "node:path";
 
 const dir = mkdtempSync(join(tmpdir(), "ponscan-track-"));
 process.env.DB_PATH = join(dir, "test.db");
-process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
 
 const { openDb } = await import("./db.ts");
 const { record, grade, settled, score, pending, HORIZON_SEC, MAX_AGE_SEC } = await import("./track.ts");
 
 const db = openDb();
+
+/**
+ * Close the database before removing its directory. Windows refuses to unlink a file that is still
+ * open, so leaving the handle to the process exit fails the whole file with EPERM after every
+ * assertion in it has already passed — a green suite everywhere else and a red one on the platform
+ * this tool is mainly run on.
+ */
+process.on("exit", () => {
+  try { db.close(); } catch { /* already closed */ }
+  rmSync(dir, { recursive: true, force: true });
+});
 
 const T0 = 1_800_000_000;
 const scored = (token: string, probability: number) => ({
