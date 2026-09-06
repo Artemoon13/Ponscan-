@@ -1,7 +1,7 @@
 import { decodeEventLog, decodeFunctionData } from "viem";
 import { curveAbi, routerAbi, TOPIC } from "./abi.ts";
 import { ADDR } from "./config.ts";
-import { logsClient, withRetry } from "./chain.ts";
+import { stateClient, withRetry } from "./chain.ts";
 import { toEth, type DB } from "./db.ts";
 import { normaliseName } from "./features.ts";
 
@@ -30,7 +30,11 @@ export type LaunchDetail = {
 };
 
 export async function fetchLaunchDetail(token: string, txHash: string, deep = true): Promise<LaunchDetail> {
-  const tx = await withRetry(() => logsClient.getTransaction({ hash: txHash as `0x${string}` }));
+  // Both reads go to the state endpoint on purpose. Only the other endpoint serves eth_getLogs, and
+  // an enrichment pass is tens of thousands of calls: sharing it starves the live watcher into 429s
+  // and loses launches. publicnode serves transactions and receipts happily, and about three times
+  // faster besides.
+  const tx = await withRetry(() => stateClient.getTransaction({ hash: txHash as `0x${string}` }));
   const detail: LaunchDetail = {
     token: token.toLowerCase(),
     sender: tx.from.toLowerCase(),
@@ -64,7 +68,7 @@ export async function fetchLaunchDetail(token: string, txHash: string, deep = tr
   }
 
   if (deep) {
-    const rc = await withRetry(() => logsClient.getTransactionReceipt({ hash: txHash as `0x${string}` }));
+    const rc = await withRetry(() => stateClient.getTransactionReceipt({ hash: txHash as `0x${string}` }));
     for (const log of rc.logs) {
       if (log.topics[0] !== TOPIC.curveBuy) continue;
       try {
