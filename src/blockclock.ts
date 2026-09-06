@@ -31,9 +31,16 @@ export class BlockClock {
     return ts;
   }
 
-  /** Pre-seeds anchors across a range so a backfill interpolates instead of fetching mid-loop. */
+  /**
+   * Pre-seeds anchors across a range so a backfill interpolates instead of fetching mid-loop.
+   *
+   * The step is exactly `maxGap`: `at()` refuses to interpolate across a wider gap, so anchors
+   * spaced further apart than that silently turn every log's timestamp back into its own round
+   * trip. A fixed number of anchors looks cheaper and is the opposite: a week of blocks then
+   * costs ~230,000 serial reads instead of the ~300 this does.
+   */
   async seed(from: number, to: number): Promise<void> {
-    const step = Math.max(this.#maxGap, Math.ceil((to - from) / 64));
+    const step = this.#maxGap;
     const points = new Set<number>([from, to]);
     for (let b = from; b < to; b += step) points.add(b);
     for (const b of [...points].sort((x, y) => x - y)) {
