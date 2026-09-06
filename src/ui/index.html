@@ -47,6 +47,20 @@
   .tag.good{color:var(--up);border-color:#1d4327}
   .tag.warn{color:var(--down);border-color:#4a3320}
   .addr{font-size:12px}
+  .contract{display:flex;align-items:center;gap:8px;margin:6px 0 2px;padding:6px 8px;
+    background:#11151a;border:1px solid var(--line);border-radius:4px}
+  .contract code{flex:1;font-size:12px;color:var(--ink);overflow-wrap:anywhere;user-select:all}
+  .contract button{background:none;border:1px solid var(--line);border-radius:3px;color:var(--dim);
+    font:inherit;font-size:11px;padding:2px 8px;cursor:pointer;white-space:nowrap}
+  .contract button:hover{color:var(--ink);border-color:#3a4250}
+  .contract a{font-size:11px;white-space:nowrap}
+  .loading{color:var(--dim);padding:28px 8px}
+  .loading .bar{height:10px;background:#171b21;border-radius:3px;margin:8px 0;
+    animation:pulse 1.1s ease-in-out infinite}
+  .loading .bar:nth-child(2){width:60%}
+  .loading .bar:nth-child(3){width:85%}
+  .loading .bar:nth-child(4){width:40%}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:.8}}
   ul.plain{list-style:none;margin:0;padding:0}
   ul.plain li{padding:3px 0;border-bottom:1px solid #1b1f26}
   .disclaimer{color:var(--dim);font-size:11px;padding:10px 18px;border-top:1px solid var(--line)}
@@ -153,6 +167,7 @@ async function loadFeed() {
     // Only mark arrivals once a baseline exists, or the whole first render flashes.
     const fresh = !first && !known.has(it.token);
     tr.className = "row" + (it.token === selected ? " sel" : "") + (fresh ? " fresh" : "");
+    tr.dataset.token = it.token;
     tr.onclick = () => openCard(it.token);
     tr.innerHTML =
       `<td class="p" style="color:${colour(it.probability)}">${pct(it.probability)}</td>` +
@@ -166,12 +181,30 @@ async function loadFeed() {
   known = new Set(d.items.map((it) => it.token));
 }
 
+/**
+ * Guards against a slow answer for a launch the reader has already clicked away from. Without it,
+ * clicking three rows quickly can leave the panel showing whichever request happened to finish last.
+ */
+let cardRequest = 0;
+
 async function openCard(token) {
   selected = token;
+  const mine = ++cardRequest;
+
+  // Acknowledge the click before the network does. The panel used to sit on the previous launch
+  // until the response landed, with the row highlight already cleared, which reads as a dead click
+  // however fast the server actually is.
   document.querySelectorAll("tr.row").forEach((t) => t.classList.remove("sel"));
+  const clicked = [...document.querySelectorAll("tr.row")].find((t) => t.dataset.token === token);
+  if (clicked) clicked.classList.add("sel");
+  $("card").innerHTML =
+    '<div class="loading"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>';
+
   const r = await fetch("/api/token/" + token);
+  if (mine !== cardRequest) return;
   if (!r.ok) { $("card").innerHTML = '<div class="empty">not found</div>'; return; }
   const { card: k, score } = await r.json();
+  if (mine !== cardRequest) return;
   const L = k.launch;
 
   const row = (dt, dd) => `<dt>${dt}</dt><dd>${dd}</dd>`;
@@ -215,7 +248,12 @@ async function openCard(token) {
 
   $("card").innerHTML = `
     <h2>${esc(k.symbol || "?")} <span class="muted">${esc(k.name || "")}</span></h2>
-    <div class="muted addr">${txLink(L.txUrl, k.token)}</div>
+    <div class="contract">
+      <code id="contract-addr">${esc(k.token)}</code>
+      <button id="copy-contract">copy</button>
+      ${txLink(k.tokenUrl, "explorer")}
+      ${txLink(k.ponsUrl, "pons")}
+    </div>
     ${score ? `<div style="margin:14px 0 2px"><span class="big" style="color:${colour(score.probability)}">${pct(score.probability)}</span>
       <span class="muted"> chance of graduating · rank #${score.rank} of ${score.of} in the last 6h</span></div>
       <ul class="reasons">${score.reasons.map((x) => `<li class="${x.direction === "up" ? "up" : "down"}">${esc(x.text)}</li>`).join("")}</ul>` : ""}
@@ -263,6 +301,20 @@ async function openCard(token) {
     ${Object.keys(k.socials).length ? `<section><h3>links</h3><ul class="plain">${
       Object.entries(k.socials).map(([n, v]) => `<li>${esc(n)}: ${txLink(esc(v), esc(v.slice(0, 60)))}</li>`).join("")}</ul></section>` : ""}
   `;
+
+  $("card").scrollTop = 0;
+  const copy = $("copy-contract");
+  copy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(k.token);
+      copy.textContent = "copied";
+    } catch {
+      // Browsers refuse clipboard access on a plain-http origin. The address is selectable either
+      // way, so say what to do rather than failing silently.
+      copy.textContent = "select it";
+    }
+    setTimeout(() => { copy.textContent = "copy"; }, 1500);
+  };
 }
 function L_phase(k) { return k.outcome.phase; }
 

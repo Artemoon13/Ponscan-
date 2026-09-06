@@ -34,12 +34,14 @@ export type Scored = {
  * behind, which is what the staleness shown on the board is for.
  */
 const REBUILD_AFTER_MS = 15_000;
+/** Rounding `since` keeps a clock that moves every second from invalidating the cache every second. */
+const SINCE_BUCKET_SEC = 60;
 
-let cached: { rows: Row[]; tokens: Set<string>; builtAt: number } | null = null;
+let cached: { rows: Row[]; tokens: Set<string>; builtAt: number; since: number } | null = null;
 
-function rebuild(db: DB): Row[] {
-  const rows = buildDataset(db);
-  cached = { rows, tokens: new Set(rows.map((r) => r.token)), builtAt: Date.now() };
+function rebuild(db: DB, since: number): Row[] {
+  const rows = buildDataset(db, { since });
+  cached = { rows, tokens: new Set(rows.map((r) => r.token)), builtAt: Date.now(), since };
   return rows;
 }
 
@@ -48,16 +50,32 @@ export function datasetAgeSec(): number | null {
   return cached ? Math.round((Date.now() - cached.builtAt) / 1000) : null;
 }
 
-/** For the feed: newest rows matter, a few seconds behind is fine. */
-export function dataset(db: DB): Row[] {
-  if (!cached || Date.now() - cached.builtAt > REBUILD_AFTER_MS) return rebuild(db);
+/**
+ * For the feed: rows back to `since`, newest data preferred, a few seconds behind is fine.
+ *
+ * A cache built for a longer reach answers a shorter question too, so it is only rebuilt when the
+ * request needs history the cache does not carry.
+ */
+export function dataset(db: DB, since: number): Row[] {
+  const want = Math.floor(since / SINCE_BUCKET_SEC) * SINCE_BUCKET_SEC;
+  const stale = !cached || Date.now() - cached.builtAt > REBUILD_AFTER_MS;
+  const tooNarrow = !cached || cached.since > want;
+  if (stale || tooNarrow) return rebuild(db, want);
   return cached.rows;
 }
 
-/** For a card: rebuild only when this launch is one the matrix has never seen. */
+/**
+ * For a card: rebuild only when this launch is one the matrix has never seen.
+ *
+ * A launch older than the cached window is not in it and never will be, so that case falls back to
+ * a full build rather than looping. It is rare — cards are opened from the feed — and slow, which is
+ * the right trade against silently answering "unknown token" for a launch that exists.
+ */
 export function datasetWith(db: DB, token: string): Row[] {
-  if (!cached || !cached.tokens.has(token)) return rebuild(db);
-  return cached.rows;
+  if (cached?.tokens.has(token)) return cached.rows;
+  const rows = rebuild(db, cached?.since ?? Math.floor(Date.now() / 1000) - 6 * 3600);
+  if (cached?.tokens.has(token)) return rows;
+  return rebuild(db, 0);
 }
 
 export function loadModel(path = "./data/model.json"): GbdtModel | null {
@@ -89,7 +107,7 @@ export function scoreRecent(
   db: DB, model: GbdtModel, windowHours = 6, limit = 200, order: FeedOrder = "score",
 ): Scored[] {
   const cutoff = Math.floor(Date.now() / 1000) - windowHours * 3600;
-  const rows = dataset(db).filter((r) => r.ts >= cutoff);
+  const rows = dataset(db, cutoff).filter((r) => r.ts >= cutoff);
   if (!rows.length) return [];
 
   const scored = rows

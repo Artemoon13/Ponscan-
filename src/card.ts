@@ -11,6 +11,8 @@ import type { DB } from "./db.ts";
  */
 export type Card = {
   token: string;
+  tokenUrl: string;
+  ponsUrl: string;
   name: string | null;
   symbol: string | null;
   description: string | null;
@@ -116,6 +118,9 @@ export function buildCard(db: DB, token: string): Card | null {
 
   return {
     token: t,
+    /** The contract itself. What a trader reaches for first, so it does not get buried. */
+    tokenUrl: EXPLORER.token(t),
+    ponsUrl: EXPLORER.pons(t),
     name: (l.name as string | null) ?? null,
     symbol: (l.symbol as string | null) ?? null,
     description: (l.description as string | null) ?? null,
