@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, mkdirSync, renameSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { CFG } from "./config.ts";
 
 /**
@@ -193,8 +193,24 @@ const MIGRATIONS: Array<{ table: string; column: string; ddl: string }> = [
   { table: "launches", column: "symbol_key", ddl: "ALTER TABLE launches ADD COLUMN symbol_key TEXT" },
 ];
 
+/**
+ * The project was renamed from ponscan to Poolitzer after databases already existed on disk. A
+ * database is days of collected history, so the default path must not silently start over: if the
+ * new file is absent and the old one is present, the old one is moved into place — together with
+ * its WAL and shared-memory sidecars, which carry unflushed writes and must travel with it.
+ */
+function adoptLegacyDatabase(path: string): void {
+  if (basename(path) !== "poolitzer.db" || existsSync(path)) return;
+  const legacy = join(dirname(path), "ponscan.db");
+  if (!existsSync(legacy)) return;
+  for (const suffix of ["", "-wal", "-shm"]) {
+    if (existsSync(legacy + suffix)) renameSync(legacy + suffix, path + suffix);
+  }
+}
+
 export function openDb(path: string = CFG.dbPath): DB {
   mkdirSync(dirname(path), { recursive: true });
+  adoptLegacyDatabase(path);
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA synchronous = NORMAL");

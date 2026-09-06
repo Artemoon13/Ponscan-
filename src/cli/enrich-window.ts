@@ -9,7 +9,7 @@ import { backfillQuoteAssets } from "../quote.ts";
  * asking whether a feature separates the classes, but a model fitted on it is calibrated to a
  * positive rate that does not exist, so the score would read far too high.
  *
- * ponscan enrich-window --hours N [--end-offset-hours N] [--workers N]
+ * poolitzer enrich-window --hours N [--end-offset-hours N] [--workers N]
  */
 const argv = process.argv.slice(2);
 const arg = (n: string, d: number): number => {

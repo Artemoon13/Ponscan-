@@ -4,7 +4,7 @@ import { grade, HORIZON_SEC, MAX_AGE_SEC, pending, score, settled } from "../tra
 /**
  * What the tool actually got right, from claims written before the answer existed.
  *
- * ponscan scoreboard [--model ID | --all]
+ * poolitzer scoreboard [--model ID | --all]
  *
  * By default this reports each model era separately. Pooling them would describe a model that never
  * ran: a nightly retrain changes the thing being measured, and a good week under one model can hide
@@ -22,7 +22,7 @@ const justGraded = grade(db);
 const rows = settled(db, pick("model"));
 const outstanding = pending(db);
 
-console.log("\nponscan scoreboard — scores recorded before the outcome was known\n");
+console.log("\npoolitzer scoreboard — scores recorded before the outcome was known\n");
 
 if (!rows.length) {
   console.log(`  nothing settled yet: ${outstanding} claims still inside the ${HORIZON_SEC / 3600}h horizon.`);

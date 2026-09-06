@@ -12,7 +12,7 @@ import { EXPLORER } from "../config.ts";
  * the chain. Recomputing from the file and printing both figures side by side shows the export is
  * complete enough to stand on its own — if the two ever disagree, the export is the honest one.
  *
- * ponscan verify [--out data/predictions.jsonl]
+ * poolitzer verify [--out data/predictions.jsonl]
  */
 const argv = process.argv.slice(2);
 const i = argv.indexOf("--out");

@@ -31,7 +31,7 @@ export const CFG = {
   spacingMs: num("RPC_SPACING_MS", 60),
   logsChunk: num("LOGS_CHUNK_BLOCKS", 60_000),
   logsSpacingMs: num("LOGS_SPACING_MS", 400),
-  dbPath: str("DB_PATH", "./data/ponscan.db"),
+  dbPath: str("DB_PATH", "./data/poolitzer.db"),
   boardPort: num("BOARD_PORT", 4663),
   /**
    * Interface the board listens on. Defaults to every interface, which is what a local run wants.

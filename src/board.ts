@@ -151,6 +151,6 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(CFG.boardPort, CFG.boardHost, () => {
-  console.log(`ponscan board on http://${CFG.boardHost}:${CFG.boardPort}`);
+  console.log(`poolitzer board on http://${CFG.boardHost}:${CFG.boardPort}`);
   if (!model) console.log("no model yet — run: npm run train");
 });

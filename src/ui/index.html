@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ponscan</title>
+<title>poolitzer</title>
 <style>
   :root{
     --bg:#0e1013; --panel:#15181d; --line:#242932; --ink:#e6e9ef; --dim:#8b94a3;
@@ -79,7 +79,7 @@
 </head>
 <body>
 <header>
-  <h1>ponscan</h1>
+  <h1>poolitzer</h1>
   <span class="stats" id="stats">loading…</span>
   <div class="modes">
     <button id="m-score" aria-pressed="true">by chance</button>
@@ -115,14 +115,14 @@ let selected = null;
  * point of the newest view — the ordering answers "what just happened", the rank answers "does it
  * matter".
  */
-let order = localStorage.getItem("ponscan.order") === "new" ? "new" : "score";
+let order = localStorage.getItem("poolitzer.order") === "new" ? "new" : "score";
 /** Tokens already on screen, so an arrival can be marked as one. */
 let known = new Set();
 
 function setOrder(next) {
   if (next === order) return;
   order = next;
-  localStorage.setItem("ponscan.order", order);
+  localStorage.setItem("poolitzer.order", order);
   $("m-score").setAttribute("aria-pressed", String(order === "score"));
   $("m-new").setAttribute("aria-pressed", String(order === "new"));
   known = new Set();

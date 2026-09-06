@@ -19,7 +19,7 @@ ls -la ~/.ssh/id_ed25519.pub
 Если нет — создать:
 
 ```bash
-ssh-keygen -t ed25519 -C "ponscan"
+ssh-keygen -t ed25519 -C "poolitzer"
 ```
 
 ---
@@ -35,7 +35,7 @@ ssh-keygen -t ed25519 -C "ponscan"
 | Type | **CX22** (2 vCPU, 4 ГБ, 40 ГБ) |
 | Networking | IPv4 включён |
 | SSH keys | **вставить свой публичный ключ прямо здесь** |
-| Name | ponscan |
+| Name | poolitzer |
 
 Ключ обязательно вставить на этапе создания. Иначе Hetzner пришлёт рутовый пароль почтой и придётся менять его через консоль.
 
@@ -55,7 +55,7 @@ ssh root@СЕРВЕР_IP "echo ok && lsb_release -ds && nproc && free -g | head 
 
 ```
 Тип:  A
-Имя:  ponscan   (или @ для корня домена)
+Имя:  poolitzer   (или @ для корня домена)
 Value: СЕРВЕР_IP
 TTL:   авто
 ```
@@ -65,7 +65,7 @@ TTL:   авто
 **Проверка** (может занять до пары минут):
 
 ```bash
-dig +short ponscan.ТВОЙ-ДОМЕН
+dig +short poolitzer.ТВОЙ-ДОМЕН
 ```
 
 Должен вернуться IP сервера. Пока не вернулся — дальше не идти, шаг 7 упрётся именно в это.
@@ -77,11 +77,11 @@ dig +short ponscan.ТВОЙ-ДОМЕН
 `[сервер]`, под root:
 
 ```bash
-adduser --disabled-password --gecos "" ponscan
-install -d -m 700 -o ponscan -g ponscan /home/ponscan/.ssh
-cp /root/.ssh/authorized_keys /home/ponscan/.ssh/
-chown ponscan:ponscan /home/ponscan/.ssh/authorized_keys
-chmod 600 /home/ponscan/.ssh/authorized_keys
+adduser --disabled-password --gecos "" poolitzer
+install -d -m 700 -o poolitzer -g poolitzer /home/poolitzer/.ssh
+cp /root/.ssh/authorized_keys /home/poolitzer/.ssh/
+chown poolitzer:poolitzer /home/poolitzer/.ssh/authorized_keys
+chmod 600 /home/poolitzer/.ssh/authorized_keys
 ```
 
 Запретить вход root по SSH и вход по паролю:
@@ -107,10 +107,10 @@ ufw status
 **Проверка.** Не закрывая текущую сессию, открыть новое окно терминала:
 
 ```bash
-ssh ponscan@СЕРВЕР_IP "whoami && sudo -n true 2>&1 | head -1"
+ssh poolitzer@СЕРВЕР_IP "whoami && sudo -n true 2>&1 | head -1"
 ```
 
-Должно вывести `ponscan`. Порт 4663 снаружи должен быть закрыт — проверим на шаге 8.
+Должно вывести `poolitzer`. Порт 4663 снаружи должен быть закрыт — проверим на шаге 8.
 
 Если новая сессия не пускает — **не закрывать старую**, чинить из неё.
 
@@ -142,12 +142,12 @@ node -e "console.log(process.features.typescript)"
 
 ## 5. Репозиторий
 
-`[сервер]`, под пользователем `ponscan`:
+`[сервер]`, под пользователем `poolitzer`:
 
 ```bash
-su - ponscan
-git clone https://github.com/Artemoon13/Ponscan-.git ponscan
-cd ponscan
+su - poolitzer
+git clone https://github.com/Artemoon13/Poolitzer-.git poolitzer
+cd poolitzer
 npm install
 ```
 
@@ -202,10 +202,10 @@ console.log("WAL слит в базу");
 ls -la data/
 ```
 
-`data/ponscan.db-wal` должен стать нулевого размера. Теперь копировать:
+`data/poolitzer.db-wal` должен стать нулевого размера. Теперь копировать:
 
 ```bash
-scp data/ponscan.db ponscan@СЕРВЕР_IP:~/ponscan/data/ponscan.db
+scp data/poolitzer.db poolitzer@СЕРВЕР_IP:~/poolitzer/data/poolitzer.db
 ```
 
 ### Вариант Б — собрать на месте (~7 минут)
@@ -230,18 +230,18 @@ npm run stats
 
 Три процесса. `[сервер]`, под root.
 
-**Доска** — `/etc/systemd/system/ponscan-board.service`:
+**Доска** — `/etc/systemd/system/poolitzer-board.service`:
 
 ```ini
 [Unit]
-Description=ponscan board
+Description=poolitzer board
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=ponscan
-WorkingDirectory=/home/ponscan/ponscan
+User=poolitzer
+WorkingDirectory=/home/poolitzer/poolitzer
 ExecStart=/usr/bin/node --no-warnings src/board.ts
 Restart=always
 RestartSec=5
@@ -252,18 +252,18 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-**Вотчер** — `/etc/systemd/system/ponscan-watch.service`:
+**Вотчер** — `/etc/systemd/system/poolitzer-watch.service`:
 
 ```ini
 [Unit]
-Description=ponscan live watcher
+Description=poolitzer live watcher
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=ponscan
-WorkingDirectory=/home/ponscan/ponscan
+User=poolitzer
+WorkingDirectory=/home/poolitzer/poolitzer
 ExecStart=/usr/bin/node --no-warnings src/cli/watch.ts
 Restart=always
 RestartSec=10
@@ -274,24 +274,24 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-**Ночное переобучение** — `/etc/systemd/system/ponscan-nightly.service`:
+**Ночное переобучение** — `/etc/systemd/system/poolitzer-nightly.service`:
 
 ```ini
 [Unit]
-Description=ponscan nightly retrain
+Description=poolitzer nightly retrain
 
 [Service]
 Type=oneshot
-User=ponscan
-WorkingDirectory=/home/ponscan/ponscan
+User=poolitzer
+WorkingDirectory=/home/poolitzer/poolitzer
 ExecStart=/usr/bin/npm run nightly
 ```
 
-и таймер `/etc/systemd/system/ponscan-nightly.timer`:
+и таймер `/etc/systemd/system/poolitzer-nightly.timer`:
 
 ```ini
 [Unit]
-Description=ponscan nightly retrain
+Description=poolitzer nightly retrain
 
 [Timer]
 OnCalendar=*-*-* 04:30:00
@@ -307,8 +307,8 @@ WantedBy=timers.target
 
 ```bash
 systemctl daemon-reload
-systemctl enable --now ponscan-board ponscan-watch ponscan-nightly.timer
-systemctl status ponscan-board ponscan-watch --no-pager
+systemctl enable --now poolitzer-board poolitzer-watch poolitzer-nightly.timer
+systemctl status poolitzer-board poolitzer-watch --no-pager
 ```
 
 **Проверка:**
@@ -317,7 +317,7 @@ systemctl status ponscan-board ponscan-watch --no-pager
 curl -s localhost:4663/api/health
 ```
 
-Ждём `watcherSeenSecAgo` в пределах пары секунд и небольшое `behindSec`. Если `watcherSeenSecAgo` равно `null` — вотчер не стартовал, смотреть `journalctl -u ponscan-watch -n 50`.
+Ждём `watcherSeenSecAgo` в пределах пары секунд и небольшое `behindSec`. Если `watcherSeenSecAgo` равно `null` — вотчер не стартовал, смотреть `journalctl -u poolitzer-watch -n 50`.
 
 ---
 
@@ -335,7 +335,7 @@ apt-get update && apt-get install -y caddy
 `/etc/caddy/Caddyfile` — целиком заменить на:
 
 ```
-ponscan.ТВОЙ-ДОМЕН {
+poolitzer.ТВОЙ-ДОМЕН {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:4663
 }
@@ -351,8 +351,8 @@ journalctl -u caddy -n 30 --no-pager
 **Проверка** `[локально]`:
 
 ```bash
-curl -sI https://ponscan.ТВОЙ-ДОМЕН | head -3
-curl -s https://ponscan.ТВОЙ-ДОМЕН/api/health
+curl -sI https://poolitzer.ТВОЙ-ДОМЕН | head -3
+curl -s https://poolitzer.ТВОЙ-ДОМЕН/api/health
 ```
 
 И отдельно — что прямой порт закрыт снаружи:
@@ -369,7 +369,7 @@ curl -s -m 5 http://СЕРВЕР_IP:4663/api/health && echo "ПЛОХО: пор�
 
 ```bash
 for i in $(seq 1 70); do
-  curl -s -o /dev/null -w "%{http_code}\n" https://ponscan.ТВОЙ-ДОМЕН/api/health
+  curl -s -o /dev/null -w "%{http_code}\n" https://poolitzer.ТВОЙ-ДОМЕН/api/health
 done | sort | uniq -c
 ```
 
@@ -378,9 +378,9 @@ done | sort | uniq -c
 **Переживает ли ребут:**
 
 ```bash
-ssh ponscan@СЕРВЕР_IP "sudo reboot"
+ssh poolitzer@СЕРВЕР_IP "sudo reboot"
 sleep 45
-curl -s https://ponscan.ТВОЙ-ДОМЕН/api/health
+curl -s https://poolitzer.ТВОЙ-ДОМЕН/api/health
 ```
 
 Должно ответить без ручного вмешательства. Это главная проверка всего шага 7.
@@ -388,14 +388,14 @@ curl -s https://ponscan.ТВОЙ-ДОМЕН/api/health
 **Лог предсказаний наполняется** `[сервер]`, через несколько минут после старта:
 
 ```bash
-cd ~/ponscan && npm run scoreboard
+cd ~/poolitzer && npm run scoreboard
 ```
 
 Первые оценённые claims появятся через 4 часа — столько настаивается горизонт. До этого команда честно скажет, сколько заявок ждёт своей очереди.
 
 **Финальный чеклист:**
 
-- [ ] `https://ponscan.ТВОЙ-ДОМЕН` открывается, сертификат валидный
+- [ ] `https://poolitzer.ТВОЙ-ДОМЕН` открывается, сертификат валидный
 - [ ] Лента заполнена, возраст верхних запусков — секунды или минуты
 - [ ] Плашки про отставание нет (или жёлтая, если догоняет)
 - [ ] Переключатель `by chance` / `newest` работает
@@ -408,15 +408,15 @@ cd ~/ponscan && npm run scoreboard
 ## Если что-то сломалось
 
 ```bash
-journalctl -u ponscan-board -n 100 --no-pager     # доска
-journalctl -u ponscan-watch -f                    # вотчер, живой лог
+journalctl -u poolitzer-board -n 100 --no-pager     # доска
+journalctl -u poolitzer-watch -f                    # вотчер, живой лог
 journalctl -u caddy -n 50 --no-pager              # сертификаты и проксирование
-systemctl list-timers ponscan-nightly.timer       # когда следующее переобучение
+systemctl list-timers poolitzer-nightly.timer       # когда следующее переобучение
 ```
 
 **Доска отвечает, но лента пустая.** Нет модели или нет данных за последние 6 часов. Проверить `ls -la data/model.json` и `npm run stats`.
 
-**Красная плашка «watcher has not reported».** Вотчер упал или не может достучаться до RPC. `journalctl -u ponscan-watch -n 50`.
+**Красная плашка «watcher has not reported».** Вотчер упал или не может достучаться до RPC. `journalctl -u poolitzer-watch -n 50`.
 
 **Caddy не берёт сертификат.** Почти всегда DNS: либо запись ещё не разошлась, либо у Cloudflare включено проксирование. Проверить `dig +short`.
 
