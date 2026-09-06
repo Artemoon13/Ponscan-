@@ -10,6 +10,7 @@
   },
   "scripts": {
     "test": "node --no-warnings --test",
+    "setup": "node --no-warnings src/cli/setup.ts",
     "doctor": "node --no-warnings src/cli/doctor.ts",
     "backfill": "node --no-warnings src/cli/backfill.ts",
     "enrich-window": "node --no-warnings src/cli/enrich-window.ts",

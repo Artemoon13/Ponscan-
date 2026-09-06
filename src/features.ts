@@ -89,10 +89,16 @@ export function buildDataset(db: DB, opts: { labelHorizonSec?: number; since?: n
   const horizon = opts.labelHorizonSec ?? 4 * 3600;
   const since = opts.since ?? 0;
 
+  // Every launch, enriched or not. A creator's record is a fact about the chain, not about how much
+  // of it this machine has decoded yet: counting only enriched launches made the strongest feature
+  // in the model a measure of local coverage. On a full database it merely undercounted; on a fresh
+  // install, where only the last few hours are enriched, a creator with a thousand launches behind
+  // them would read as a first-timer. Backfill alone supplies everything this needs — deployer,
+  // time, and whether it graduated — which is why a working board is minutes from a clone rather
+  // than an hour.
   const spine = db.prepare(`
     SELECT l.token, l.deployer, l.block, l.ts, g.ts AS grad_ts
     FROM launches l LEFT JOIN graduations g USING(token)
-    WHERE l.enriched_at IS NOT NULL
     ORDER BY l.block ASC, l.log_index ASC`).all() as SpineRow[];
 
   const detail = new Map<string, LaunchRow>();
@@ -114,8 +120,8 @@ export function buildDataset(db: DB, opts: { labelHorizonSec?: number; since?: n
   }
 
   // Graduations become visible history only once they happen, so they are applied on a time queue.
-  // The same queue drives creator history and name-cluster history: a sibling launch sharing this
-  // token's ticker can graduate after it, and counting that would be reading the future.
+  // A creator's earlier launch can graduate after the launch being scored, and crediting it by the
+  // earlier launch's own timestamp would be reading the future.
   const gradQueue = spine
     .filter((r) => r.grad_ts !== null)
     .map((r) => ({ ts: r.grad_ts as number, deployer: r.deployer }))
@@ -146,6 +152,9 @@ export function buildDataset(db: DB, opts: { labelHorizonSec?: number; since?: n
 
     const priorL = devLaunches.get(sp.deployer) ?? 0;
     const priorG = devGraduations.get(sp.deployer) ?? 0;
+    // Exemptions are the one piece of history that does need enrichment, since they are read out of
+    // the launch calldata. That makes `exempt_seen_before` a partial count where coverage is partial
+    // — unlike the creator counters above, which are now exact.
     const exempts = exemptsByToken.get(sp.token) ?? [];
 
     // History advances for every launch; only launches inside the window become rows. Nothing above

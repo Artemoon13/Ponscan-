@@ -128,7 +128,7 @@ const server = createServer((req, res) => {
   res.writeHead(404).end("not found");
 });
 
-server.listen(CFG.boardPort, () => {
-  console.log(`ponscan board on http://localhost:${CFG.boardPort}`);
+server.listen(CFG.boardPort, CFG.boardHost, () => {
+  console.log(`ponscan board on http://${CFG.boardHost}:${CFG.boardPort}`);
   if (!model) console.log("no model yet — run: npm run train");
 });

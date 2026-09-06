@@ -47,8 +47,8 @@ Two more things worth knowing before you lean on it:
 - **You have about two minutes.** Half of all graduations happen within two minutes of launch, 90%
   within seventy minutes. A launch you read an hour later has already decided.
 - **It held up across the whole week, but a week is all we know.** Six separate test periods, every
-  one better than chance, and the spread between them was narrow: ROC-AUC 0.733 to 0.794, shortlist
-  lift 3.1x to 4.2x. That is an edge across many launches, not a guarantee on any single one, and
+  one better than chance, and the spread between them was narrow: ROC-AUC 0.734 to 0.795, shortlist
+  lift 3.0x to 4.4x. That is an edge across many launches, not a guarantee on any single one, and
   nothing here has been through a market-wide change of mood.
 
 These numbers come from a full week — 164,700 launches and 3,480 graduations of real launches, tested the hard way: the model is only ever
@@ -90,15 +90,19 @@ npm run doctor
 `doctor` checks it can reach the chain and that pons hasn't moved its contracts. If it fails, stop
 there; nothing else will work.
 
-Then collect some history and train on it:
+Then collect what the board needs:
 
 ```bash
-npm run backfill -- --hours 168        # a week of launches — about five minutes
-npm run enrich-window -- --hours 24    # read those launch transactions — about half an hour
-npm run train                          # fit the model
+npm run setup
 ```
 
-And use it:
+About thirteen minutes, measured on a busy machine. It pulls a week of launches and graduations,
+then decodes the last eight hours of launch transactions — and the split matters: reading factory
+events costs one request per sixty thousand blocks, while decoding a launch costs one request per
+launch. A week of the first is five minutes; a week of the second is forty. You need the whole week
+of history for creator records to be right, and only the visible window decoded.
+
+A trained model ships with the repository, so there is nothing to fit before you can look:
 
 ```bash
 npm run board       # the list, at http://localhost:4663
@@ -106,8 +110,12 @@ npm run watch       # the same thing live in a terminal
 npm run scoreboard  # how its past calls actually turned out
 ```
 
-The first run is slow because it is reading a week of chain history a transaction at a time. After
-that it keeps up on its own.
+Two things worth doing once it is running:
+
+```bash
+npm run enrich-window -- --hours 168   # decode the rest of the week, about forty minutes
+npm run train                          # refit on your own data rather than the shipped model
+```
 
 ## Where it lets you down
 
@@ -159,6 +167,7 @@ factory logs  ──▶  SQLite  ──▶  features at T+0  ──▶  GBDT  �
 ## Commands
 
 ```bash
+npm run setup          # everything a fresh clone needs: a week of history, the visible window decoded
 npm run doctor         # endpoints, chain id, contract addresses against the factory's own getters
 npm run backfill       # factory events: who launched, when, and what graduated
 npm run enrich-window  # decode launch transactions across a contiguous span
@@ -170,6 +179,7 @@ npm run watch          # live feed, logging each score it prints
 npm run scoreboard     # the live record, by model era
 npm run verify         # export the log as JSONL, recompute from the file
 npm run nightly        # backfill, enrich, retrain, in that order
+npm run names          # ask token contracts for names the launch never declared
 npm test               # the parts that fail silently when broken
 ```
 

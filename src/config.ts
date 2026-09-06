@@ -33,6 +33,13 @@ export const CFG = {
   logsSpacingMs: num("LOGS_SPACING_MS", 400),
   dbPath: str("DB_PATH", "./data/ponscan.db"),
   boardPort: num("BOARD_PORT", 4663),
+  /**
+   * Interface the board listens on. Defaults to every interface, which is what a local run wants.
+   * Behind a reverse proxy set it to 127.0.0.1: otherwise the port stays reachable directly, and a
+   * request that skips the proxy also skips its TLS and arrives with no forwarded address, so rate
+   * limiting counts the whole internet as one client.
+   */
+  boardHost: str("BOARD_HOST", "0.0.0.0"),
 } as const;
 
 /**
