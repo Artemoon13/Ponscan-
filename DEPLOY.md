@@ -108,7 +108,8 @@ dig +short ТВОЙ-ДОМЕН @8.8.8.8
 
 ## 3. Пользователь и базовая защита
 
-`[сервер]`, под root:
+`[сервер]`, под root — это последний шаг, который выполняется от root напрямую. В конце его вход
+root по SSH выключается, и дальше всё идёт под `ponscan` через `sudo`.
 
 ```bash
 adduser --disabled-password --gecos "" ponscan
@@ -183,14 +184,18 @@ Host ponscan
 
 Ubuntu 24.04 везёт Node 18, а проект требует 22.6+, потому что исполняет TypeScript напрямую без сборки.
 
-`[сервер]`, под root:
+`[сервер]`, под `ponscan`. Вход root по SSH отключён на шаге 3, поэтому всё, что требует прав,
+делается через `sudo`:
 
 ```bash
-apt-get update
-apt-get install -y curl ca-certificates git
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt-get install -y nodejs
+sudo apt-get update
+sudo apt-get install -y curl ca-certificates git
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
 ```
+
+`sudo -E` в третьей строке обязателен: скрипт NodeSource читает переменные окружения, и без `-E`
+sudo их выбросит.
 
 **Проверка:**
 
@@ -208,9 +213,8 @@ node -e "console.log(process.features.typescript)"
 `[сервер]`, под пользователем `ponscan`:
 
 ```bash
-su - ponscan
-git clone https://github.com/Artemoon13/Ponscan-.git ponscan
-cd ponscan
+git clone https://github.com/Artemoon13/Ponscan-.git ~/ponscan
+cd ~/ponscan
 npm install
 ```
 
@@ -297,7 +301,15 @@ npm run stats
 
 ## 7. systemd
 
-Три процесса. `[сервер]`, под root.
+Три процесса. `[сервер]`, под `ponscan` через `sudo`.
+
+Файлы юнитов создавать так, чтобы `sudo` относился к записи, а не только к `cat`:
+
+```bash
+sudo tee /etc/systemd/system/ponscan-board.service > /dev/null <<'EOF'
+...содержимое ниже...
+EOF
+```
 
 **Доска** — `/etc/systemd/system/ponscan-board.service`:
 
@@ -375,9 +387,9 @@ WantedBy=timers.target
 Включить:
 
 ```bash
-systemctl daemon-reload
-systemctl enable --now ponscan-board ponscan-watch ponscan-nightly.timer
-systemctl status ponscan-board ponscan-watch --no-pager
+sudo systemctl daemon-reload
+sudo systemctl enable --now ponscan-board ponscan-watch ponscan-nightly.timer
+sudo systemctl status ponscan-board ponscan-watch --no-pager
 ```
 
 **Проверка** `[сервер]`:
@@ -400,13 +412,13 @@ ssh -N -L 4664:localhost:4663 ponscan@СЕРВЕР_IP
 
 ## 8. Caddy и TLS
 
-`[сервер]`, под root:
+`[сервер]`, под `ponscan`:
 
 ```bash
-apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-apt-get update && apt-get install -y caddy
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt-get update && sudo apt-get install -y caddy
 ```
 
 `/etc/caddy/Caddyfile` — целиком заменить на:
@@ -420,9 +432,11 @@ apt-get update && apt-get install -y caddy
 
 Строку `www.` оставить, только если добавили вторую A-запись на шаге 2. Если её нет, Caddy будет пытаться выписать сертификат на несуществующее имя и не выпишет ни одного.
 
+Редактировать конфиг: `sudo nano /etc/caddy/Caddyfile`
+
 ```bash
-systemctl reload caddy
-journalctl -u caddy -n 30 --no-pager
+sudo systemctl reload caddy
+sudo journalctl -u caddy -n 30 --no-pager
 ```
 
 Сертификат Caddy получает сам за несколько секунд. В логе должно быть `certificate obtained successfully`.
@@ -457,7 +471,7 @@ done | sort | uniq -c
 **Переживает ли ребут:**
 
 ```bash
-ssh ponscan@СЕРВЕР_IP "sudo reboot"
+ssh ponscan "sudo reboot"
 sleep 45
 curl -s https://ТВОЙ-ДОМЕН/api/health
 ```
