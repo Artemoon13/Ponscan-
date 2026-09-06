@@ -6,6 +6,8 @@ import type { DB } from "./db.ts";
 
 export type Scored = {
   token: string;
+  /** Launch time, so the caller can order by recency without a second query. */
+  ts: number;
   probability: number;
   /** Rank among launches from the last `windowHours`, 1 = most likely to graduate. */
   rank: number;
@@ -15,30 +17,46 @@ export type Scored = {
 };
 
 /**
- * The feed and every card rebuild the same feature matrix. At 112,000 enriched launches that is
- * three and a half seconds of work to answer a question about the last six hours, and it grows with
- * the database, so a dashboard left open spends most of its life recomputing history that did not
- * change.
+ * One feature matrix, shared by the feed and every card.
  *
- * The key is the shape of the data the matrix is derived from, not a clock. A time-based cache would
- * eventually show a stale score for a launch that has already graduated, which is the one thing this
- * tool must never do; keying on the data means new rows land on the very next request and unchanged
- * data costs nothing.
+ * Rebuilding it costs about five seconds at 166,000 enriched launches, so who rebuilds it and when
+ * is the difference between a board that answers instantly and one that takes fifteen seconds to
+ * open a card.
  *
- * Graduations are part of the key because creator history is accumulated by graduation time: a
- * graduation that lands now changes the features of every later launch by the same creator.
+ * What makes a cache safe here: **rows for past launches never change**. Features are computed from
+ * history strictly earlier than the launch's own timestamp, and a graduation happening now is later
+ * than every launch already in the matrix, so it cannot alter one. A cached matrix is therefore
+ * never wrong about what it holds — only ever incomplete. That turns the question from "is this
+ * stale" into "is the row I need present", which has a cheap answer.
+ *
+ * So the two callers ask for different things. A card names one launch and is served from the cache
+ * whenever that launch is in it. The feed wants whatever is newest and accepts being a few seconds
+ * behind, which is what the staleness shown on the board is for.
  */
-let cached: { key: string; rows: Row[] } | null = null;
+const REBUILD_AFTER_MS = 15_000;
 
+let cached: { rows: Row[]; tokens: Set<string>; builtAt: number } | null = null;
+
+function rebuild(db: DB): Row[] {
+  const rows = buildDataset(db);
+  cached = { rows, tokens: new Set(rows.map((r) => r.token)), builtAt: Date.now() };
+  return rows;
+}
+
+/** How far behind the matrix is, in seconds. Surfaced so the board can say so out loud. */
+export function datasetAgeSec(): number | null {
+  return cached ? Math.round((Date.now() - cached.builtAt) / 1000) : null;
+}
+
+/** For the feed: newest rows matter, a few seconds behind is fine. */
 export function dataset(db: DB): Row[] {
-  const k = db.prepare(`
-    SELECT (SELECT count(*) FROM launches WHERE enriched_at IS NOT NULL) enriched,
-           (SELECT coalesce(max(block), 0) FROM launches WHERE enriched_at IS NOT NULL) block,
-           (SELECT count(*) FROM graduations) graduated`).get() as
-    { enriched: number; block: number; graduated: number };
+  if (!cached || Date.now() - cached.builtAt > REBUILD_AFTER_MS) return rebuild(db);
+  return cached.rows;
+}
 
-  const key = `${k.enriched}:${k.block}:${k.graduated}`;
-  if (cached?.key !== key) cached = { key, rows: buildDataset(db) };
+/** For a card: rebuild only when this launch is one the matrix has never seen. */
+export function datasetWith(db: DB, token: string): Row[] {
+  if (!cached || !cached.tokens.has(token)) return rebuild(db);
   return cached.rows;
 }
 
@@ -54,29 +72,51 @@ export function loadModel(path = "./data/model.json"): GbdtModel | null {
  * know it is the highest of the last two hundred launches. The rank is what makes the number usable,
  * so it is computed here rather than left to the caller.
  */
-export function scoreRecent(db: DB, model: GbdtModel, windowHours = 6, limit = 200): Scored[] {
+export type FeedOrder = "score" | "new";
+
+/**
+ * Scores every launch in a recent window and ranks them against each other.
+ *
+ * A bare probability is hard to act on when the base rate is 2.2%: "3.9%" means little until you
+ * know it is the highest of the last two thousand launches. The rank is what makes the number
+ * usable, so it is computed here rather than left to the caller.
+ *
+ * `order` changes the reading order only. The rank is always by score, in both orders, because a
+ * "#1" that meant "most recent" would be worthless — the point of showing a fresh launch is to see
+ * where it lands against everything else, not to be told it is new.
+ */
+export function scoreRecent(
+  db: DB, model: GbdtModel, windowHours = 6, limit = 200, order: FeedOrder = "score",
+): Scored[] {
   const cutoff = Math.floor(Date.now() / 1000) - windowHours * 3600;
   const rows = dataset(db).filter((r) => r.ts >= cutoff);
   if (!rows.length) return [];
 
   const scored = rows
-    .map((r) => ({ token: r.token, x: r.x, p: predict(model, r.x) }))
+    .map((r) => ({ token: r.token, ts: r.ts, x: r.x, p: predict(model, r.x) }))
     .sort((a, b) => b.p - a.p);
 
-  return scored.slice(0, limit).map((s, i) => ({
+  const ranked = scored.map((s, i) => ({
     token: s.token,
+    ts: s.ts,
+    x: s.x,
     probability: s.p,
     rank: i + 1,
     of: scored.length,
     percentile: 100 * (1 - i / Math.max(1, scored.length - 1)),
-    reasons: explain(model, s.x, 3),
   }));
+
+  const shown = order === "new"
+    ? [...ranked].sort((a, b) => b.ts - a.ts || a.rank - b.rank).slice(0, limit)
+    : ranked.slice(0, limit);
+
+  return shown.map(({ x, ...rest }) => ({ ...rest, reasons: explain(model, x, 3) }));
 }
 
 /** Scores one launch and places it against the same recent window. */
 export function scoreOne(db: DB, model: GbdtModel, token: string, windowHours = 6): Scored | null {
   const cutoff = Math.floor(Date.now() / 1000) - windowHours * 3600;
-  const rows = dataset(db);
+  const rows = datasetWith(db, token.toLowerCase());
   const me = rows.find((r) => r.token === token.toLowerCase());
   if (!me) return null;
 
@@ -85,6 +125,7 @@ export function scoreOne(db: DB, model: GbdtModel, token: string, windowHours = 
   const better = peers.filter((q) => q > p).length;
   return {
     token: me.token,
+    ts: me.ts,
     probability: p,
     rank: better + 1,
     of: Math.max(peers.length, 1),

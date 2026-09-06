@@ -50,12 +50,24 @@
   ul.plain{list-style:none;margin:0;padding:0}
   ul.plain li{padding:3px 0;border-bottom:1px solid #1b1f26}
   .disclaimer{color:var(--dim);font-size:11px;padding:10px 18px;border-top:1px solid var(--line)}
+  .modes{margin-left:auto;display:flex;gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+  .modes button{background:none;border:0;color:var(--dim);font:inherit;font-size:12px;
+    padding:4px 12px;cursor:pointer}
+  .modes button:hover{color:var(--ink)}
+  .modes button[aria-pressed="true"]{background:#1d232c;color:var(--ink)}
+  .shown{color:var(--dim);font-size:11px;padding:0 8px 8px}
+  tr.row.fresh td{animation:landed 2.5s ease-out}
+  @keyframes landed{from{background:#1c2b1f}to{background:transparent}}
 </style>
 </head>
 <body>
 <header>
   <h1>ponscan</h1>
   <span class="stats" id="stats">loading…</span>
+  <div class="modes">
+    <button id="m-score" aria-pressed="true">by chance</button>
+    <button id="m-new" aria-pressed="false">newest</button>
+  </div>
 </header>
 
 <div class="wrap">
@@ -64,6 +76,7 @@
       <thead><tr><th style="width:64px">chance</th><th style="width:56px">rank</th><th>token</th><th style="width:60px">age</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
+    <div class="shown" id="shown"></div>
     <div class="empty" id="empty" hidden></div>
   </div>
   <div class="card" id="card"><div class="empty">select a launch</div></div>
@@ -78,6 +91,26 @@
 const $ = (id) => document.getElementById(id);
 let selected = null;
 
+/**
+ * "by chance" ranks the window; "newest" reads it in launch order. The rank column means the same
+ * thing in both: a launch's place by score. Seeing a fresh launch land at #12 of 2,400 is the whole
+ * point of the newest view — the ordering answers "what just happened", the rank answers "does it
+ * matter".
+ */
+let order = localStorage.getItem("ponscan.order") === "new" ? "new" : "score";
+/** Tokens already on screen, so an arrival can be marked as one. */
+let known = new Set();
+
+function setOrder(next) {
+  if (next === order) return;
+  order = next;
+  localStorage.setItem("ponscan.order", order);
+  $("m-score").setAttribute("aria-pressed", String(order === "score"));
+  $("m-new").setAttribute("aria-pressed", String(order === "new"));
+  known = new Set();
+  loadFeed();
+}
+
 const age = (ts) => {
   const s = Math.max(0, Math.floor(Date.now() / 1000) - ts);
   if (s < 90) return s + "s";
@@ -90,7 +123,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const colour = (p) => p >= 0.06 ? "var(--up)" : p >= 0.03 ? "var(--down)" : "var(--dim)";
 
 async function loadFeed() {
-  const r = await fetch("/api/feed?hours=6");
+  const r = await fetch("/api/feed?hours=6&sort=" + order);
   const d = await r.json();
   const c = d.counts;
   $("stats").textContent =
@@ -103,6 +136,9 @@ async function loadFeed() {
   }
   const tb = $("rows");
   tb.innerHTML = "";
+  $("shown").textContent = d.inWindow
+    ? `showing ${d.shown} of ${d.inWindow.toLocaleString()} launches in the last 6 hours`
+    : "";
   if (!d.items.length) {
     $("empty").hidden = false;
     $("empty").textContent = "no launches in the last 6 hours";
@@ -110,10 +146,13 @@ async function loadFeed() {
   }
   $("empty").hidden = true;
 
+  const first = known.size === 0;
   for (const it of d.items) {
     const m = it.meta || {};
     const tr = document.createElement("tr");
-    tr.className = "row" + (it.token === selected ? " sel" : "");
+    // Only mark arrivals once a baseline exists, or the whole first render flashes.
+    const fresh = !first && !known.has(it.token);
+    tr.className = "row" + (it.token === selected ? " sel" : "") + (fresh ? " fresh" : "");
     tr.onclick = () => openCard(it.token);
     tr.innerHTML =
       `<td class="p" style="color:${colour(it.probability)}">${pct(it.probability)}</td>` +
@@ -124,6 +163,7 @@ async function loadFeed() {
       `<td class="rank">${m.ts ? age(m.ts) : ""}</td>`;
     tb.appendChild(tr);
   }
+  known = new Set(d.items.map((it) => it.token));
 }
 
 async function openCard(token) {
@@ -227,6 +267,10 @@ async function openCard(token) {
 function L_phase(k) { return k.outcome.phase; }
 
 loadFeed();
+$("m-score").onclick = () => setOrder("score");
+$("m-new").onclick = () => setOrder("new");
+$("m-score").setAttribute("aria-pressed", String(order === "score"));
+$("m-new").setAttribute("aria-pressed", String(order === "new"));
 setInterval(loadFeed, 15000);
 </script>
 </body>

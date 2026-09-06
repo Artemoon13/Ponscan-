@@ -10,3 +10,6 @@ data/model.json
 .env
 *.log
 .gstack/
+
+# Working plan for the launch, not part of the repo.
+LAUNCH-PLAN.md

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildCard } from "./card.ts";
-import { loadModel, scoreOne, scoreRecent } from "./score.ts";
+import { loadModel, scoreOne, scoreRecent, type FeedOrder } from "./score.ts";
 import { openDb } from "./db.ts";
 import { CFG } from "./config.ts";
 
@@ -31,7 +31,8 @@ const server = createServer((req, res) => {
     // Reloaded per request so a nightly retrain is picked up without restarting the board.
     model = loadModel();
     const hours = Number(url.searchParams.get("hours") ?? 6);
-    const rows = model ? scoreRecent(db, model, hours, 150) : [];
+    const order: FeedOrder = url.searchParams.get("sort") === "new" ? "new" : "score";
+    const rows = model ? scoreRecent(db, model, hours, 150, order) : [];
     const meta = db.prepare(`
       SELECT token, symbol, name, ts, exempt_count, initial_buy_eth, phase,
              (token IN (SELECT token FROM graduations)) AS graduated
@@ -40,6 +41,11 @@ const server = createServer((req, res) => {
 
     json(res, {
       hasModel: model !== null,
+      order,
+      // The feed is capped, and a list that silently hides two thousand launches reads as if it
+      // were the whole window. The UI says so out loud, so this has to come back with it.
+      shown: rows.length,
+      inWindow: rows.length ? rows[0].of : 0,
       counts: db.prepare(`
         SELECT (SELECT count(*) FROM launches) launches,
                (SELECT count(*) FROM graduations) graduations,

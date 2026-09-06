@@ -1,7 +1,7 @@
 # ponscan
 
 New tokens launch on [pons](https://www.ponsfamily.com) faster than anyone can read them. Almost all
-of them die. About **{{BASE_RATE}} in a hundred** make it off the bonding curve and into a real
+of them die. About **two in a hundred** make it off the bonding curve and into a real
 Uniswap pool.
 
 ponscan watches every launch as it happens and puts the ones worth a look at the top. It runs on your
@@ -28,28 +28,30 @@ The point is not to be told what to buy. The point is to not read four hundred l
 
 Yes, a bit. Here is the honest version.
 
-ponscan ranks every launch of the last six hours against the others — usually around eight hundred
-of them. Call the top tenth of that ranking, roughly the **top eighty launches**, the shortlist.
+ponscan ranks every launch of the last six hours against the others — several thousand of them on a
+busy evening. Call the top tenth of that ranking the **shortlist**.
 
-**Out of a hundred launches picked at random, about {{BASE100_HITS}} reach the pool. Out of a hundred
-taken from the shortlist, about {{TOP100_HITS}} do.**
+**Out of a hundred launches picked at random, about two reach the pool. Out of a hundred
+taken from the shortlist, about eight do.**
 
-So roughly **{{DECILE_LIFT}}x better than guessing**. That is worth having. It is also nowhere near
-certainty — even on the shortlist, {{WRONG_PCT}} out of every hundred still go nowhere. Anyone who
+So roughly **3.7x better than guessing**. That is worth having. It is also nowhere near
+certainty — even on the shortlist, ninety-two out of every hundred still go nowhere. Anyone who
 tells you their model does better than this on launch data alone is selling something.
 
-Why the top tenth and not the top ten? Because at these rates the top ten launches contain one or two
-graduations on a good day, and any percentage computed from two events is noise. Eighty launches is
-the smallest slice that is both near the top and large enough for the number to mean anything.
+Why the top tenth and not the top ten? Because at these rates the top ten launches hold one or two
+graduations on a good day, and a percentage computed from two events is noise. A tenth is the
+smallest slice that is both near the top and large enough for the number to mean anything.
 
 Two more things worth knowing before you lean on it:
 
-- **You have about two minutes.** Half of all graduations happen within {{GRAD_P50}} of launch, 90%
-  within {{GRAD_P90}}. A launch you read an hour later has already decided.
-- **It stops working sometimes.** {{STABILITY_NOTE}} It is an edge across many launches, not a
-  guarantee on any one of them.
+- **You have about two minutes.** Half of all graduations happen within two minutes of launch, 90%
+  within seventy minutes. A launch you read an hour later has already decided.
+- **It held up across the whole week, but a week is all we know.** Six separate test periods, every
+  one better than chance, and the spread between them was narrow: ROC-AUC 0.733 to 0.794, shortlist
+  lift 3.1x to 4.2x. That is an edge across many launches, not a guarantee on any single one, and
+  nothing here has been through a market-wide change of mood.
 
-These numbers come from {{EVAL_SPAN}} of real launches, tested the hard way: the model is only ever
+These numbers come from a full week — 164,700 launches and 3,480 graduations of real launches, tested the hard way: the model is only ever
 scored on launches that happened *after* the ones it learned from, never on a random shuffle. You can
 re-run that yourself in one command, and you should.
 
@@ -72,7 +74,7 @@ Two rules keep that log honest:
 - **A score cannot be edited afterwards.** The first thing ponscan says about a launch is the thing
   it gets graded on.
 
-Live record so far: {{SCOREBOARD_SUMMARY}}
+Live record so far: run `npm run scoreboard` — it reports whatever has settled on your own machine, which is the only record worth anything to you
 
 ## Running it
 
@@ -109,12 +111,17 @@ that it keeps up on its own.
 
 ## Where it lets you down
 
-- **You are wrong most of the time even when you follow it.** {{WRONG_PCT}} out of every hundred on
-  the shortlist still go nowhere. If that ratio does not fit how you trade, this tool will not fix
-  that.
-- **The exact multipliers are shakier than they look.** The shortlist holds {{DECILE_HITS}}
-  graduations in a typical test period — the direction holds up, the second decimal place is noise.
-  `scoreboard` prints the raw hit counts next to every percentage for exactly this reason.
+- **You are wrong most of the time even when you follow it.** Ninety-two launches out of every
+  hundred on the shortlist still go nowhere. Eight in a hundred beats two in a hundred and is still
+  mostly failure. If that ratio does not fit how you trade, this tool will not fix that.
+- **The multipliers carry more precision than they deserve.** The shortlist holds roughly 130
+  graduations in a typical test period. The direction is solid; the second decimal place is not.
+  `scoreboard` prints raw hit counts next to every rate so the sample size stays visible.
+- **An earlier, smaller sample said the model broke sometimes. It did not.** On a single day of data
+  one test period in six landed at chance, and this file used to say so out loud. With a full week —
+  ten times the graduations in each period — that vanished entirely. It was too few events, not a
+  model that stops working. Worth knowing because it cuts both ways: a small sample invents
+  instability, and it invents edges just as easily.
 - **It has not lived through a regime change.** Launch tactics drift, and a scanner that works this
   month can quietly stop working next month. The live scoreboard is the thing that will tell you —
   watch it, not the numbers in this file.
@@ -167,8 +174,8 @@ npm test               # the parts that fail silently when broken
 ```
 
 `backfill` covers a week in about five minutes. `enrich-window` is the slow part at roughly
-{{ENRICH_RATE}} launches a second, because it reads every launch transaction; a full week is
-{{ENRICH_HOURS}}. The two use different endpoints on purpose: only one public node serves
+fifty launches a second, because it reads every launch transaction; a full week is
+about forty minutes. The two use different endpoints on purpose: only one public node serves
 `eth_getLogs`, so enrichment deliberately reads transactions from the other one and leaves that
 budget to the watcher.
 
@@ -208,7 +215,7 @@ Each of these silently produces a plausible, wrong answer:
 - **Unsettled launches are dropped.** A launch from ten minutes ago has not graduated *yet*, which is
   not the same as not graduating. Training on it as a negative teaches the model that recent launches
   fail.
-- **Average precision is the headline, not ROC-AUC.** At a {{BASE_RATE_PCT}} positive rate, ROC-AUC
+- **Average precision is the headline, not ROC-AUC.** At a 2.2% positive rate, ROC-AUC
   flatters a model that is useless at the top of the ranking, and the top is the only part anyone
   looks at.
 - **`validate` refits at several sequential cut points** and reports the spread. A single split on a

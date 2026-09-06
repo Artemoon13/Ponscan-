@@ -2,6 +2,7 @@ import type { Log } from "viem";
 import { TOPIC } from "./abi.ts";
 import { ADDR, CFG } from "./config.ts";
 import { logsClient, sleep, stateClient, withRetry, wsClient } from "./chain.ts";
+import { BlockClock } from "./blockclock.ts";
 import { getMeta, setMeta, type DB } from "./db.ts";
 import { writeFactoryLogs } from "./ingest.ts";
 
@@ -43,11 +44,33 @@ export async function runLive(db: DB, ev: LiveEvents = {}): Promise<void> {
     }
   };
 
+  const clock = new BlockClock();
   let cursor = Number(getMeta(db, "live_cursor_block") ?? 0);
   if (!cursor) cursor = Number(getMeta(db, "backfill_to_block") ?? 0) || (await head());
   let busy = false;
+  let lastBeat = 0;
+
+  /**
+   * A heartbeat, separate from the cursor.
+   *
+   * A watcher that has fallen over and a chain that has simply produced no launches look identical
+   * from the outside: the list stops changing either way. Recording the head we last saw, and when
+   * we saw it, is what lets a reader tell "nothing is happening" from "we stopped looking" — the
+   * difference between an honest empty screen and a screen that is quietly lying.
+   *
+   * Throttled because the socket fires about ten times a second and this is the only write on the
+   * path that happens whether or not anything was found.
+   */
+  const beat = (head: number): void => {
+    const now = Date.now();
+    if (now - lastBeat < 5000) return;
+    lastBeat = now;
+    setMeta(db, "live_head_block", String(head));
+    setMeta(db, "live_seen_at", String(Math.floor(now / 1000)));
+  };
 
   const catchUp = async (head: number): Promise<void> => {
+    beat(head);
     if (busy || head <= cursor) return;
     busy = true;
     try {
@@ -63,9 +86,20 @@ export async function runLive(db: DB, ev: LiveEvents = {}): Promise<void> {
       )) as RawLog[];
 
       if (logs.length) {
+        // Block time, not wall-clock time. Stamping every launch in a catch-up with "now" makes a
+        // batch spanning an hour of chain look simultaneous, which silently breaks everything
+        // downstream that reads a launch's age: the recency ordering, the age column, the six-hour
+        // window, and — worst — the prediction log's rule that a launch older than five minutes is
+        // never recorded. That rule is what makes the log honest, and it cannot hold on a timestamp
+        // that is always the present moment.
+        //
+        // Anchoring at the head first gives every earlier block in the batch a bracketing pair to
+        // interpolate between, so this costs one block read per catch-up rather than one per log.
+        await clock.at(head);
         const tsOf = new Map<number, number>();
-        const now = Math.floor(Date.now() / 1000);
-        for (const l of logs) tsOf.set(Number(BigInt(l.blockNumber as string)), now);
+        for (const b of new Set(logs.map((l) => Number(BigInt(l.blockNumber as string))))) {
+          tsOf.set(b, await clock.at(b));
+        }
         writeFactoryLogs(db, logs, tsOf);
 
         for (const l of logs) {
