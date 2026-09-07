@@ -38,7 +38,7 @@ export type Card = {
   /**
    * What the second model expects this launch to reach, as a band rather than a figure.
    *
-   * The point estimate barely beats a constant, so a single number would be a guess wearing a
+   * The point estimate beats a constant by a fifth of its error, which is an edge and still not a
    * precision it does not have. The band is measured: residual quantiles from launches the model
    * never saw, its coverage checked on a third slice. `coverage` is what that check found.
    */

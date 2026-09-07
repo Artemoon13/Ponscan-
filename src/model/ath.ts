@@ -1,5 +1,6 @@
 import { buildDataset, FEATURES, type Row } from "../features.ts";
 import { calibrate, predict, train, type GbdtModel } from "./gbdt.ts";
+import { quotePerToken } from "../pool.ts";
 import type { DB } from "../db.ts";
 
 /**
@@ -14,6 +15,14 @@ import type { DB } from "../db.ts";
  * dollars: that needs the quote asset's price, half of launches are quoted against a tokenised
  * stock, and the ratio is what the model can actually learn — the dollar figure is the ratio times a
  * number the chain does not know. The card multiplies it back out for display.
+ *
+ * The peak is the *effective* one: the pool's where the launch graduated, the curve's where it did
+ * not. Using the curve's for everything was teaching the model a constant on exactly the launches
+ * worth predicting. A graduated token's curve high is the bar it had to clear, so measured across
+ * graduated tokens it runs $36,756 at the tenth percentile to $53,357 at the ninetieth, a spread of
+ * 1.5x. Their pool peaks run $47,005 to $475,899 over the same tokens, a spread of 10.1x, and sit
+ * 1.58x above the curve at the median and up to 51x above it. All of the variance is after
+ * graduation, and none of it was in the target.
  *
  * Only settled curves are trained on. A launch from ten minutes ago has not finished climbing, and
  * its peak-so-far is not its peak; feeding that in teaches the model that recent launches peak low.
@@ -35,6 +44,8 @@ export type AthRow = Row & { logPeak: number };
  */
 export function buildAthDataset(db: DB, nowTs = Math.floor(Date.now() / 1000)): AthRow[] {
   const peaks = new Map<string, number>();
+  /** The first price each curve traded at, kept because the pool arm below divides into it. */
+  const opens = new Map<string, number>();
   // Both sides, matching how a peak is measured everywhere else and how the stored summary counts.
   // Reading only buys here meant a curve could qualify or not depending on whether it had been
   // compacted yet, which would have made membership of the training set an artefact of housekeeping.
@@ -48,7 +59,9 @@ export function buildAthDataset(db: DB, nowTs = Math.floor(Date.now() / 1000)): 
   let peak = 0;
   let count = 0;
   const flush = (): void => {
-    if (current && count >= MIN_TRADES && first > 0 && peak > 0) peaks.set(current, Math.log(peak / first));
+    if (!current || !(first > 0) || !(peak > 0) || count < MIN_TRADES) return;
+    opens.set(current, first);
+    peaks.set(current, Math.log(peak / first));
   };
   for (const r of rows) {
     if (r.token !== current) { flush(); current = r.token; first = 0; peak = 0; count = 0; }
@@ -69,9 +82,42 @@ export function buildAthDataset(db: DB, nowTs = Math.floor(Date.now() / 1000)): 
     SELECT token, first_price, peak_price, trades FROM curve_summary
     WHERE trades >= ? AND first_price > 0 AND peak_price > 0`).all(MIN_TRADES) as
     Array<{ token: string; first_price: number; peak_price: number; trades: number }>) {
-    if (peaks.has(r.token)) continue;
-    const ratio = r.peak_price / r.first_price;
-    if (ratio > 0 && Number.isFinite(ratio)) peaks.set(r.token, Math.log(ratio));
+    if (opens.has(r.token)) continue;
+    opens.set(r.token, r.first_price);
+    peaks.set(r.token, Math.log(r.peak_price / r.first_price));
+  }
+
+  /**
+   * Then let the pool answer for anything that graduated.
+   *
+   * Both sides are put in whole quote units per whole token before they are compared, which keeps
+   * every quote asset in the set: a ratio needs no dollar price, and half of these launches are
+   * quoted against a tokenised stock this project has no feed for.
+   *
+   * The larger of the two wins rather than the pool always, because a token can graduate and then
+   * do nothing, and its curve high is then the real high.
+   */
+  for (const r of db.prepare(`
+    SELECT p.token, p.token_is_c1, p.dec0, p.dec1, p.init_sqrt, k.min_sqrt, k.max_sqrt, l.pair_token
+    FROM pools p JOIN pool_peaks k ON k.pool_id = p.pool_id JOIN launches l ON l.token = p.token`).all() as
+    Array<{ token: string; token_is_c1: number; dec0: number; dec1: number;
+            init_sqrt: string; min_sqrt: string; max_sqrt: string; pair_token: string }>) {
+    const openRaw = opens.get(r.token);
+    if (openRaw === undefined || !(openRaw > 0)) continue;
+
+    const dec = r.token_is_c1 ? r.dec0 : r.dec1;
+    // Raw curve prices are quote units per token unit; this lifts the opening to whole units so it
+    // can be divided into a pool price, which already is.
+    const openWhole = openRaw * (1e18 / 10 ** dec);
+    const best = Math.max(
+      quotePerToken(r.token_is_c1 ? r.min_sqrt : r.max_sqrt, r),
+      quotePerToken(r.init_sqrt, r),
+    );
+    if (!(best > 0) || !Number.isFinite(best)) continue;
+
+    const ratio = best / openWhole;
+    const curveRatio = Math.exp(peaks.get(r.token) ?? 0);
+    if (ratio > curveRatio && Number.isFinite(ratio)) peaks.set(r.token, Math.log(ratio));
   }
 
   const out: AthRow[] = [];
@@ -169,11 +215,12 @@ export function trainAth(rows: AthRow[]): GbdtModel {
 /**
  * The model plus the band it is allowed to claim.
  *
- * The point estimate is weak — it beats a constant by about 3% of mean absolute error — so a card
- * that printed one number would dress up a guess. The band is the honest output: residual quantiles
- * taken from rows the model never saw, and its coverage measured on a third slice that produced
- * neither. `coverage` is what that measurement found, not what was aimed for, so a reader can see
- * when the band is narrower than it should be.
+ * The point estimate used to be weak, beating a constant by about 3% of mean absolute error, which
+ * is why the band is the output rather than a figure. On the effective peak it beats a constant by
+ * 21%, and the band is still the output: 21% is a real edge and not a reason to print one number as
+ * though it were the answer. Residual quantiles come from rows the model never saw, and `coverage`
+ * is what a third slice actually measured, not what was aimed for, so a reader can see when the band
+ * is narrower than it should be.
  */
 export type AthModel = {
   model: GbdtModel;
@@ -185,6 +232,8 @@ export type AthModel = {
   trainedOn: number;
   spearman: number;
   topDecileLift: number;
+  /** How much less mean absolute error than a constant, as a share, on rows it never saw. */
+  maeGain: number;
 };
 
 const BAND = 0.8;
@@ -214,6 +263,7 @@ export function fitAthModel(rows: AthRow[]): AthModel | null {
     trainedOn: a,
     spearman: ev.spearman,
     topDecileLift: ev.topDecileLift,
+    maeGain: ev.maeBaseline > 0 ? 1 - ev.maeModel / ev.maeBaseline : 0,
   };
 }
 

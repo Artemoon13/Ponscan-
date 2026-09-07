@@ -54,12 +54,13 @@ if (athRows.length < 300) {
     writeAth("./data/model-ath.json", JSON.stringify({
       model: fitted.model, lo: fitted.lo, hi: fitted.hi, coverage: fitted.coverage,
       trainedOn: fitted.trainedOn, spearman: fitted.spearman, topDecileLift: fitted.topDecileLift,
+      maeGain: fitted.maeGain,
       at: Math.floor(Date.now() / 1000),
     }));
     console.log(`  fitted on ${fitted.trainedOn} launches -> ./data/model-ath.json`);
     console.log(`  ranks:  Spearman ${fitted.spearman.toFixed(3)} · top decile peaks ${fitted.topDecileLift.toFixed(2)}x the median`);
     console.log(`  sizes:  80% band covers ${(100 * fitted.coverage).toFixed(0)}% of unseen launches`);
-    console.log(`  the band is the output; the point estimate on its own is barely better than a constant.`);
+    console.log(`  the band is the output; the point estimate beats a constant by ${(100 * fitted.maeGain).toFixed(0)}% of mean absolute error.`);
   }
 }
 

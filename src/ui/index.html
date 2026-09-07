@@ -1395,7 +1395,7 @@ function renderCard() {
     <div class="ptop">
       <div class="bigs">
         <div class="big lime"><div class="k">Graduate</div><div class="v">${s ? pct(s.probability) : "—"}</div></div>
-        <div class="big line" title="${A_ && A_.available ? `Range, not a figure: the point estimate barely beats a constant. This 80% band covered ${(100 * A_.coverage).toFixed(0)}% of unseen launches; the model's rank correlation with the real peak is ${A_.spearman.toFixed(2)}.` : "Needs the peak model. Run npm run curves, then npm run train"}">
+        <div class="big line" title="${A_ && A_.available ? `A range rather than a figure. This 80% band covered ${(100 * A_.coverage).toFixed(0)}% of launches the model never saw, and its rank correlation with the real peak is ${A_.spearman.toFixed(2)}. The peak counted is the pool's where a launch graduated and the curve's where it did not.` : "Needs the peak model. Run npm run curves, then npm run train"}">
           <div class="k">Peak, likely range</div>
           <div class="v">${A_ && A_.available && A_.loUsd ? `${esc(A_.loUsd)}–${esc(A_.hiUsd)}` : A_ && A_.available ? `×${A_.loMultiple.toFixed(1)}–${A_.hiMultiple.toFixed(1)}` : "—"}</div>
         </div>
