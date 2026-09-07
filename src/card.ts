@@ -3,6 +3,7 @@ import { formatUnits, quoteFromCache } from "./quote.ts";
 import { curveStats, peakMultiple, type CurveStats } from "./curve.ts";
 import { capsFor, formatUsd, marketCapUsd, startingCapUsd } from "./prices.ts";
 import { loadAthModel, predictAthFor } from "./ath-score.ts";
+import { poolCaps } from "./pool.ts";
 import type { DB } from "./db.ts";
 
 /**
@@ -85,6 +86,14 @@ export type Card = {
     peakUsd: string | null;
     topWallets: Array<{ address: string; inAmount: string; outAmount: string; multiple: number | null; url: string }>;
   };
+  /**
+   * Life after the curve, for a token that graduated.
+   *
+   * Separate from `trading`, which stops at the curve by construction. A graduated token's curve
+   * peak is nearly a constant, since reaching the threshold is what graduating means; the figure
+   * that varies, and the one a reader is actually asking about, is this one.
+   */
+  pool: { peakUsd: string | null; openUsd: string | null; lastUsd: string | null; swaps: number; tracked: boolean } | null;
   outcome: { phase: number; graduated: boolean; graduationTx: string | null; graduationTxUrl: string | null; secondsToGraduate: number | null };
   creatorHistory: {
     priorLaunches: number; priorGraduations: number;
@@ -138,10 +147,17 @@ function topPeaks(db: DB, deployer: string, beforeBlock: number, limit: number):
     .map((r) => {
       const q = quoteFromCache(db, r.pair_token);
       // Raw prices are quote units per token unit; this lifts them to whole quote per whole token.
-      const usd = marketCapUsd(r.peak * (1e18 / 10 ** q.decimals), q.symbol);
+      const scale = 1e18 / 10 ** q.decimals;
+      const curveUsd = marketCapUsd(r.peak * scale, q.symbol);
+      const launchUsd = marketCapUsd(r.first * scale, q.symbol);
+      // For a launch that graduated, the curve high is the threshold it had to clear and the real
+      // high is in the pool, so the larger of the two is what answers "how far did it get".
+      const inPool = r.graduated ? poolCaps(db, r.token, q.symbol)?.peakUsd ?? null : null;
+      const usd = curveUsd === null ? inPool : inPool === null ? curveUsd : Math.max(curveUsd, inPool);
       return {
         token: r.token, symbol: r.symbol, ts: r.ts, graduated: Boolean(r.graduated),
-        multiple: r.peak / r.first, cap: usd,
+        multiple: usd !== null && launchUsd ? usd / launchUsd : r.peak / r.first,
+        cap: usd,
         usd: usd === null ? null : formatUsd(usd), url: EXPLORER.token(r.token),
       };
     })
@@ -239,6 +255,7 @@ export function buildCard(db: DB, token: string): Card | null {
 
   // The multiple is what the model predicts; dollars come from the near-constant starting cap, so a
   // launch with no trades yet still gets a figure instead of only a ratio.
+  const pc = poolCaps(db, t, quote.symbol);
   const best = topPeaks(db, deployer, Number(l.block), 3);
 
   const athModel = loadAthModel();
@@ -325,6 +342,15 @@ export function buildCard(db: DB, token: string): Card | null {
       url: EXPLORER.address(e.address),
       seenInOtherLaunches: (otherCount.get(e.address, t) as { c: number }).c,
     })),
+    pool: pc === null ? null : {
+      peakUsd: pc.peakUsd === null ? null : formatUsd(pc.peakUsd),
+      openUsd: pc.openUsd === null ? null : formatUsd(pc.openUsd),
+      lastUsd: pc.lastUsd === null ? null : formatUsd(pc.lastUsd),
+      swaps: pc.swaps,
+      // A pool on record whose swaps have not been read yet is a different thing from one nobody
+      // has traded in, and the card must not say "nothing happened" while it is still catching up.
+      tracked: pc.swaps > 0,
+    },
     outcome: {
       phase: Number(l.phase),
       graduated: Boolean(grad),

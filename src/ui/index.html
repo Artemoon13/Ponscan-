@@ -727,7 +727,7 @@ function gradeOf(n, g) {
 }
 
 function renderCard() {
-  const { card: k, score: s } = S.card; const L = k.launch, C = k.cluster, T = k.trading, H = k.creatorHistory, A_ = k.ath;
+  const { card: k, score: s } = S.card; const L = k.launch, C = k.cluster, T = k.trading, H = k.creatorHistory, A_ = k.ath, P = k.pool;
   const fact = (key, val, cls = "", href = "") => `<div class="fact"><span class="k">${key}</span><span class="v ${cls}" title="${esc(val.replace(/<[^>]+>/g, ""))}">${val}</span>${href ? `<a class="x" href="${href}" target="_blank" rel="noopener">↗</a>` : "<span></span>"}</div>`;
   const A = (a) => `${EXP}/address/${a}`;
   const g = gradeOf(H.priorLaunches, H.priorGraduations);
@@ -756,7 +756,8 @@ function renderCard() {
     ${fact("Trades", `${T.buys} buys · ${T.sells} sells`)}
     ${fact("Buyers", `${T.buyersTotal} total · <b>${T.buyersFirstMinute}</b> in the first minute`)}
     ${fact("Opening tax paid", T.snipers.length ? `${esc(T.snipeTaxTotal)} ${esc(L.quoteSymbol)} by ${new Set(T.snipers.map((x) => x.address)).size} wallet(s)` : "nobody raced the window")}
-    ${fact("Peak reached", T.peakMultiple === null ? "nothing has traded on the curve yet" : (T.peakUsd ? esc(T.peakUsd) : `×${T.peakMultiple.toFixed(2)} above its first trade`))}
+    ${fact("Peak on the curve", T.peakMultiple === null ? "nothing has traded on the curve yet" : (T.peakUsd ? esc(T.peakUsd) : `×${T.peakMultiple.toFixed(2)} above its first trade`))}
+    ${P ? fact("Peak in the pool", !P.tracked ? "pool found, swaps not read yet" : P.peakUsd ? `${esc(P.peakUsd)}${P.lastUsd ? ` · ${esc(P.lastUsd)} now · ${P.swaps.toLocaleString()} swaps` : ""}` : "no swaps yet", P.tracked && P.peakUsd ? "lime" : "") : ""}
     ${T.coBuyers.length ? `<div class="sec"><span class="k">Bought inside the launch tx</span></div><div class="list2">${T.coBuyers.map((b) => `<div class="li"><span><a href="${A(b.address)}" target="_blank" rel="noopener">${short(b.address)}</a></span><span class="m">${esc(b.amount)} ${esc(L.quoteSymbol)}</span></div>`).join("")}</div>` : ""}
     ${T.snipers.length ? `<div class="sec"><span class="k">Raced the 3-second window</span></div><div class="list2">${T.snipers.slice(0, 8).map((x) => `<div class="li"><span><a href="${A(x.address)}" target="_blank" rel="noopener">${short(x.address)}</a>${x.onExemptList ? '<span class="x r">on exempt list</span>' : ""}</span><span class="m">+${x.blocksAfterLaunch} blk · paid ${esc(x.tax)}</span></div>`).join("")}</div>` : ""}
     ${T.topWallets.length ? `<div class="sec"><span class="k">Biggest wallets, by money in</span></div><div class="list2">${T.topWallets.slice(0, 8).map((p) => `<div class="li"><span><a href="${A(p.address)}" target="_blank" rel="noopener">${short(p.address)}</a>${p.multiple !== null ? `<span class="x ${p.multiple >= 1 ? "l" : "r"}">×${p.multiple.toFixed(2)}</span>` : ""}</span><span class="m">in ${esc(p.inAmount)} · out ${esc(p.outAmount)}</span></div>`).join("")}</div>` : ""}`;

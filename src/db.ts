@@ -119,6 +119,31 @@ CREATE TABLE IF NOT EXISTS curve_indexed (
   indexed_at INTEGER NOT NULL
 ) STRICT;
 
+CREATE TABLE IF NOT EXISTS pools (
+  token       TEXT PRIMARY KEY,
+  pool_id     TEXT NOT NULL,
+  currency0   TEXT NOT NULL,
+  currency1   TEXT NOT NULL,
+  token_is_c1 INTEGER NOT NULL,
+  dec0        INTEGER NOT NULL,
+  dec1        INTEGER NOT NULL,
+  init_block  INTEGER NOT NULL,
+  init_sqrt   TEXT NOT NULL
+) STRICT;
+CREATE INDEX IF NOT EXISTS pools_pool ON pools(pool_id);
+
+CREATE TABLE IF NOT EXISTS pool_peaks (
+  pool_id    TEXT PRIMARY KEY,
+  min_sqrt   TEXT NOT NULL,
+  max_sqrt   TEXT NOT NULL,
+  min_block  INTEGER NOT NULL,
+  max_block  INTEGER NOT NULL,
+  last_sqrt  TEXT NOT NULL,
+  last_block INTEGER NOT NULL,
+  swaps      INTEGER NOT NULL,
+  to_block   INTEGER NOT NULL
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS fee_events (
   tx        TEXT NOT NULL,
   log_index INTEGER NOT NULL,

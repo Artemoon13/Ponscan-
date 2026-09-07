@@ -9,11 +9,16 @@ import { spawnSync } from "node:child_process";
  * settled and been read, and reading is the step that lags. Its limit is deliberate rather than
  * unbounded, since the read is rate-limited at roughly 1.7 curves a second, which puts four
  * thousand of them at about forty minutes.
+ *
+ * `pools` follows the graduated ones past the curve. It is cheap next to the rest: the swap read is
+ * chain-wide against Uniswap v4's singleton, so one pass covers every graduated token at once at
+ * roughly 430 reads a day, against the curve indexer's 1.7 a second.
  */
 const steps: Array<[string, string[]]> = [
   ["backfill", ["--hours", "26"]],
   ["enrich-window", ["--hours", "20", "--workers", "6"]],
   ["curves", ["--limit", "4000", "--min-age-hours", "4", "--max-age-hours", "168"]],
+  ["pools", ["--limit", "1200", "--max-blocks", "900000"]],
   ["train", []],
 ];
 
