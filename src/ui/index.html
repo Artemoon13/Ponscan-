@@ -195,6 +195,43 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .never div{display:grid;grid-template-columns:16px 1fr;gap:10px}
 .never i{font:600 14px var(--mono);color:var(--red);font-style:normal}
 /* milestones: status is the point, so it carries the colour */
+/* the roadmap header strip: what this page is, and where it has got to */
+.rmbar{display:flex;align-items:center;gap:14px;padding:14px 20px;border:1px solid var(--l08);border-bottom:0;border-radius:10px 10px 0 0;background:var(--bg2);font:11.5px var(--mono);color:var(--t45)}
+.rmbar b{font:600 13px Geist,sans-serif;color:var(--ink);letter-spacing:-.01em}
+.rmbar .sp{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--lime)}
+.rmbar .sp .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite}
+.rmwrap{border:1px solid var(--l08);border-radius:0 0 10px 10px;background:var(--bg2);padding:34px 24px 10px}
+/* Absolute positions on a 190px stage, the geometry the design uses: one line, marks sitting on it,
+   captions alternating above and below so five of them fit without colliding. */
+.tl{position:relative;height:190px}
+.tl .line{position:absolute;left:0;right:0;top:94px;height:2px;background:var(--l15)}
+.tl .fill{position:absolute;left:0;top:94px;height:2px;background:var(--lime)}
+.tl .m{position:absolute;width:min(190px,17%);transform:translateX(-7px)}
+.tl .m .dot{position:absolute;left:0;width:14px;height:14px;border-radius:3px;border:2px solid var(--bg2);box-shadow:0 0 0 2px currentColor;background:currentColor}
+.tl .m .stem{position:absolute;left:6px;width:2px;background:currentColor}
+.tl .m .tag{font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.08em}
+.tl .m .ti{font-weight:600;font-size:16px;margin-top:4px;letter-spacing:-.01em;color:var(--ink)}
+.tl .m .de{font-size:12px;line-height:1.5;color:var(--t55);margin-top:4px;text-wrap:pretty}
+.tl .m.done{color:var(--lime)}
+.tl .m.now{color:var(--amber)}
+.tl .m.next{color:var(--t35)}
+.tl .m.next .ti{color:var(--t65)}
+.tl .m.now .dot{animation:pulse 2s infinite}
+/* Absolute placement cannot survive a narrow screen, so below the breakpoint the same milestones
+   stack as the plain list they were before. */
+@media (max-width:1000px){
+  .rmwrap{padding:18px}
+  .tl{height:auto;display:flex;flex-direction:column;gap:14px}
+  .tl .line,.tl .fill,.tl .m .dot,.tl .m .stem{display:none}
+  .tl .m{position:static!important;width:auto;transform:none;padding-left:12px;border-left:2px solid currentColor}
+}
+.ship{display:flex;flex-direction:column}
+.ship .r{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:9px;align-items:baseline;padding:7px 0;border-top:1px solid var(--l06);font-size:12.5px}
+.ship .r:first-child{border-top:0}
+.ship .r i{font-style:normal;font:600 12px var(--mono);color:var(--lime)}
+.ship .r.no i{color:var(--t35)}
+.ship .r span{font:11px var(--mono);color:var(--t45);text-align:right}
+.ship .r.no b{color:var(--t55);font-weight:400}
 .miles{display:flex;flex-direction:column;gap:10px;margin-top:28px}
 .mile{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:14px 16px;border:1px solid var(--l08);border-radius:8px;background:var(--bg2)}
 .mile .tag{font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.08em;align-self:start;padding:4px 7px;border-radius:4px;text-align:center}
@@ -484,16 +521,12 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
     <h1>What gets built next</h1>
     <div class="sub">The local board is live. The hosted one is not built yet, and neither is anything that needs the token.</div>
 
-    <div class="miles">
-      <div class="mile"><span class="tag done">shipped</span><div><b>The board, on your machine</b><span>Every pons v2 launch on Robinhood Chain, scored the second it lands, with its rank and three reasons. Clone, run, done.</span></div></div>
-      <div class="mile"><span class="tag done">shipped</span><div><b>The card behind every launch</b><span>Who created it, what they self-bought, which wallets they exempted from the opening tax, who else bought in the launch transaction, where the fees go, and what that creator launched before. Every line links to its transaction.</span></div></div>
-      <div class="mile"><span class="tag done">shipped</span><div><b>What happens after graduation</b><span>A graduated token's curve high is the bar it had to clear, not how far it got. The pool is followed too, so a card can say a launch opened at $52K and reached $522K.</span></div></div>
-      <div class="mile"><span class="tag now">building</span><div><b>Pool history for every graduated token</b><span>The swap stream is being read back through the whole chain. Until it finishes, older graduations show only what has been read so far, and say so.</span></div></div>
-      <div class="mile"><span class="tag now">building</span><div><b>Tickers on older launches</b><span>Roughly four in five launches in the database have no symbol yet, because enrichment has only covered the recent window. Until it catches up, older launches show a shortened address.</span></div></div>
-      <div class="mile"><span class="tag next">planned</span><div><b>A hosted board</b><span>The same code with a node in front, so reading it does not require cloning a repository and running a runtime.</span></div></div>
-      <div class="mile"><span class="tag next">planned</span><div><b>Alerts</b><span>Say once what you care about and hear about it when it happens, instead of watching a list.</span></div></div>
-      <div class="mile"><span class="tag next">planned</span><div><b>Telegram, then Pro</b><span>Neither exists today. Both depend on $POOLITZER, which has not launched.</span></div></div>
+    <div class="rmbar">
+      <b>Roadmap</b><span>in order &middot; no dates</span>
+      <span id="rm-count">&mdash;</span>
+      <span class="sp"><span class="dot"></span><span id="rm-now">&mdash;</span></span>
     </div>
+    <div class="rmwrap"><div class="tl" id="rm-tl"></div></div>
 
     <div class="cols2">
       <div class="prose">
@@ -522,17 +555,23 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <p>Commits show what shipped and when. The model page shows what the model scored on data it had not seen, and the scoreboard grades claims that were recorded before their outcomes existed. If something here goes quiet for weeks, ask about it in public.</p>
       </div>
 
-      <div class="side">
-        <h3>Measured from this database</h3>
-        <div class="row2"><b>Launches indexed</b><span id="rm-total">&mdash;</span></div>
-        <div class="row2"><b>Reached the pool</b><span id="rm-grad">&mdash;</span></div>
-        <div class="row2"><b>Base graduation rate</b><span id="rm-base">&mdash;</span></div>
-        <div class="row2"><b>Top-decile lift</b><span id="rm-lift">&mdash;</span></div>
-        <div class="row2"><b>Launches enriched</b><span id="rm-enr">&mdash;</span></div>
-        <h3 style="margin-top:20px">Source</h3>
-        <div class="row2"><b>Licence</b><span>MIT</span></div>
-        <div class="row2"><b>Runtime</b><span>Node &gt;= 22.6</span></div>
-        <div class="row2"><b>Wallet keys needed</b><span>0</span></div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="side">
+          <h3>Shipped so far</h3>
+          <div class="ship" id="rm-ship"></div>
+        </div>
+        <div class="side">
+          <h3>Measured from this database</h3>
+          <div class="row2"><b>Launches indexed</b><span id="rm-total">&mdash;</span></div>
+          <div class="row2"><b>Reached the pool</b><span id="rm-grad">&mdash;</span></div>
+          <div class="row2"><b>Base graduation rate</b><span id="rm-base">&mdash;</span></div>
+          <div class="row2"><b>Top-decile lift</b><span id="rm-lift">&mdash;</span></div>
+          <div class="row2"><b>Launches enriched</b><span id="rm-enr">&mdash;</span></div>
+        </div>
+        <div class="side" id="rm-coin">
+          <h3>$POOLITZER</h3>
+          <div style="font:12px var(--mono);color:var(--t55);line-height:1.5" id="rm-coin-b">&mdash;</div>
+        </div>
       </div>
     </div>
   </div>
@@ -894,12 +933,82 @@ function passes(it) {
 }
 
 /**
- * The roadmap's side panel, from the same figures the front page already asks for.
+ * The roadmap, drawn on one line rather than listed.
+ *
+ * Five marks on a rule, captions alternating above and below so they fit side by side, and the rule
+ * filled in lime only as far as the work actually got. The stage is 190px and the rule sits at 94,
+ * so each caption is placed to land its own mark on that line rather than near it.
+ *
+ * Status lives in the data, not in the markup: the header's "n of five shipped" and the length of
+ * the fill are both counted from the same array the marks come from, so a milestone cannot move
+ * without the summary moving with it.
+ */
+const ROAD = [
+  { tag: "shipped", cls: "done", title: "The terminal", d: "reads, scores, ranks, and waits the opening tax out" },
+  { tag: "shipped", cls: "done", title: "The card", d: "creator, self-buy, exempt wallets, fee route, their history" },
+  { tag: "shipped", cls: "done", title: "Past the curve", d: "a graduated launch is followed into the pool" },
+  { tag: "building", cls: "now", title: "The whole history", d: "pool peaks and tickers, read back over every launch" },
+  { tag: "then", cls: "next", title: "Hosted, then alerts", d: "same score, our node, nothing to install" },
+];
+
+const SHIPPED = [
+  { t: "Terminal · npm run watch", w: "Sep", ok: true },
+  { t: "Board · localhost:4663", w: "Sep", ok: true },
+  { t: "Scoreboard + verify", w: "Sep", ok: true },
+  { t: "Peak model, as a band", w: "Sep", ok: true },
+  { t: "Pool tracking after graduation", w: "Sep", ok: true },
+  { t: "Hosted board", w: "not yet", ok: false },
+  { t: "$POOLITZER", w: "not yet", ok: false },
+];
+
+function drawRoadmap() {
+  const stage = $("rm-tl");
+  if (!stage || stage.dataset.drawn) return;
+  stage.dataset.drawn = "1";
+
+  const n = ROAD.length;
+  const at = (i) => 2 + (i * 78) / (n - 1); // percent; the caption is 17% wide, so the last mark stops short of the edge
+  const shipped = ROAD.filter((m) => m.cls === "done").length;
+  const building = ROAD.find((m) => m.cls === "now");
+
+  // The fill stops at the last finished mark, so the rule shows progress rather than decoration.
+  const fillTo = at(Math.max(0, shipped - 1));
+
+  stage.innerHTML =
+    '<div class="line"></div><div class="fill" style="width:' + fillTo + '%"></div>' +
+    ROAD.map((m, i) => {
+      const above = i % 2 === 0;
+      const pos = above
+        ? 'top:6px'
+        : 'top:96px';
+      const dot = above ? 'top:82px' : 'top:-9px';
+      const stem = above ? 'top:64px;height:20px' : 'top:5px;height:20px';
+      const pad = above ? '' : 'padding-top:28px;';
+      return '<div class="m ' + m.cls + '" style="left:' + at(i) + '%;' + pos + '">' +
+        '<span class="dot" style="' + dot + '"></span>' +
+        '<span class="stem" style="' + stem + '"></span>' +
+        '<div style="' + pad + '">' +
+        '<div class="tag">' + esc(m.tag) + '</div>' +
+        '<div class="ti">' + esc(m.title) + '</div>' +
+        '<div class="de">' + esc(m.d) + '</div></div></div>';
+    }).join("");
+
+  $("rm-count").textContent = shipped + " of " + n + " shipped";
+  $("rm-now").textContent = building ? building.title.toLowerCase() : "nothing in flight";
+
+  $("rm-ship").innerHTML = SHIPPED.map((s) =>
+    '<div class="r' + (s.ok ? "" : " no") + '"><i>' + (s.ok ? "\u2713" : "\u00b7") + "</i><b>" +
+    esc(s.t) + "</b><span>" + esc(s.w) + "</span></div>").join("");
+}
+
+/**
+ * The roadmap's figures, from the same request the front page already makes.
  *
  * A roadmap that quotes its own database is harder to let rot than one carrying typed-in numbers,
- * and these come from the one request the page was making anyway.
+ * and these come from a call the page was making anyway.
  */
 function renderRoadmap(s) {
+  drawRoadmap();
   if (!s) return;
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
   set("rm-total", s.total ? s.total.toLocaleString() : "\u2014");
@@ -907,6 +1016,12 @@ function renderRoadmap(s) {
   set("rm-base", s.baseRate === null || s.baseRate === undefined ? "\u2014" : (100 * s.baseRate).toFixed(2) + "%");
   set("rm-lift", s.decileLift ? s.decileLift.toFixed(2) + "x" : "not validated yet");
   set("rm-enr", s.enriched && s.total ? s.enriched.toLocaleString() + " of " + s.total.toLocaleString() : "\u2014");
+  const coin = $("rm-coin-b");
+  if (coin) {
+    coin.textContent = s.coin && s.coin.token
+      ? s.coin.token
+      : "no address published. Anything claiming to be $POOLITZER before one appears here is not ours.";
+  }
 }
 
 function renderHero() {
