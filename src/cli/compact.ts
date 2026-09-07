@@ -1,31 +1,37 @@
 import { openDb } from "../db.ts";
 import { summariseCurve } from "../curve.ts";
+import { CFG } from "../config.ts";
 
 /**
  * Folds old curves into summaries and drops their trades.
  *
  * Storing every trade forever is what does not scale here, and it is disk rather than the chain
- * that binds: reading is free and comfortable, while a trade costs about 490 bytes with its
- * indexes, a read curve carries 65 of them, and 26,000 launches happen a day. Keeping every row of
- * every curve would be roughly 830 MB a day.
+ * that binds: reading is free and comfortable, while a trade costs 510 bytes with its indexes, a
+ * read curve carries 57 of them on average, and about 24,000 launches happen a day. Keeping every
+ * row of every curve would be roughly 700 MB a day, and the trades are already 70% of the file.
  *
  * What is dropped is the per-transaction detail of launches nobody is looking at any more. What
  * survives is everything computed from it, stored whole rather than recomputed later, so a card
  * from last month still shows its peak, its buyers, its taxes and its top wallets. Only the links
  * to individual transactions go, and for a launch this old those are the least-read thing on it.
  *
+ * Two days rather than seven, decided once the cost was measured against full curve coverage: at
+ * seven the file lands near 4.6 GB, at two near 1.3 GB, and what the extra five days buy is
+ * transaction links on launches that are no longer being traded. The token this site is about is
+ * never folded, because its own page draws a price path and that path is the trades themselves.
+ *
  * Curves are summarised before anything is deleted, and each token is one transaction, so an
  * interrupted run leaves summaries without their trades gone rather than trades gone without a
  * summary.
  *
- * gimlet compact [--older-than-days N] [--limit N] [--dry-run] [--vacuum]
+ * gimlet compact [--older-than-days N] [--older-than-hours N] [--limit N] [--dry-run] [--vacuum]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 ? Number(argv[i + 1]) : dflt;
 };
-const days = arg("older-than-days", 7);
+const days = arg("older-than-days", 2);
 const hours = arg("older-than-hours", days * 24);
 const limit = arg("limit", 20_000);
 const dry = argv.includes("--dry-run");
@@ -34,14 +40,16 @@ const vacuum = argv.includes("--vacuum");
 const db = openDb();
 const cutoff = Math.floor(Date.now() / 1000) - hours * 3600;
 
+const keep = (CFG.coinToken ?? "").toLowerCase();
 const targets = db.prepare(`
   SELECT l.token, l.block, l.ts
   FROM curve_indexed c
   JOIN launches l USING(token)
   WHERE l.ts < ?
+    AND l.token <> ?
     AND l.token NOT IN (SELECT token FROM curve_summary)
     AND EXISTS (SELECT 1 FROM curve_trades t WHERE t.token = l.token)
-  ORDER BY l.ts LIMIT ?`).all(cutoff, limit) as Array<{ token: string; block: number; ts: number }>;
+  ORDER BY l.ts LIMIT ?`).all(cutoff, keep, limit) as Array<{ token: string; block: number; ts: number }>;
 
 const rowsBefore = (db.prepare("SELECT count(*) c FROM curve_trades").get() as { c: number }).c;
 console.log(`curves read: ${(db.prepare("SELECT count(*) c FROM curve_indexed").get() as { c: number }).c}`);

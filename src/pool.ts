@@ -601,14 +601,23 @@ let gradMult: { at: number; v: number | null } | null = null;
 export function graduationMultiple(db: DB): number | null {
   if (gradMult && Date.now() - gradMult.at < 3_600_000) return gradMult.v;
 
+  // The summary arm is not an optimisation. This figure is measured across every graduated token
+  // ever read, and compaction removes their trades within days of the launch; on trades alone the
+  // constant would quietly narrow to whatever graduated this week.
   const rows = db.prepare(`
     WITH firsts AS (
       SELECT token, CAST(quote_wei AS REAL) / CAST(token_amt AS REAL) px,
              row_number() OVER (PARTITION BY token ORDER BY block, log_index) rn
       FROM curve_trades WHERE CAST(token_amt AS REAL) > 0 AND CAST(quote_wei AS REAL) > 0
+    ),
+    opens AS (
+      SELECT token, px FROM firsts WHERE rn = 1
+      UNION ALL
+      SELECT token, first_price px FROM curve_summary
+      WHERE first_price > 0 AND token NOT IN (SELECT token FROM firsts WHERE rn = 1)
     )
-    SELECT p.token_is_c1, p.dec0, p.dec1, p.init_sqrt, f.px first_px
-    FROM pools p JOIN firsts f ON f.token = p.token AND f.rn = 1`).all() as
+    SELECT p.token_is_c1, p.dec0, p.dec1, p.init_sqrt, o.px first_px
+    FROM pools p JOIN opens o ON o.token = p.token`).all() as
     Array<PoolRow & { first_px: number }>;
 
   const ratios: number[] = [];

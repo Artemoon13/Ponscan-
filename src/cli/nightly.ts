@@ -26,7 +26,7 @@ const steps: Array<[string, string[]]> = [
   // Housekeeping last, once the night's reading is in. Folding a curve costs its per-transaction
   // detail and nothing else: checked across every curve in the database, the summary reports the
   // same target its trades did and rebuilds the same cards.
-  ["compact", ["--older-than-days", "7", "--vacuum"]],
+  ["compact", ["--older-than-days", "2", "--vacuum"]],
 ];
 
 for (const [script, args] of steps) {

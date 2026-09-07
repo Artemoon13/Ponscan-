@@ -173,15 +173,24 @@ export function summariseCurve(db: DB, token: string, launchBlock: number): bool
   const stats = curveStats(db, token, launchBlock);
   if (!stats.indexed) return false;
 
+  // What the creator took of their own supply. It is a per-trade fact, so it has to be read here,
+  // while the trades are still on disk, or it goes with them.
+  const own = db.prepare(`
+    SELECT sum(CAST(t.token_amt AS REAL)) amt FROM curve_trades t
+    JOIN launches l USING(token)
+    WHERE t.token = ? AND t.side = 'buy' AND t.block = l.block AND t.recipient = l.deployer`).get(token) as
+    | { amt: number | null } | undefined;
+
   db.prepare(`
-    INSERT INTO curve_summary (token, first_price, peak_price, last_price, trades, buys, sells, stats_json, compacted_at)
-    VALUES (?,?,?,?,?,?,?,?,?)
+    INSERT INTO curve_summary (token, first_price, peak_price, last_price, trades, buys, sells, stats_json, compacted_at, self_buy_tokens)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(token) DO UPDATE SET
       first_price = excluded.first_price, peak_price = excluded.peak_price, last_price = excluded.last_price,
       trades = excluded.trades, buys = excluded.buys, sells = excluded.sells,
-      stats_json = excluded.stats_json, compacted_at = excluded.compacted_at`).run(
+      stats_json = excluded.stats_json, compacted_at = excluded.compacted_at,
+      self_buy_tokens = excluded.self_buy_tokens`).run(
     token, p.first, p.peak, p.last, stats.trades, stats.buys, stats.sells,
-    JSON.stringify(stats), Math.floor(Date.now() / 1000),
+    JSON.stringify(stats), Math.floor(Date.now() / 1000), own?.amt ?? null,
   );
   return true;
 }

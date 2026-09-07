@@ -320,8 +320,14 @@ export function buildCard(db: DB, token: string): Card | null {
       SELECT sum(CAST(token_amt AS REAL)) amt FROM curve_trades
       WHERE token = ? AND side = 'buy' AND block = ? AND recipient = ?`).get(t, Number(l.block), deployer) as
       | { amt: number | null } | undefined;
-    if (!r || !r.amt || !(r.amt > 0)) return null;
-    return (r.amt / 1e18 / SUPPLY) * 100;
+    // Compaction takes the trades away a couple of days after a launch, so the summary answers for
+    // them. Without this the flag would not read as unknown, it would read as zero.
+    const amt = r?.amt && r.amt > 0
+      ? r.amt
+      : ((db.prepare("SELECT self_buy_tokens a FROM curve_summary WHERE token = ?").get(t) as
+          { a: number | null } | undefined)?.a ?? null);
+    if (!amt || !(amt > 0)) return null;
+    return (amt / 1e18 / SUPPLY) * 100;
   })();
 
   const best = topPeaks(db, deployer, Number(l.block), 3);

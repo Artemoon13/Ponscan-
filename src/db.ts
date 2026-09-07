@@ -140,7 +140,10 @@ CREATE TABLE IF NOT EXISTS curve_summary (
   sells        INTEGER NOT NULL,
   -- The rest of CurveStats, computed while the rows still existed.
   stats_json   TEXT NOT NULL,
-  compacted_at INTEGER NOT NULL
+  compacted_at INTEGER NOT NULL,
+  -- Raw token units the creator bought in their own launch block. Stored rather than derived
+  -- because it lives only in the trades, and the trades are what this row exists to replace.
+  self_buy_tokens REAL
 ) STRICT;
 
 -- Price, volume and fees over time, for the one coin this site is about.
@@ -314,6 +317,9 @@ const MIGRATIONS: Array<{ table: string; column: string; ddl: string }> = [
   // number that was shown, because that is the claim; this is what the correction must be refitted
   // against, or each pass would correct an already-corrected score and drift downward unnoticed.
   { table: "predictions", column: "raw_probability", ddl: "ALTER TABLE predictions ADD COLUMN raw_probability REAL" },
+  // The share of supply a creator took in their own launch is a red flag worth keeping, and it was
+  // readable only from the trades, so shortening how long trades are kept would have retired it.
+  { table: "curve_summary", column: "self_buy_tokens", ddl: "ALTER TABLE curve_summary ADD COLUMN self_buy_tokens REAL" },
 ];
 
 /**
