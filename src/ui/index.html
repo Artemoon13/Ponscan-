@@ -266,6 +266,30 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .envt td.v{color:var(--ink);white-space:nowrap}
 .envt td.d{color:var(--t55);font-family:Geist,sans-serif;font-size:12.5px;line-height:1.45}
 /* the honest banner for a page describing something that does not exist yet */
+.coinhd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;font:11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
+.coinpx{margin-top:10px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.coinpx b{font:700 46px var(--mono);letter-spacing:-.02em;color:var(--ink)}
+.coinpx .ch{font:600 15px var(--mono)}
+.coinpx .ch.up{color:var(--lime)}.coinpx .ch.dn{color:var(--red)}
+.coinpx .w{font:12px var(--mono);color:var(--t45)}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));border:1px solid var(--l08);border-radius:9px;margin-top:20px;overflow:hidden}
+.strip div{padding:12px 14px;border-left:1px solid var(--l08)}
+.strip div:first-child{border-left:0}
+.strip .k{font:500 9.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
+.strip .v{margin-top:5px;font:600 15px var(--mono);color:var(--ink)}
+.strip .v.dim{color:var(--t35);font-weight:500;font-size:12.5px}
+.verify{border:1px solid var(--l08);border-radius:10px;background:var(--bg2);padding:18px 20px}
+.verify h3{margin:0 0 4px;font:600 15px Geist,sans-serif;letter-spacing:-.01em;color:var(--ink)}
+.verify .r{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px;padding:8px 0;border-top:1px solid var(--l06);font:11.5px var(--mono);align-items:baseline}
+.verify .r .k{color:var(--t45)}
+.verify .r .v{color:var(--ink);overflow-wrap:anywhere}
+.verify .note{margin-top:12px;font:12.5px Geist,sans-serif;color:var(--t55);line-height:1.5}
+.feeflow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}
+.feeflow .s{border:1px solid var(--l08);border-radius:9px;padding:13px 15px;background:var(--bg2)}
+.feeflow .s .n{font:600 11px var(--mono);color:var(--lime);border:1px solid var(--l15);border-radius:5px;padding:2px 7px;display:inline-block}
+.feeflow .s b{display:block;margin-top:9px;font-size:13.5px}
+.feeflow .s span{display:block;margin-top:3px;font-size:12px;color:var(--t55);line-height:1.45}
+.feeflow .s .val{display:block;margin-top:7px;font:600 12.5px var(--mono);color:var(--lime)}
 .notyet{margin-top:22px;border:1px solid rgba(232,184,58,.35);background:rgba(232,184,58,.07);border-radius:9px;padding:14px 16px;font-size:13.5px;color:var(--ink);line-height:1.55}
 .notyet b{color:var(--amber)}
 .settings{display:flex;align-items:center;gap:16px;padding:0 24px;height:42px;border-bottom:1px solid var(--l08);flex:none;font-size:11.5px;color:var(--t45);white-space:nowrap;overflow-x:auto}
@@ -749,6 +773,87 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
 
 <!-- ───────────── TOKEN ───────────── -->
 <section id="page-token" hidden>
+  <div class="doc">
+    <div id="coin-standin"></div>
+    <div class="coinhd" id="coin-crumb">coin</div>
+    <div class="coinpx"><b id="coin-px">&mdash;</b><span class="w" id="coin-fdv"></span></div>
+
+    <div class="strip" id="coin-strip"></div>
+
+    <div class="cols2">
+      <div>
+        <div class="prose">
+          <h2><span class="n">&middot;</span>Where the fee goes</h2>
+          <p>Every trade in the pool pays a fee, the pons hook routes the creator's share on-chain, and it lands wherever the launch pointed it. That routing is set at launch and is public; this is read from the launch itself, not from anyone's word about it.</p>
+        </div>
+        <div class="feeflow" id="coin-fee"></div>
+
+        <div class="prose">
+          <h2><span class="n">&middot;</span>What this page does not show</h2>
+          <p>No holder count, no liquidity, no 24-hour volume, and no price chart. None of those are indexed: the swap stream is folded to a running high, low and last per pool the moment it is read, because 3.4 million swaps a day pass through the singleton and keeping them all is what the disk cannot afford. Everything above comes from the launch record and that fold. A page people check before buying is the last place to start estimating.</p>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="verify">
+          <h3>Verify before you buy</h3>
+          <div style="font:12px Geist,sans-serif;color:var(--t55)">Match the address, not the name. Nothing on this site asks you to connect a wallet.</div>
+          <div id="coin-verify"></div>
+          <div class="note">Every other address carrying this name is not ours.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="page-board" hidden>
+  <div class="board" id="board">
+    <div class="list">
+      <div class="lhead"><b>Fresh launches</b><span class="m" id="lh-m">—</span><span class="live" id="lh-live"><span class="dot"></span>LIVE</span></div>
+      <div class="stale" id="stale"></div>
+      <div class="filters">
+        <span class="f on" data-f="All">All</span>
+        <span class="f" data-f="Top decile">Top decile</span>
+        <span class="f" data-f="Repeat creators">Repeat creators</span>
+        <span class="f" data-f="ETH-quoted">ETH-quoted</span>
+        <span class="f mono" id="gear" title="score threshold and time window">⚙ settings</span>
+        <span class="shown" id="shown"></span>
+        <div class="spacer"></div>
+        <span class="f mono" id="m-score" title="ranked by score">by chance</span>
+        <span class="f mono" id="m-new" title="newest first, rank still by score">newest</span>
+        <span class="f mono" id="pause">⏸ pause</span>
+      </div>
+      <div class="settings" id="settings" hidden>
+        <label for="s-min">Show only at or above <input type="number" id="s-min" min="0" max="99" step="0.5"> % chance</label>
+        <label for="s-win">Window <select id="s-win"><option value="1">1 hour</option><option value="3">3 hours</option><option value="6">6 hours</option><option value="12">12 hours</option><option value="24">24 hours</option></select></label>
+        <span class="f mono" id="s-reset">Reset</span>
+        <span class="sfoot" id="s-foot"></span>
+      </div>
+      <div class="cols"><span>Time</span><span>Token</span><span class="r">Grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r" title="the highest any earlier launch by this creator ever reached">Dev ATH</span><span class="r">Age</span></div>
+      <div class="rows" id="rows"></div>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+    <div class="divider" id="divider" title="Drag to resize"><i></i></div>
+    <div class="panel" id="panel"><div class="empty">Click a launch to open its card</div></div>
+  </div>
+</section>
+
+<!-- ───────────── MODEL ───────────── -->
+<section id="page-model" hidden>
+  <div class="page">
+    <div class="ph"><h2>Model</h2><span class="m" id="mo-h">—</span></div>
+    <div class="pipe" id="pipe"></div>
+    <div class="metrics" id="metrics"></div>
+    <div class="two2">
+      <div class="pane"><div class="k">Feature influence · mean |contribution| on the current board</div><div id="imp"></div></div>
+      <div class="pane"><div class="k">Live scoreboard · claims written before the outcome existed</div><div class="log" id="livelog"></div></div>
+    </div>
+    <p class="honest" id="honest"></p>
+  </div>
+</section>
+
+<!-- ───────────── TOKEN ───────────── -->
+<section id="page-token" hidden>
   <div class="page narrow">
     <div class="tok-hd"><span class="coin">P</span><h2>$POOLITZER</h2><span class="pill">pons v2 · Robinhood Chain</span></div>
     <div class="contract lg"><span class="k">contract</span><span class="addr" style="color:var(--t45)">not launched, so there is no address to show</span></div>
@@ -843,6 +948,7 @@ function route() {
   document.body.style.overflow = S.page === "board" ? "hidden" : "";
   if (S.page === "board" && arg && arg.startsWith("0x")) openCard(arg.toLowerCase());
   if (S.page === "model") loadModel();
+  if (S.page === "token") loadCoin();
   if (S.page === "home" || S.page === "roadmap") loadStats();
   loadFeed();
   window.scrollTo(0, 0);
@@ -1302,6 +1408,86 @@ async function loadStats() {
   $("k-median").textContent = d.medianSecToGraduate === null ? "—" : d.medianSecToGraduate < 600 ? d.medianSecToGraduate + " s" : Math.round(d.medianSecToGraduate / 60) + " min";
   $("k-lift").textContent = d.decileLift === null ? "—" : d.decileLift.toFixed(2) + "×";
   renderRoadmap(d);
+}
+
+/** Dollars, the same shape the server prints them in, so a page and a card agree. */
+function usd(v) {
+  if (v === null || v === undefined || !isFinite(v)) return "—";
+  if (v >= 1e9) return "$" + (v / 1e9).toFixed(1) + "B";
+  if (v >= 1e6) return "$" + (v / 1e6).toFixed(1) + "M";
+  if (v >= 1e3) return "$" + Math.round(v / 1e3) + "K";
+  return "$" + Math.round(v);
+}
+
+/* ── coin page ── */
+/**
+ * The coin the site is about.
+ *
+ * Which token that is comes from configuration, because $POOLITZER does not exist yet and a coin
+ * page is only worth reading if its numbers are real. Until it launches this shows a token that
+ * did, and says so at the top rather than quietly presenting somebody else's figures as ours.
+ */
+async function loadCoin() {
+  let d;
+  try {
+    const r = await fetch("/api/coin");
+    if (!r.ok) return;
+    d = await r.json();
+  } catch { return; }
+
+  const box = $("coin-standin");
+  if (!d.configured || !d.found) {
+    box.innerHTML = '<div class="notyet"><b>Not launched.</b> There is no $POOLITZER contract yet, so there is nothing to show here. Anything claiming to be $POOLITZER before an address appears on this page is not ours.</div>';
+    $("coin-px").textContent = "—";
+    return;
+  }
+
+  const sym = d.symbol || short(d.token);
+  box.innerHTML = d.standIn
+    ? '<div class="notyet"><b>Standing in.</b> $POOLITZER has not launched, so this page is showing <b>' +
+      esc(sym) + '</b>, a token that did, read the same way every other launch on this board is read. ' +
+      'When ours launches this page points at it and nothing else here changes.</div>'
+    : "";
+
+  $("coin-crumb").textContent = "coin / " + sym + " / robinhood chain 4663";
+
+  const px = d.pool && d.pool.lastUsd !== null ? d.pool.lastUsd / d.supply : null;
+  $("coin-px").textContent = px === null ? "—" : "$" + px.toPrecision(2);
+  $("coin-fdv").textContent = d.pool && d.pool.lastUsd !== null
+    ? "market cap " + usd(d.pool.lastUsd) + " · " + d.supply.toLocaleString() + " supply"
+    : "";
+
+  const cell = (k, v, dim) => '<div><div class="k">' + k + '</div><div class="v' + (dim ? " dim" : "") + '">' + v + "</div></div>";
+  $("coin-strip").innerHTML =
+    cell("Opened at", d.pool ? usd(d.pool.openUsd) : "—") +
+    cell("Peak", d.pool ? usd(d.pool.peakUsd) : "—") +
+    cell("Now", d.pool ? usd(d.pool.lastUsd) : "—") +
+    cell("Pool swaps", d.pool ? d.pool.swaps.toLocaleString() : "—") +
+    cell("Reached the pool", d.graduated ? (d.secondsToGraduate !== null ? secs(d.secondsToGraduate) : "yes") : "not yet") +
+    cell("Holders", "not indexed", true);
+
+  const tax = d.creatorTaxBps === null ? "unknown" : (d.creatorTaxBps / 100).toFixed(2) + "%";
+  $("coin-fee").innerHTML =
+    '<div class="s"><span class="n">01</span><b>Swap</b><span>every trade in the pool</span><span class="val">' + esc(tax) + " to the creator</span></div>" +
+    '<div class="s"><span class="n">02</span><b>pons hook</b><span>routes the creator fee on-chain</span><span class="val">' + esc(short(d.token)) + "</span></div>" +
+    '<div class="s"><span class="n">03</span><b>Recipient</b><span>set at launch, public</span><span class="val">' +
+      (d.feeRecipient ? esc(short(d.feeRecipient)) : "not declared") + "</span></div>" +
+    '<div class="s"><span class="n">04</span><b>Graduation</b><span>the bar this launch had to clear</span><span class="val">' +
+      (d.threshold ? esc(d.threshold) + " " + esc(d.quoteSymbol) : "—") + "</span></div>";
+
+  const row = (k, v, href) => '<div class="r"><span class="k">' + k + '</span><span class="v">' +
+    (href ? '<a href="' + href + '" target="_blank" rel="noopener">' + v + "</a>" : v) + "</span></div>";
+  $("coin-verify").innerHTML =
+    row("contract", esc(d.token), EXP + "/token/" + d.token) +
+    row("creator", esc(short(d.creator)), EXP + "/address/" + d.creator) +
+    row("fee recipient", d.feeRecipient ? esc(short(d.feeRecipient)) : "not declared",
+        d.feeRecipient ? EXP + "/address/" + d.feeRecipient : "") +
+    row("quote asset", esc(d.quoteSymbol)) +
+    row("supply", d.supply.toLocaleString()) +
+    row("self-buy", d.selfBuy === null ? "not declared" : esc(d.selfBuy) + " " + esc(d.quoteSymbol)) +
+    row("exempt wallets", String(d.exemptCount)) +
+    row("launch tx", esc(short(d.launchTx)), EXP + "/tx/" + d.launchTx) +
+    (d.graduationTx ? row("graduation tx", esc(short(d.graduationTx)), EXP + "/tx/" + d.graduationTx) : "");
 }
 
 /* ── model page ── */

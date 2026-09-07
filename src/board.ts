@@ -12,7 +12,7 @@ import { formatUsd, marketCapUsd } from "./prices.ts";
 import { BLOCKS_PER_DAY } from "./config.ts";
 import { CFG } from "./config.ts";
 import { indexCurve } from "./curve.ts";
-import { quotePerToken } from "./pool.ts";
+import { poolCaps, quotePerToken } from "./pool.ts";
 import { logsClient, sleep, stateClient, withRetry } from "./chain.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -396,6 +396,55 @@ const server = createServer(async (req, res) => {
 
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     res.end(page);
+    return;
+  }
+
+  /**
+   * The coin the site is about, read from the chain like any other launch.
+   *
+   * Everything here comes from the same tables every other card uses, so the page cannot claim
+   * anything the board could not also show about somebody else's token. What it deliberately does
+   * not carry is holders, liquidity or a 24-hour volume: none of those are indexed, and inventing
+   * them on the one page people would check before buying is the last place to start guessing.
+   */
+  if (url.pathname === "/api/coin") {
+    const tok = CFG.coinToken;
+    if (!tok) { json(res, { configured: false }); return; }
+
+    const l = db.prepare("SELECT * FROM launches WHERE token = ?").get(tok) as Record<string, unknown> | undefined;
+    if (!l) { json(res, { configured: true, found: false, token: tok }); return; }
+
+    const q = quoteFromCache(db, String(l.pair_token));
+    const g = db.prepare("SELECT tx, ts FROM graduations WHERE token = ?").get(tok) as
+      | { tx: string; ts: number } | undefined;
+    const caps = poolCaps(db, tok, q.symbol);
+    const dec = Number(q.decimals);
+
+    json(res, {
+      configured: true,
+      found: true,
+      standIn: !CFG.coinIsOurs,
+      token: tok,
+      symbol: (l.symbol as string | null) ?? null,
+      name: (l.name as string | null) ?? null,
+      launchTs: Number(l.ts),
+      launchTx: String(l.tx),
+      creator: (l.launch_sender as string | null) ?? String(l.deployer),
+      feeRecipient: (l.creator_fee_recipient as string | null) ?? null,
+      creatorTaxBps: l.creator_tax_bps === null ? null : Number(l.creator_tax_bps),
+      selfBuy: l.initial_buy_wei === null ? null : formatUnits(BigInt(l.initial_buy_wei as string), dec),
+      exemptCount: Number(l.exempt_count ?? 0),
+      quoteSymbol: q.symbol,
+      threshold: l.graduation_threshold_wei === null
+        ? null : formatUnits(BigInt(l.graduation_threshold_wei as string), dec),
+      graduated: Boolean(g),
+      graduationTx: g?.tx ?? null,
+      secondsToGraduate: g ? g.ts - Number(l.ts) : null,
+      supply: 1_000_000_000,
+      pool: caps === null ? null : {
+        openUsd: caps.openUsd, peakUsd: caps.peakUsd, lastUsd: caps.lastUsd, swaps: caps.swaps,
+      },
+    });
     return;
   }
 
