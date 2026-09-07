@@ -31,7 +31,8 @@
     "watchdog": "node --no-warnings src/cli/watchdog.ts",
     "recalibrate": "node --no-warnings src/cli/recalibrate.ts",
     "test": "node --no-warnings --test",
-    "pools": "node --no-warnings src/cli/pools.ts"
+    "pools": "node --no-warnings src/cli/pools.ts",
+    "telegram": "node --no-warnings src/cli/telegram.ts"
   },
   "dependencies": {
     "viem": "^2.56.3"
