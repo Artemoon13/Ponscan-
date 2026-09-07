@@ -100,8 +100,15 @@ function live(): { a: number; b: number } | null {
   }
 }
 
-/** The probability as shown: the model's own, then the live correction if there is one. */
-export function shown(p: number, c: { a: number; b: number } | null): number {
+/**
+ * The probability as shown: the model's own, then the live correction if there is one.
+ *
+ * Not named `shown`: `scoreRecent` already binds that for its display ordering, and a module-level
+ * function of the same name is shadowed by it throughout the function body — including above the
+ * binding, where the local is still in its dead zone. That reads as a plain reference and throws at
+ * runtime on the first feed request, which is to say in production and not in any test.
+ */
+export function corrected(p: number, c: { a: number; b: number } | null): number {
   return c ? applyLive(c, p) : p;
 }
 
@@ -148,7 +155,7 @@ export function scoreRecent(
 
   const c = live();
   const scored = rows
-    .map((r) => { const raw = predict(model, r.x); return { token: r.token, ts: r.ts, x: r.x, raw, p: shown(raw, c) }; })
+    .map((r) => { const raw = predict(model, r.x); return { token: r.token, ts: r.ts, x: r.x, raw, p: corrected(raw, c) }; })
     .sort((a, b) => b.p - a.p);
 
   const ranked = scored.map((s, i) => ({
@@ -187,9 +194,9 @@ export function scoreOne(db: DB, model: GbdtModel, token: string, windowHours = 
   if (!me) return null;
 
   const c = live();
-  const peers = rows.filter((r) => r.ts >= cutoff).map((r) => shown(predict(model, r.x), c));
+  const peers = rows.filter((r) => r.ts >= cutoff).map((r) => corrected(predict(model, r.x), c));
   const raw = predict(model, me.x);
-  const p = shown(raw, c);
+  const p = corrected(raw, c);
   const better = peers.filter((q) => q > p).length;
   return {
     token: me.token,
