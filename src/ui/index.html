@@ -180,7 +180,10 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .settings input{width:58px}
 .settings input:focus,.settings select:focus{outline:2px solid var(--lime);outline-offset:1px;border-color:var(--lime)}
 .settings .sfoot{font:11px var(--mono);color:var(--t4);flex:none}
-.cols,.row{display:grid;grid-template-columns:52px 150px 88px 44px minmax(0,1fr) 84px 56px;gap:0 12px;padding:0 24px;align-items:center}
+.cols,.row{display:grid;grid-template-columns:52px 150px 88px 44px minmax(0,1fr) 84px 66px 56px;gap:0 12px;padding:0 24px;align-items:center}
+/* A creator with no read history reads as absent, not as zero. */
+.dv{font:500 11.5px var(--mono)}
+.dv.none{color:var(--t35)}
 .cols{height:32px;font:500 10px var(--mono);color:var(--t45);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--l08);flex:none}
 .cols .r,.row .r{text-align:right}
 .rows{overflow:auto;flex:1}
@@ -438,7 +441,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <span class="f mono" id="s-reset">Reset</span>
         <span class="sfoot" id="s-foot"></span>
       </div>
-      <div class="cols"><span>Time</span><span>Token</span><span class="r">Grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r">Age</span></div>
+      <div class="cols"><span>Time</span><span>Token</span><span class="r">Grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r" title="the highest any earlier launch by this creator ever reached">Dev ATH</span><span class="r">Age</span></div>
       <div class="rows" id="rows"></div>
       <div class="empty" id="empty" hidden></div>
     </div>
@@ -647,6 +650,11 @@ function renderBoard() {
     const chips = it.reasons.slice(0, 3).map((r) =>
       `<span class="${r.direction}" title="${esc(r.text)}">${esc(r.short)}</span>`);
     if (m.graduated) chips.unshift(`<span class="g">reached the pool${m.grad_secs ? " · " + secs(m.grad_secs) : ""}</span>`);
+    // The creator's high-water mark. Built here rather than inline: it needs a tooltip either way,
+    // and an absent history has to read as absent rather than as a zero.
+    const dev = m.dev_best_usd
+      ? '<span title="their best launch so far: ' + esc(m.dev_best_symbol || "?") + " reached " + esc(m.dev_best_usd) + '">' + esc(m.dev_best_usd) + "</span>"
+      : '<span class="none" title="none of their earlier curves have been read yet">—</span>';
     if (m.cluster_total > 1) chips.push(`<span title="launches sharing this ticker (reached the pool)">${m.cluster_total} share ticker (${m.cluster_grad})</span>`);
     return `<div class="row${top ? " top" : ""}${it.token === S.sel ? " sel" : ""}${fresh ? " fresh" : ""}" data-token="${it.token}">
       <span class="t"><span>${m.ts ? hhmmss(m.ts) : ""}</span><i>${fresh ? "NEW" : ""}</i></span>
@@ -655,6 +663,7 @@ function renderBoard() {
       <span class="rk r">#${it.rank}</span>
       <span class="chips">${chips.join("")}</span>
       <span class="sb r">${m.self_buy === null || m.self_buy === undefined ? '<span style="color:var(--t35)">—</span>' : esc(m.self_buy) + ' <span style="color:var(--t45);font-size:10.5px">' + esc(m.quote_symbol) + "</span>"}</span>
+      <span class="dv r">${dev}</span>
       <span class="ag r" data-ts="${m.ts || 0}">${m.ts ? ago(m.ts) : ""}</span></div>`;
   }).join("");
   S.known = new Set(d.items.map((it) => it.token));

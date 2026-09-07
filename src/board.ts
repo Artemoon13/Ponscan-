@@ -7,10 +7,12 @@ import { dataset, datasetAgeSec, FEATURES, loadModel, scoreOne, scoreRecent, typ
 import { getMeta, openDb } from "./db.ts";
 import { contributions } from "./model/gbdt.ts";
 import { grade, modelId, pending, score as scoreLog, settled } from "./track.ts";
-import { formatUnits } from "./quote.ts";
+import { formatUnits, quoteFromCache } from "./quote.ts";
+import { formatUsd, marketCapUsd } from "./prices.ts";
 import { BLOCKS_PER_DAY } from "./config.ts";
 import { CFG } from "./config.ts";
 import { indexCurve } from "./curve.ts";
+import { quotePerToken } from "./pool.ts";
 import { logsClient, sleep, stateClient, withRetry } from "./chain.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -88,6 +90,7 @@ const AGG_TTL_MS = 30_000;
 type Aggregates = {
   clusters: Map<string, { n: number; g: number }>;
   devTotal: Map<string, number>;
+  devBest: Map<string, { usd: number; symbol: string | null; token: string }>;
   counts: { launches: number; graduations: number; enriched: number };
 };
 let aggCache: { at: number; since: number; v: Aggregates } | null = null;
@@ -118,12 +121,60 @@ function aggregates(rawSince: number): Aggregates {
     devTotal.set(r.d, r.n);
   }
 
+  /**
+   * The highest any of a creator's launches has ever reached, in dollars.
+   *
+   * Put on the row rather than left inside the card, because it is the one fact about a fresh launch
+   * that is already settled: the launch itself has no history yet, its creator does. A wallet whose
+   * best of sixty-four attempts was six thousand dollars is saying something the score cannot.
+   *
+   * Built from what has a peak rather than from every launch, which is a much smaller set: read
+   * curves, folded summaries, and pools. Measured at 485 ms plus 123 ms over the six-hour window,
+   * which is why it sits behind the same thirty-second cache as the other totals; a creator's record
+   * does not move within half a minute.
+   */
+  const devBest = new Map<string, { usd: number; symbol: string | null; token: string }>();
+  const consider = (dev: string, usd: number | null, symbol: string | null, token: string): void => {
+    if (usd === null || !Number.isFinite(usd)) return;
+    const cur = devBest.get(dev);
+    if (!cur || usd > cur.usd) devBest.set(dev, { usd, symbol, token });
+  };
+
+  for (const r of db.prepare(`
+    WITH peaked AS (
+      SELECT token, peak_price peak FROM curve_summary
+      UNION ALL
+      SELECT token, max(CAST(quote_wei AS REAL) / CAST(token_amt AS REAL)) peak
+      FROM curve_trades WHERE CAST(token_amt AS REAL) > 0 GROUP BY token
+    )
+    SELECT l.deployer, l.token, l.symbol, l.pair_token, p.peak
+    FROM peaked p JOIN launches l ON l.token = p.token
+    WHERE l.deployer IN (SELECT deployer FROM launches WHERE ts >= ?)`).all(since) as
+    Array<{ deployer: string; token: string; symbol: string | null; pair_token: string; peak: number }>) {
+    const q = quoteFromCache(db, r.pair_token);
+    // Raw quote units per token unit, lifted to whole units on both sides.
+    consider(r.deployer, marketCapUsd(r.peak * (1e18 / 10 ** q.decimals), q.symbol), r.symbol, r.token);
+  }
+
+  // A graduated token's curve high is the bar it had to clear, so the pool has to be allowed to
+  // answer for it; this is the same rule the card applies.
+  for (const r of db.prepare(`
+    SELECT l.deployer, l.token, l.symbol, l.pair_token, k.min_sqrt, k.max_sqrt, p.token_is_c1, p.dec0, p.dec1
+    FROM pool_peaks k JOIN pools p ON p.pool_id = k.pool_id JOIN launches l ON l.token = p.token
+    WHERE l.deployer IN (SELECT deployer FROM launches WHERE ts >= ?)`).all(since) as
+    Array<{ deployer: string; token: string; symbol: string | null; pair_token: string;
+            min_sqrt: string; max_sqrt: string; token_is_c1: number; dec0: number; dec1: number }>) {
+    const q = quoteFromCache(db, r.pair_token);
+    const sqrt = r.token_is_c1 ? r.min_sqrt : r.max_sqrt;
+    consider(r.deployer, marketCapUsd(quotePerToken(sqrt, r), q.symbol), r.symbol, r.token);
+  }
+
   const counts = db.prepare(`
     SELECT (SELECT count(*) FROM launches) launches,
            (SELECT count(*) FROM graduations) graduations,
            (SELECT count(*) FROM launches WHERE enriched_at IS NOT NULL) enriched`).get() as Aggregates["counts"];
 
-  const v: Aggregates = { clusters, devTotal, counts };
+  const v: Aggregates = { clusters, devTotal, devBest, counts };
   aggCache = { at: Date.now(), since, v };
   return v;
 }
@@ -371,7 +422,7 @@ const server = createServer(async (req, res) => {
       LEFT JOIN graduations g ON g.token = l.token
       WHERE l.ts >= ?`).all(since) as Array<Record<string, unknown>>;
 
-    const { clusters, devTotal, counts } = aggregates(since);
+    const { clusters, devTotal, devBest, counts } = aggregates(since);
 
     const ZERO = "0x0000000000000000000000000000000000000000";
     for (const m of meta) {
@@ -387,6 +438,13 @@ const server = createServer(async (req, res) => {
       m.cluster_total = c?.n ?? 0;
       m.cluster_grad = c?.g ?? 0;
       m.dev_total = devTotal.get(m.deployer as string) ?? 1;
+      // The creator's high-water mark, already formatted: the row shows a figure, not a calculation.
+      // Null where nobody has read any of their earlier curves, which the list says out loud rather
+      // than rendering as a zero.
+      const best = devBest.get(m.deployer as string);
+      m.dev_best_usd = best ? formatUsd(best.usd) : null;
+      m.dev_best_symbol = best ? best.symbol : null;
+      m.dev_best_token = best ? best.token : null;
       delete m.initial_buy_wei;
       delete m.grad_ts;
     }
