@@ -284,7 +284,10 @@ const server = createServer(async (req, res) => {
 
   if (url.pathname === "/") {
     const html = readFileSync(join(here, "ui", "index.html"));
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    // Re-read per request so an edit shows up on reload — which only works if the browser is told
+    // not to keep its own copy. With no cache header at all it caches heuristically and serves a
+    // stale page against a live API, which reads as the data being wrong rather than the page.
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     res.end(html);
     return;
   }

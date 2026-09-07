@@ -115,7 +115,7 @@ export type Card = {
  * "Read" is the limit, not "launched". Curves are pulled on demand, so this ranks what is known, and
  * the card reports separately how many of the creator's curves nobody has looked at yet.
  */
-export type PastPeak = { token: string; symbol: string | null; multiple: number; usd: string | null; url: string };
+export type PastPeak = { token: string; symbol: string | null; ts: number; graduated: boolean; multiple: number; usd: string | null; url: string };
 
 function topPeaks(db: DB, deployer: string, beforeBlock: number, limit: number): PastPeak[] {
   const rows = db.prepare(`
@@ -126,11 +126,12 @@ function topPeaks(db: DB, deployer: string, beforeBlock: number, limit: number):
       WHERE c.token IN (SELECT token FROM launches WHERE deployer = ? AND block < ?)
         AND CAST(c.token_amt AS REAL) > 0 AND CAST(c.quote_wei AS REAL) > 0
     )
-    SELECT p.token, l.symbol, l.pair_token,
+    SELECT p.token, l.symbol, l.ts, l.pair_token, (g.token IS NOT NULL) graduated,
            max(p.px) peak, max(CASE WHEN p.rn = 1 THEN p.px END) first
     FROM p JOIN launches l ON l.token = p.token
+    LEFT JOIN graduations g ON g.token = p.token
     GROUP BY p.token`).all(deployer, beforeBlock) as
-    Array<{ token: string; symbol: string | null; pair_token: string; peak: number; first: number }>;
+    Array<{ token: string; symbol: string | null; ts: number; pair_token: string; graduated: number; peak: number; first: number }>;
 
   return rows
     .filter((r) => r.first > 0 && r.peak > 0 && Number.isFinite(r.peak / r.first))
@@ -139,12 +140,17 @@ function topPeaks(db: DB, deployer: string, beforeBlock: number, limit: number):
       // Raw prices are quote units per token unit; this lifts them to whole quote per whole token.
       const usd = marketCapUsd(r.peak * (1e18 / 10 ** q.decimals), q.symbol);
       return {
-        token: r.token, symbol: r.symbol, multiple: r.peak / r.first,
+        token: r.token, symbol: r.symbol, ts: r.ts, graduated: Boolean(r.graduated),
+        multiple: r.peak / r.first, cap: usd,
         usd: usd === null ? null : formatUsd(usd), url: EXPLORER.token(r.token),
       };
     })
-    .sort((a, b) => b.multiple - a.multiple)
-    .slice(0, limit);
+    // Ranked by the cap it actually reached, not by how far it ran: against a graduation bar near
+    // $50K, "got to $40K" says more about a creator than "tripled off a $2K open". Launches quoted
+    // in an asset with no price in the book cannot be ranked that way and sort below those that can.
+    .sort((a, b) => (b.cap ?? -1) - (a.cap ?? -1) || b.multiple - a.multiple)
+    .slice(0, limit)
+    .map(({ cap: _cap, ...rest }) => rest);
 }
 
 const ZERO = "0x0000000000000000000000000000000000000000";

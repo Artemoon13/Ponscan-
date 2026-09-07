@@ -667,8 +667,8 @@ function renderCard() {
   const reasons = s ? s.reasons.map((r) => `<div class="${r.direction}"><i>${r.direction === "up" ? "+" : "−"}</i><span>${esc(r.text[0].toUpperCase() + r.text.slice(1))}</span></div>`).join("") : "";
   // Their highest climbers across every curve of theirs that has been read, not just the recent ten.
   const bestList = (H.topPeaks && H.topPeaks.length)
-    ? `<div class="thead"><span>Their best launches</span><span></span><span style="text-align:right">Peak reached</span><span></span></div>` +
-      H.topPeaks.map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">highest of ${H.priorLaunches} launch${H.priorLaunches === 1 ? "" : "es"}${H.unread ? " · " + H.unread + " not read yet" : ""}</span><span class="o ${p.multiple >= 3 ? "g" : ""}">${(p.usd ? esc(p.usd) + " " : "") + "×" + p.multiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
+    ? `<div class="thead"><span>Their best launches</span><span class="w">${(H.priorLaunches - H.unread) + "/" + H.priorLaunches + " read"}</span><span style="text-align:right">Peak reached</span><span></span></div>` +
+      H.topPeaks.map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.multiple >= 3 ? "g" : ""}">${(p.usd ? esc(p.usd) + " " : "") + "×" + p.multiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
     : "";
   const past = H.recent.length
     ? `<div class="thead"><span>Earlier</span><span></span><span style="text-align:right">Peak reached</span><span></span></div>` +
