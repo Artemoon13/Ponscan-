@@ -130,11 +130,18 @@ export function alertText(db: DB, s: Scored, m: LaunchMeta, now = Math.floor(Dat
 
   const blocks: string[][] = [head];
 
-  // Only while the answer is still open. Once a launch has graduated and its pool peak is known,
-  // printing a forecast beside the fact reads as the tool contradicting itself.
+  // A forecast only while the answer is still open; printing one beside a known outcome reads as the
+  // tool arguing with itself. A launch can graduate inside the alert window, though, and one that
+  // did is the most interesting thing on the board, so it gets the fact instead of the guess.
   if (card && !card.outcome.graduated) {
     const f = forecastLines(db, card);
     if (f.length) blocks.push(f);
+  } else if (card?.outcome.graduated) {
+    const p = card.pool;
+    const took = card.outcome.secondsToGraduate;
+    const done = [`<b>reached the pool</b>${took !== null ? ` after ${ago(took)}` : ""}`];
+    if (p?.tracked && p.peakUsd) done.push(`peak ${esc(p.peakUsd)}${p.lastUsd ? ` · ${esc(p.lastUsd)} now` : ""}`);
+    blocks.push(done);
   }
 
   if (card) {
