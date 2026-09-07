@@ -1,7 +1,7 @@
 import { EXPLORER } from "./config.ts";
 import { formatUnits, quoteFromCache } from "./quote.ts";
 import { curveStats, peakMultiple, type CurveStats } from "./curve.ts";
-import { capsFor, formatUsd, marketCapUsd, startingCapUsd } from "./prices.ts";
+import { capsFor, formatUsd, marketCapUsd, startingCapUsd, SUPPLY } from "./prices.ts";
 import { loadAthModel, predictAthFor } from "./ath-score.ts";
 import { poolCaps } from "./pool.ts";
 import type { DB } from "./db.ts";
@@ -47,6 +47,8 @@ export type Card = {
     multiple: number | null; loMultiple: number | null; hiMultiple: number | null;
     pointUsd: string | null; loUsd: string | null; hiUsd: string | null;
     coverage: number | null; spearman: number | null;
+    /** Chance this launch clears x10 at all, and the share of launches that do, to read it against. */
+    tailChance: number | null; tailBase: number | null;
   };
   /**
    * The name cluster this launch belongs to: other launches that used the same ticker.
@@ -95,6 +97,8 @@ export type Card = {
    */
   pool: { peakUsd: string | null; openUsd: string | null; lastUsd: string | null; swaps: number; tracked: boolean } | null;
   outcome: { phase: number; graduated: boolean; graduationTx: string | null; graduationTxUrl: string | null; secondsToGraduate: number | null };
+  /** What the creator took of the supply in their own launch, as a percentage, or null if unread. */
+  selfBuyShare: number | null;
   creatorHistory: {
     priorLaunches: number; priorGraduations: number;
     /** Best observed peak across every earlier launch whose curve has been read. Null if none have. */
@@ -301,6 +305,25 @@ export function buildCard(db: DB, token: string): Card | null {
   // The multiple is what the model predicts; dollars come from the near-constant starting cap, so a
   // launch with no trades yet still gets a figure instead of only a ratio.
   const pc = poolCaps(db, t, quote.symbol);
+  /**
+   * How much of the supply the creator took in their own launch.
+   *
+   * The wei they spent is already on the card, and on its own it says nothing: 0.4 ETH is a lot on
+   * one curve and a rounding error on another. The share of supply is the figure that transfers,
+   * and it is in the trade itself, since every curve buy records the tokens that came back.
+   *
+   * Read rather than declared: `initial_tokens` exists on the launch row and is null on all 44,905
+   * enriched launches, so the trade at the launch block is the only place this actually lives.
+   */
+  const selfBuyShare = (() => {
+    const r = db.prepare(`
+      SELECT sum(CAST(token_amt AS REAL)) amt FROM curve_trades
+      WHERE token = ? AND side = 'buy' AND block = ? AND recipient = ?`).get(t, Number(l.block), deployer) as
+      | { amt: number | null } | undefined;
+    if (!r || !r.amt || !(r.amt > 0)) return null;
+    return (r.amt / 1e18 / SUPPLY) * 100;
+  })();
+
   const best = topPeaks(db, deployer, Number(l.block), 3);
 
   const athModel = loadAthModel();
@@ -312,6 +335,7 @@ export function buildCard(db: DB, token: string): Card | null {
 
   return {
     token: t,
+    selfBuyShare,
     /** The contract itself. What a trader reaches for first, so it does not get buried. */
     tokenUrl: EXPLORER.token(t),
     ponsUrl: EXPLORER.pons(t),
@@ -381,6 +405,8 @@ export function buildCard(db: DB, token: string): Card | null {
       hiUsd: asUsd(athRaw?.hi ?? null),
       coverage: athModel?.coverage ?? null,
       spearman: athModel?.spearman ?? null,
+      tailChance: athRaw?.tailChance ?? null,
+      tailBase: athModel?.tailBase ?? null,
     },
     exemptions: exemptRows.map((e) => ({
       address: e.address,

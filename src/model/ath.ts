@@ -229,6 +229,19 @@ export type AthModel = {
   hi: number;
   /** Share of unseen launches that actually fell inside the band. */
   coverage: number;
+  /**
+   * A separate model for the question the point estimate cannot answer.
+   *
+   * Squared loss on a heavy tail predicts the middle: its output tops out around x11 while the data
+   * runs to x600, so it will never say "this one does x100". What it does do is rank, and ranking is
+   * enough to answer "does this run at all" as a probability. Trained on the same features against
+   * whether the peak cleared x10.
+   */
+  tail: GbdtModel | null;
+  /** Share of launches that cleared the mark at all, so a probability can be read against it. */
+  tailBase: number;
+  /** Measured on unseen rows: share above the mark among the tenth the tail model rated highest. */
+  tailTopDecile: number;
   trainedOn: number;
   spearman: number;
   topDecileLift: number;
@@ -236,7 +249,19 @@ export type AthModel = {
   maeGain: number;
 };
 
-const BAND = 0.8;
+/**
+ * Half, not four fifths.
+ *
+ * An 80% band on this target spans 3.4x from end to end, which is honest and nearly useless to read:
+ * "somewhere between $15K and $50K" is a shrug. Half the launches land inside a 1.7x span, so that
+ * is what the card shows, with the coverage it actually measured printed beside it. A reader who
+ * wants near-certainty has the whole distribution in the model page; a reader looking at a launch
+ * wants the middle of it.
+ */
+export const BAND = 0.5;
+
+/** The multiple that counts as a run, for the separate question of whether one happens at all. */
+export const TAIL_AT = 10;
 
 export function fitAthModel(rows: AthRow[]): AthModel | null {
   if (rows.length < 300) return null;
@@ -257,8 +282,27 @@ export function fitAthModel(rows: AthRow[]): AthModel | null {
   }).length;
 
   const ev = evaluateAth(model, test);
+
+  // The tail model sees the same rows the point model was fitted on, and is scored on the same
+  // held-out slice, so its numbers can be read beside the others.
+  const mark = Math.log(TAIL_AT);
+  const fitRows = rows.slice(0, a);
+  const hits = fitRows.filter((r) => r.logPeak >= mark).length;
+  let tail: GbdtModel | null = null;
+  let tailTopDecile = 0;
+  if (hits >= 30) {
+    tail = train(fitRows.map((r) => r.x), fitRows.map((r) => (r.logPeak >= mark ? 1 : 0)), [...FEATURES],
+      { objective: "logistic", rounds: 200, learningRate: 0.05, maxDepth: 3, minChildHessian: 20 });
+    calibrate(tail, test.map((r) => r.x), Uint8Array.from(test.map((r) => (r.logPeak >= mark ? 1 : 0))));
+    const scored = test.map((r) => ({ p: predict(tail as GbdtModel, r.x), hit: r.logPeak >= mark ? 1 : 0 }))
+      .sort((x, y) => y.p - x.p);
+    const dec = scored.slice(0, Math.max(1, Math.floor(scored.length * 0.1)));
+    tailTopDecile = dec.length ? dec.reduce((s, r) => s + r.hit, 0) / dec.length : 0;
+  }
+  const tailBase = test.length ? test.filter((r) => r.logPeak >= mark).length / test.length : 0;
+
   return {
-    model, lo, hi,
+    model, lo, hi, tail, tailBase, tailTopDecile,
     coverage: test.length ? inside / test.length : 0,
     trainedOn: a,
     spearman: ev.spearman,
@@ -267,10 +311,20 @@ export function fitAthModel(rows: AthRow[]): AthModel | null {
   };
 }
 
-/** Predicted peak for one launch, as a multiple of its launch price, with its band. */
-export function predictAth(m: AthModel, x: Float64Array): { multiple: number; lo: number; hi: number } {
+/** Predicted peak for one launch, as a multiple of its launch price, with its band and tail chance. */
+export function predictAth(m: AthModel, x: Float64Array): {
+  multiple: number; lo: number; hi: number; tailChance: number | null;
+} {
   const p = predict(m.model, x);
-  return { multiple: Math.exp(p), lo: Math.exp(p + m.lo), hi: Math.exp(p + m.hi) };
+  return {
+    multiple: Math.exp(p),
+    lo: Math.exp(p + m.lo),
+    hi: Math.exp(p + m.hi),
+    // Platt-scaled when it was fitted, so this is a probability rather than a score that merely
+    // sorts. The card still shows the base rate beside it, because a probability is only readable
+    // against how often the thing happens at all.
+    tailChance: m.tail ? predict(m.tail, x) : null,
+  };
 }
 
 export { calibrate };

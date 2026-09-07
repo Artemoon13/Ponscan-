@@ -97,7 +97,7 @@ const AGG_TTL_MS = 30_000;
 type Aggregates = {
   clusters: Map<string, { n: number; g: number }>;
   devTotal: Map<string, number>;
-  devBest: Map<string, { usd: number; symbol: string | null; token: string }>;
+  devBest: Map<string, Array<{ usd: number; symbol: string | null; token: string }>>;
   counts: { launches: number; graduations: number; enriched: number };
 };
 let aggCache: { at: number; since: number; v: Aggregates } | null = null;
@@ -140,11 +140,23 @@ function aggregates(rawSince: number): Aggregates {
    * which is why it sits behind the same thirty-second cache as the other totals; a creator's record
    * does not move within half a minute.
    */
-  const devBest = new Map<string, { usd: number; symbol: string | null; token: string }>();
+  /**
+   * The two best, not the one best.
+   *
+   * The column promises the highest an *earlier* launch by this creator reached, and a row must not
+   * be allowed to answer with itself. A creator whose only launch is the row you are looking at was
+   * reporting that launch's own peak as their track record: the board said $1.2M beside a card that
+   * said "first launch from this wallet". Keeping the runner-up costs nothing and lets a row skip
+   * past itself.
+   */
+  type Peaked = { usd: number; symbol: string | null; token: string };
+  const devBest = new Map<string, Peaked[]>();
   const consider = (dev: string, usd: number | null, symbol: string | null, token: string): void => {
     if (usd === null || !Number.isFinite(usd)) return;
-    const cur = devBest.get(dev);
-    if (!cur || usd > cur.usd) devBest.set(dev, { usd, symbol, token });
+    const list = devBest.get(dev) ?? [];
+    list.push({ usd, symbol, token });
+    list.sort((a, b) => b.usd - a.usd);
+    devBest.set(dev, list.slice(0, 2));
   };
 
   for (const r of db.prepare(`
@@ -616,7 +628,8 @@ const server = createServer(async (req, res) => {
       // The creator's high-water mark, already formatted: the row shows a figure, not a calculation.
       // Null where nobody has read any of their earlier curves, which the list says out loud rather
       // than rendering as a zero.
-      const best = devBest.get(m.deployer as string);
+      // Skip past this row's own launch: what is wanted is the creator's record, not this token's.
+      const best = (devBest.get(m.deployer as string) ?? []).find((b) => b.token !== m.token);
       m.dev_best_usd = best ? formatUsd(best.usd) : null;
       m.dev_best_symbol = best ? best.symbol : null;
       m.dev_best_token = best ? best.token : null;
@@ -689,6 +702,6 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(CFG.boardPort, CFG.boardHost, () => {
-  console.log(`poolitzer board on http://${CFG.boardHost}:${CFG.boardPort}`);
+  console.log(`gimlet board on http://${CFG.boardHost}:${CFG.boardPort}`);
   if (!model) console.log("no model yet. Run: npm run train");
 });

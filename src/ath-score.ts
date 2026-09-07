@@ -32,7 +32,7 @@ export function loadAthModel(path = "./data/model-ath.json"): AthModel | null {
  * on this database, and a synchronous five seconds on the request path is the whole server's, not
  * just this card's.
  */
-export function predictAthFor(db: DB, m: AthModel, token: string): { multiple: number; lo: number; hi: number } | null {
+export function predictAthFor(db: DB, m: AthModel, token: string): { multiple: number; lo: number; hi: number; tailChance: number | null } | null {
   const row = datasetWith(db, token).find((r) => r.token === token);
   return row ? predictAth(m, row.x) : null;
 }
