@@ -151,4 +151,61 @@ export function trainAth(rows: AthRow[]): GbdtModel {
     { objective: "squared", rounds: 200, learningRate: 0.05, maxDepth: 3, minChildHessian: 20 });
 }
 
+/**
+ * The model plus the band it is allowed to claim.
+ *
+ * The point estimate is weak — it beats a constant by about 3% of mean absolute error — so a card
+ * that printed one number would dress up a guess. The band is the honest output: residual quantiles
+ * taken from rows the model never saw, and its coverage measured on a third slice that produced
+ * neither. `coverage` is what that measurement found, not what was aimed for, so a reader can see
+ * when the band is narrower than it should be.
+ */
+export type AthModel = {
+  model: GbdtModel;
+  /** Additive bounds in log space: a prediction p becomes [p + lo, p + hi]. */
+  lo: number;
+  hi: number;
+  /** Share of unseen launches that actually fell inside the band. */
+  coverage: number;
+  trainedOn: number;
+  spearman: number;
+  topDecileLift: number;
+};
+
+const BAND = 0.8;
+
+export function fitAthModel(rows: AthRow[]): AthModel | null {
+  if (rows.length < 300) return null;
+  // Three slices: fit, take residual quantiles, then measure coverage on rows that produced neither.
+  const a = Math.floor(rows.length * 0.6);
+  const b = Math.floor(rows.length * 0.8);
+  const model = trainAth(rows.slice(0, a));
+
+  const resid = rows.slice(a, b).map((r) => r.logPeak - predict(model, r.x)).sort((x, y) => x - y);
+  const at = (p: number): number => resid[Math.min(resid.length - 1, Math.floor(resid.length * p))];
+  const lo = at((1 - BAND) / 2);
+  const hi = at(1 - (1 - BAND) / 2);
+
+  const test = rows.slice(b);
+  const inside = test.filter((r) => {
+    const p = predict(model, r.x);
+    return r.logPeak >= p + lo && r.logPeak <= p + hi;
+  }).length;
+
+  const ev = evaluateAth(model, test);
+  return {
+    model, lo, hi,
+    coverage: test.length ? inside / test.length : 0,
+    trainedOn: a,
+    spearman: ev.spearman,
+    topDecileLift: ev.topDecileLift,
+  };
+}
+
+/** Predicted peak for one launch, as a multiple of its launch price, with its band. */
+export function predictAth(m: AthModel, x: Float64Array): { multiple: number; lo: number; hi: number } {
+  const p = predict(m.model, x);
+  return { multiple: Math.exp(p), lo: Math.exp(p + m.lo), hi: Math.exp(p + m.hi) };
+}
+
 export { calibrate };

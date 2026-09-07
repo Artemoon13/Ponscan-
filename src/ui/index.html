@@ -198,6 +198,9 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .big .v{font:600 32px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .big.line .v{color:var(--lime)}
 .big .v small{font-size:14px;letter-spacing:0;opacity:.7}
+.big.line .v{font-size:23px}
+.subline{margin-top:12px;font:11.5px var(--mono);color:var(--t5)}
+.subline b{color:var(--ink);font-weight:600}
 .reasons{display:flex;flex-direction:column;gap:8px;margin-top:16px;line-height:1.4}
 .reasons div{display:grid;grid-template-columns:12px 1fr;gap:8px}
 .reasons i{font-style:normal;font-family:var(--mono)}
@@ -224,8 +227,8 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .stat3 b{display:block;font:700 20px/1 var(--mono)}
 .stat3 div.lime b{color:var(--lime)}
 .stat3 span{font-size:11px;color:var(--t5);margin-top:4px;display:block}
-.thead{height:32px;display:grid;grid-template-columns:60px minmax(0,1fr) 90px 12px;gap:12px;align-items:center;padding:0 20px;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45);border-bottom:1px solid var(--l08)}
-.trow{display:grid;grid-template-columns:60px minmax(0,1fr) 90px 12px;gap:12px;padding:0 20px;height:36px;border-bottom:1px solid var(--l05);align-items:center}
+.thead{height:32px;display:grid;grid-template-columns:60px minmax(0,1fr) 116px 12px;gap:12px;align-items:center;padding:0 20px;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45);border-bottom:1px solid var(--l08)}
+.trow{display:grid;grid-template-columns:60px minmax(0,1fr) 116px 12px;gap:12px;padding:0 20px;height:36px;border-bottom:1px solid var(--l05);align-items:center}
 .trow b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow .w{color:var(--t55);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .trow .o{font:600 12px var(--mono);text-align:right;white-space:nowrap}
@@ -648,7 +651,7 @@ function gradeOf(n, g) {
 }
 
 function renderCard() {
-  const { card: k, score: s } = S.card; const L = k.launch, C = k.cluster, T = k.trading, H = k.creatorHistory;
+  const { card: k, score: s } = S.card; const L = k.launch, C = k.cluster, T = k.trading, H = k.creatorHistory, A_ = k.ath;
   const fact = (key, val, cls = "", href = "") => `<div class="fact"><span class="k">${key}</span><span class="v ${cls}" title="${esc(val.replace(/<[^>]+>/g, ""))}">${val}</span>${href ? `<a class="x" href="${href}" target="_blank" rel="noopener">↗</a>` : "<span></span>"}</div>`;
   const A = (a) => `${EXP}/address/${a}`;
   const g = gradeOf(H.priorLaunches, H.priorGraduations);
@@ -663,8 +666,8 @@ function renderCard() {
 
   const reasons = s ? s.reasons.map((r) => `<div class="${r.direction}"><i>${r.direction === "up" ? "+" : "−"}</i><span>${esc(r.text[0].toUpperCase() + r.text.slice(1))}</span></div>`).join("") : "";
   const past = H.recent.length
-    ? `<div class="thead"><span>Earlier</span><span></span><span style="text-align:right">Peak</span><span></span></div>` +
-      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? "—" : "×" + p.peakMultiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
+    ? `<div class="thead"><span>Earlier</span><span></span><span style="text-align:right">Peak reached</span><span></span></div>` +
+      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? "—" : (p.peakUsd ? esc(p.peakUsd) + " " : "") + "×" + p.peakMultiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
     : `<div class="note">${H.priorLaunches === 0 ? "First launch from this wallet." : "No earlier launches on record."}</div>`;
 
   /* sections the design does not have, kept because the tool does */
@@ -672,7 +675,7 @@ function renderCard() {
     ${fact("Trades", `${T.buys} buys · ${T.sells} sells`)}
     ${fact("Buyers", `${T.buyersTotal} total · <b>${T.buyersFirstMinute}</b> in the first minute`)}
     ${fact("Opening tax paid", T.snipers.length ? `${esc(T.snipeTaxTotal)} ${esc(L.quoteSymbol)} by ${new Set(T.snipers.map((x) => x.address)).size} wallet(s)` : "nobody raced the window")}
-    ${fact("Peak on the curve", T.peakMultiple === null ? "too few trades to have a peak" : `×${T.peakMultiple.toFixed(2)} above its first trade`, T.peakMultiple !== null && T.peakMultiple >= 3 ? "" : "")}
+    ${fact("Peak reached", T.peakMultiple === null ? "too few trades to have a peak" : `${T.peakUsd ? esc(T.peakUsd) + " · " : ""}×${T.peakMultiple.toFixed(2)} above its first trade`)}
     ${T.coBuyers.length ? `<div class="sec"><span class="k">Bought inside the launch tx</span></div><div class="list2">${T.coBuyers.map((b) => `<div class="li"><span><a href="${A(b.address)}" target="_blank" rel="noopener">${short(b.address)}</a></span><span class="m">${esc(b.amount)} ${esc(L.quoteSymbol)}</span></div>`).join("")}</div>` : ""}
     ${T.snipers.length ? `<div class="sec"><span class="k">Raced the 3-second window</span></div><div class="list2">${T.snipers.slice(0, 8).map((x) => `<div class="li"><span><a href="${A(x.address)}" target="_blank" rel="noopener">${short(x.address)}</a>${x.onExemptList ? '<span class="x r">on exempt list</span>' : ""}</span><span class="m">+${x.blocksAfterLaunch} blk · paid ${esc(x.tax)}</span></div>`).join("")}</div>` : ""}
     ${T.topWallets.length ? `<div class="sec"><span class="k">Biggest wallets, by money in</span></div><div class="list2">${T.topWallets.slice(0, 8).map((p) => `<div class="li"><span><a href="${A(p.address)}" target="_blank" rel="noopener">${short(p.address)}</a>${p.multiple !== null ? `<span class="x ${p.multiple >= 1 ? "l" : "r"}">×${p.multiple.toFixed(2)}</span>` : ""}</span><span class="m">in ${esc(p.inAmount)} · out ${esc(p.outAmount)}</span></div>`).join("")}</div>` : ""}`;
@@ -686,9 +689,13 @@ function renderCard() {
     <div class="ptop">
       <div class="bigs">
         <div class="big lime"><div class="k">Graduate</div><div class="v">${s ? pct(s.probability) : "—"}</div></div>
-        <div class="big line"><div class="k">Rank · of ${s ? s.of.toLocaleString() : "—"} in 6h</div><div class="v">${s ? "#" + s.rank : "—"}</div></div>
+        <div class="big line" title="${A_ && A_.available ? `Range, not a figure: the point estimate barely beats a constant. This 80% band covered ${(100 * A_.coverage).toFixed(0)}% of unseen launches; the model's rank correlation with the real peak is ${A_.spearman.toFixed(2)}.` : "Needs the peak model — run npm run curves then npm run train"}">
+          <div class="k">Peak, likely range</div>
+          <div class="v">${A_ && A_.available && A_.loUsd ? `${esc(A_.loUsd)}–${esc(A_.hiUsd)}` : A_ && A_.available ? `×${A_.loMultiple.toFixed(1)}–${A_.hiMultiple.toFixed(1)}` : "—"}</div>
+        </div>
       </div>
       <div class="reasons">${reasons}</div>
+      <div class="subline">rank <b>#${s ? s.rank : "—"}</b> of ${s ? s.of.toLocaleString() : "—"} in the last 6h${A_ && A_.available ? ` · peak model expects <b>×${A_.multiple.toFixed(1)}</b>, 80% band` : ""}</div>
     </div>
     <div class="pbody">
       ${fact("Creator (tx.from)", L.creator ? short(L.creator) : "unknown", "", L.creator ? A(L.creator) : "")}
@@ -704,7 +711,7 @@ function renderCard() {
       <div class="soc"><span class="k">Socials</span><span class="b">${hasX ? `<a href="${esc(soc.twitter)}" target="_blank" rel="noopener"><b>𝕏</b>Twitter ↗</a>` : ""}${hasWeb ? `<a href="${esc(soc.website)}" target="_blank" rel="noopener"><b>⌂</b>Website ↗</a>` : ""}${!hasX && !hasWeb ? '<span class="none">none declared</span>' : ""}</span></div>
       <div class="sec"><span class="k">Creator</span><span class="v">${L.creator ? L.creator : "—"}</span>${L.creator ? `<a href="${A(L.creator)}" target="_blank" rel="noopener">↗</a>` : ""}</div>
       <div class="stat3"><div><b>${H.priorLaunches}</b><span>launches before</span></div><div class="lime"><b>${H.priorGraduations}</b><span>graduated · ${rate}</span></div>
-        <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? "×" + H.bestPeak.multiple.toFixed(1) : "—"}</b><span>${H.bestPeak ? "best peak · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread ? "reading " + H.unread + " curves…" : "no peaks yet"}</span></div></div>
+        <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? (H.bestPeak.usd ? esc(H.bestPeak.usd) : "×" + H.bestPeak.multiple.toFixed(1)) : "—"}</b><span>${H.bestPeak ? "best peak · ×" + H.bestPeak.multiple.toFixed(1) + " · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread ? "reading " + H.unread + " curves…" : "no peaks yet"}</span></div></div>
       ${past}
       <div class="sec"><span class="k">Trading on the curve</span></div>
       ${trading}

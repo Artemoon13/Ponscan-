@@ -108,3 +108,44 @@ export function capsFor(db: DB, token: string, quoteSymbol: string | null, quote
     peakMultiple: peak / first,
   };
 }
+
+/**
+ * What a launch is worth the moment it opens, per quote asset.
+ *
+ * The curve starts at a price the protocol fixes, so this is very nearly a constant: measured across
+ * 2,512 read curves the starting cap sits at roughly $4K with a p90/p10 spread of 1.33, and within a
+ * single quote asset it is tighter still. That is what lets a *fresh* launch — one with no trades yet
+ * — have its predicted multiple expressed in dollars at all. Without it the model could only ever say
+ * "x3", never "about $12K".
+ *
+ * Measured rather than assumed, and null when too few curves have been read for that asset to say.
+ */
+const startCache = new Map<string, number | null>();
+
+export function startingCapUsd(db: DB, quoteSymbol: string | null, quoteDecimals: number): number | null {
+  if (!quoteSymbol) return null;
+  const hit = startCache.get(quoteSymbol);
+  if (hit !== undefined) return hit;
+
+  const rows = db.prepare(`
+    SELECT t.quote_wei, t.token_amt FROM curve_trades t
+    JOIN launches l USING(token)
+    LEFT JOIN quote_assets q ON q.address = l.pair_token
+    WHERE t.side = 'buy'
+      AND CASE WHEN l.pair_token = '0x0000000000000000000000000000000000000000'
+               THEN 'ETH' ELSE coalesce(q.symbol,'?') END = ?
+      AND t.rowid IN (SELECT min(rowid) FROM curve_trades WHERE side='buy' GROUP BY token)`).all(quoteSymbol) as
+    Array<{ quote_wei: string; token_amt: string }>;
+
+  const caps: number[] = [];
+  for (const r of rows) {
+    const tokens = Number(r.token_amt) / 1e18;
+    if (!(tokens > 0)) continue;
+    const cap = marketCapUsd((Number(r.quote_wei) / 10 ** quoteDecimals) / tokens, quoteSymbol);
+    if (cap !== null && Number.isFinite(cap)) caps.push(cap);
+  }
+  caps.sort((a, b) => a - b);
+  const median = caps.length >= 5 ? caps[Math.floor(caps.length / 2)] : null;
+  startCache.set(quoteSymbol, median);
+  return median;
+}

@@ -1,6 +1,8 @@
 import { EXPLORER } from "./config.ts";
 import { formatUnits, quoteFromCache } from "./quote.ts";
 import { curveStats, peakMultiple, type CurveStats } from "./curve.ts";
+import { capsFor, formatUsd, startingCapUsd } from "./prices.ts";
+import { loadAthModel, predictAthFor } from "./ath-score.ts";
 import type { DB } from "./db.ts";
 
 /**
@@ -31,6 +33,19 @@ export type Card = {
   fees: {
     recipient: string | null; recipientUrl: string; redirected: boolean;
     changes: Array<{ prev: string; next: string; tx: string; txUrl: string; ts: number }>;
+  };
+  /**
+   * What the second model expects this launch to reach, as a band rather than a figure.
+   *
+   * The point estimate barely beats a constant, so a single number would be a guess wearing a
+   * precision it does not have. The band is measured: residual quantiles from launches the model
+   * never saw, its coverage checked on a third slice. `coverage` is what that check found.
+   */
+  ath: {
+    available: boolean;
+    multiple: number | null; loMultiple: number | null; hiMultiple: number | null;
+    pointUsd: string | null; loUsd: string | null; hiUsd: string | null;
+    coverage: number | null; spearman: number | null;
   };
   /**
    * The name cluster this launch belongs to: other launches that used the same ticker.
@@ -66,16 +81,18 @@ export type Card = {
     snipeTaxTotal: string;
     /** Highest price the curve reached, as a multiple of its first trade. Observed, not forecast. */
     peakMultiple: number | null;
+    /** Peak market cap in dollars, from the price snapshot. Null when the quote asset has no price. */
+    peakUsd: string | null;
     topWallets: Array<{ address: string; inAmount: string; outAmount: string; multiple: number | null; url: string }>;
   };
   outcome: { phase: number; graduated: boolean; graduationTx: string | null; graduationTxUrl: string | null; secondsToGraduate: number | null };
   creatorHistory: {
     priorLaunches: number; priorGraduations: number;
     /** Best observed peak across the earlier launches whose curves have been read. Null if none have. */
-    bestPeak: { symbol: string | null; token: string; multiple: number } | null;
+    bestPeak: { symbol: string | null; token: string; multiple: number; usd: string | null } | null;
     /** How many of `recent` still have no curve data, so the card can say so instead of implying zero. */
     unread: number;
-    recent: Array<{ token: string; symbol: string | null; ts: number; graduated: boolean; peakMultiple: number | null; url: string }>;
+    recent: Array<{ token: string; symbol: string | null; ts: number; graduated: boolean; peakMultiple: number | null; peakUsd: string | null; url: string }>;
   };
 };
 
@@ -109,10 +126,10 @@ export function buildCard(db: DB, token: string): Card | null {
     WHERE x.deployer = ? AND g.ts < ?`).get(deployer, l.ts) as { c: number };
 
   const recent = db.prepare(`
-    SELECT x.token, x.symbol, x.ts, (g.token IS NOT NULL) AS graduated
+    SELECT x.token, x.symbol, x.ts, x.pair_token, (g.token IS NOT NULL) AS graduated
     FROM launches x LEFT JOIN graduations g USING(token)
     WHERE x.deployer = ? AND x.token != ? ORDER BY x.block DESC LIMIT 10`).all(deployer, t) as
-    Array<{ token: string; symbol: string | null; ts: number; graduated: number }>;
+    Array<{ token: string; symbol: string | null; ts: number; pair_token: string; graduated: number }>;
 
   const socials = (() => {
     try { return JSON.parse((l.socials_json as string) ?? "{}") as Record<string, string>; } catch { return {}; }
@@ -132,18 +149,40 @@ export function buildCard(db: DB, token: string): Card | null {
   const kind: Card["cluster"]["kind"] =
     clusterRows.length <= 1 ? "unique" : creators <= Math.max(1, Math.floor(clusterRows.length / 10)) ? "repeat-spam" : "swarm";
 
-  // Peaks come from curve trades, which are read per token on demand, so an earlier launch nobody
-  // has opened yet has no peak rather than a peak of zero. The card counts those separately.
-  const history = recent.map((r) => ({
-    token: r.token, symbol: r.symbol, ts: r.ts,
-    graduated: Boolean(r.graduated), peakMultiple: peakMultiple(db, r.token), url: EXPLORER.token(r.token),
-  }));
-
   const feeRecipient = (l.creator_fee_recipient as string | null) ?? null;
   // Amounts are denominated in the launch's quote asset, which is often a 6-decimal stablecoin or a
   // tokenised stock rather than ETH. Formatting them all as 1e18 prints 0.0000 for real values.
   const quote = quoteFromCache(db, String(l.pair_token));
   const cs: CurveStats = curveStats(db, t, Number(l.block));
+  const ownCaps = capsFor(db, t, quote.symbol, quote.decimals);
+
+  /**
+   * Peaks for the creator's earlier launches.
+   *
+   * Each is priced in *its own* quote asset, not this card's. A creator launching once against ETH
+   * and once against USDG is ordinary, and using this token's decimals for both would misprice the
+   * other by a factor of a trillion — the same decimals bug that once printed "0.0000" on the card.
+   *
+   * Curves are read per token on demand, so an earlier launch nobody has opened yet has no peak
+   * rather than a peak of zero; the card counts those separately and says so.
+   */
+  const history = recent.map((r) => {
+    const q = quoteFromCache(db, r.pair_token);
+    const caps = capsFor(db, r.token, q.symbol, q.decimals);
+    return {
+      token: r.token, symbol: r.symbol, ts: r.ts, graduated: Boolean(r.graduated),
+      peakMultiple: caps.peakMultiple, peakUsd: caps.peakUsd === null ? null : formatUsd(caps.peakUsd),
+      url: EXPLORER.token(r.token),
+    };
+  });
+
+  // The multiple is what the model predicts; dollars come from the near-constant starting cap, so a
+  // launch with no trades yet still gets a figure instead of only a ratio.
+  const athModel = loadAthModel();
+  const athRaw = athModel ? predictAthFor(db, athModel, t) : null;
+  const startCap = startingCapUsd(db, quote.symbol, quote.decimals);
+  const asUsd = (m: number | null): string | null =>
+    m === null || startCap === null ? null : formatUsd(m * startCap);
   const fq = (wei: string): string => formatUnits(BigInt(wei), quote.decimals);
 
   return {
@@ -201,10 +240,22 @@ export function buildCard(db: DB, token: string): Card | null {
       })),
       snipeTaxTotal: fq(cs.snipeTaxTotalWei),
       peakMultiple: cs.peakMultiple,
+      peakUsd: ownCaps.peakUsd === null ? null : formatUsd(ownCaps.peakUsd),
       topWallets: cs.positions.slice(0, 10).map((p) => ({
         address: p.address, inAmount: fq(p.boughtWei), outAmount: fq(p.soldWei),
         multiple: p.multiple, url: EXPLORER.address(p.address),
       })),
+    },
+    ath: {
+      available: athRaw !== null,
+      multiple: athRaw?.multiple ?? null,
+      loMultiple: athRaw?.lo ?? null,
+      hiMultiple: athRaw?.hi ?? null,
+      pointUsd: asUsd(athRaw?.multiple ?? null),
+      loUsd: asUsd(athRaw?.lo ?? null),
+      hiUsd: asUsd(athRaw?.hi ?? null),
+      coverage: athModel?.coverage ?? null,
+      spearman: athModel?.spearman ?? null,
     },
     exemptions: exemptRows.map((e) => ({
       address: e.address,
@@ -223,7 +274,7 @@ export function buildCard(db: DB, token: string): Card | null {
       priorGraduations: priorGrad.c,
       bestPeak: history.reduce<Card["creatorHistory"]["bestPeak"]>((best, r) =>
         r.peakMultiple !== null && (best === null || r.peakMultiple > best.multiple)
-          ? { symbol: r.symbol, token: r.token, multiple: r.peakMultiple } : best, null),
+          ? { symbol: r.symbol, token: r.token, multiple: r.peakMultiple, usd: r.peakUsd } : best, null),
       unread: history.filter((r) => r.peakMultiple === null).length,
       recent: history,
     },
