@@ -4,11 +4,16 @@ import { spawnSync } from "node:child_process";
  * The scheduled job: catch up on history, fill in the launch transactions, refit.
  *
  * Order matters. Enriching before backfilling would skip launches that are not in the database yet,
- * and training before enriching would fit on a window that is only partly covered.
+ * and training before enriching would fit on a window that is only partly covered. Curves come
+ * last before training because the peak model is fitted on them: it needs launches that have both
+ * settled and been read, and reading is the step that lags. Its limit is deliberate rather than
+ * unbounded, since the read is rate-limited at roughly 1.7 curves a second, which puts four
+ * thousand of them at about forty minutes.
  */
 const steps: Array<[string, string[]]> = [
   ["backfill", ["--hours", "26"]],
   ["enrich-window", ["--hours", "20", "--workers", "6"]],
+  ["curves", ["--limit", "4000", "--min-age-hours", "4", "--max-age-hours", "168"]],
   ["train", []],
 ];
 
