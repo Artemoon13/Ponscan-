@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Poolitzer</title>
+<link rel="icon" href="/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -38,6 +39,9 @@ button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer
 .nav{height:56px;display:flex;align-items:center;padding:0 40px;gap:28px;border-bottom:1px solid var(--l10);flex:none;position:sticky;top:0;background:var(--bg);z-index:5}
 .brand{display:flex;align-items:center;gap:12px;cursor:pointer;color:var(--ink)}
 .mark{width:22px;height:22px;background:var(--lime);border-radius:5px 5px 12px 5px}
+/* The artwork carries its own black ground and fine detail, so it gets no rounding, no
+   tint, and a little more room than the plain square it replaces. */
+.mark.img{width:26px;height:26px;background:none;border-radius:0;object-fit:contain}
 .brand b{font-size:19px;letter-spacing:-.02em}
 .links{display:flex;gap:26px;font-size:16px;align-self:stretch;align-items:stretch}
 .links a{display:flex;align-items:center;cursor:pointer;padding-top:2px;color:var(--t65);border-bottom:2px solid transparent}
@@ -60,6 +64,7 @@ button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer
 .btn-lg{padding:14px 22px;border-radius:7px;font-size:14px}
 .brand:hover{color:var(--ink)}
 .brand:hover .mark{background:var(--lime2)}
+.brand:hover .mark.img{background:none;opacity:.85}
 .links a:hover{color:var(--ink)}
 .shot:hover{color:var(--ink);border-color:rgba(204,255,0,.35)}
 .tokencard:hover{color:var(--ink);border-color:rgba(204,255,0,.75)}
@@ -301,7 +306,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
 <div class="app">
 
 <nav class="nav">
-  <a class="brand" href="#/"><span class="mark"></span><b>Poolitzer</b></a>
+  <a class="brand" href="#/"><span class="mark" id="mark"></span><img class="mark img" src="/logo.png" alt="" onload="document.getElementById('mark').remove()" onerror="this.remove()"><b>Poolitzer</b></a>
   <div class="links">
     <a href="#/board" data-nav="board">Board</a>
     <a href="#/model" data-nav="model">Model</a>

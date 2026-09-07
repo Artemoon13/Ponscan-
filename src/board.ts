@@ -282,6 +282,20 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  /**
+   * The project mark, if one has been dropped in.
+   *
+   * Optional on purpose: the repository ships without a logo, and a missing file is a 404 the page
+   * handles by falling back to the plain lime square rather than a broken image.
+   */
+  if (url.pathname === "/logo.png") {
+    const file = join(here, "ui", "logo.png");
+    if (!existsSync(file)) { res.writeHead(404).end(); return; }
+    res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=300" });
+    res.end(readFileSync(file));
+    return;
+  }
+
   if (url.pathname === "/") {
     const html = readFileSync(join(here, "ui", "index.html"));
     // Re-read per request so an edit shows up on reload — which only works if the browser is told
