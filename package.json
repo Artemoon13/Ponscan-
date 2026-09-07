@@ -9,6 +9,7 @@
     "node": ">=22.6"
   },
   "scripts": {
+    "icon": "node --no-warnings src/cli/icon.ts",
     "doctor": "node --no-warnings src/cli/doctor.ts",
     "setup": "node --no-warnings src/cli/setup.ts",
     "backfill": "node --no-warnings src/cli/backfill.ts",

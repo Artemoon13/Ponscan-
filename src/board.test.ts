@@ -165,6 +165,25 @@ test("serves the preview image", async () => {
   assert.deepEqual([...bytes.slice(0, 4)], [0x89, 0x50, 0x4e, 0x47], "that is not a PNG");
 });
 
+test("serves the favicons, and small ones", async () => {
+  // The point of cutting them: the full mark is a megabyte, fetched by every visitor to draw
+  // something 32 pixels across. If these ever start returning the mark itself, that is back.
+  for (const [name, ceiling] of [["icon-64.png", 40_000], ["icon-128.png", 120_000]] as const) {
+    const r = await fetch(`${BASE}/${name}`);
+    assert.equal(r.status, 200, name);
+    assert.equal(r.headers.get("content-type"), "image/png");
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    assert.deepEqual([...bytes.slice(0, 4)], [0x89, 0x50, 0x4e, 0x47], `${name} is not a PNG`);
+    assert.ok(bytes.length < ceiling, `${name} is ${bytes.length} bytes, which is the full mark again`);
+  }
+});
+
+test("the page points at the small icons, not the mark", async () => {
+  const html = await (await fetch(BASE)).text();
+  assert.match(html, /rel="icon"[^>]*href="\/icon-64\.png"/);
+  assert.doesNotMatch(html, /rel="icon"[^>]*href="\/logo\.png"/, "the tab is fetching the full mark");
+});
+
 test("reports its own health", async () => {
   const r = await fetch(`${BASE}/api/health`);
   assert.equal(r.status, 200);
