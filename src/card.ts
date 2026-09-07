@@ -1,6 +1,6 @@
 import { EXPLORER } from "./config.ts";
 import { formatUnits, quoteFromCache } from "./quote.ts";
-import { curveStats, type CurveStats } from "./curve.ts";
+import { curveStats, peakMultiple, type CurveStats } from "./curve.ts";
 import type { DB } from "./db.ts";
 
 /**
@@ -64,12 +64,18 @@ export type Card = {
     coBuyers: Array<{ address: string; amount: string; url: string }>;
     snipers: Array<{ address: string; tax: string; bought: string; blocksAfterLaunch: number; onExemptList: boolean; url: string }>;
     snipeTaxTotal: string;
+    /** Highest price the curve reached, as a multiple of its first trade. Observed, not forecast. */
+    peakMultiple: number | null;
     topWallets: Array<{ address: string; inAmount: string; outAmount: string; multiple: number | null; url: string }>;
   };
   outcome: { phase: number; graduated: boolean; graduationTx: string | null; graduationTxUrl: string | null; secondsToGraduate: number | null };
   creatorHistory: {
     priorLaunches: number; priorGraduations: number;
-    recent: Array<{ token: string; symbol: string | null; ts: number; graduated: boolean; url: string }>;
+    /** Best observed peak across the earlier launches whose curves have been read. Null if none have. */
+    bestPeak: { symbol: string | null; token: string; multiple: number } | null;
+    /** How many of `recent` still have no curve data, so the card can say so instead of implying zero. */
+    unread: number;
+    recent: Array<{ token: string; symbol: string | null; ts: number; graduated: boolean; peakMultiple: number | null; url: string }>;
   };
 };
 
@@ -125,6 +131,13 @@ export function buildCard(db: DB, token: string): Card | null {
   // One wallet relaunching the same ticker is spam; many wallets on one ticker is a narrative.
   const kind: Card["cluster"]["kind"] =
     clusterRows.length <= 1 ? "unique" : creators <= Math.max(1, Math.floor(clusterRows.length / 10)) ? "repeat-spam" : "swarm";
+
+  // Peaks come from curve trades, which are read per token on demand, so an earlier launch nobody
+  // has opened yet has no peak rather than a peak of zero. The card counts those separately.
+  const history = recent.map((r) => ({
+    token: r.token, symbol: r.symbol, ts: r.ts,
+    graduated: Boolean(r.graduated), peakMultiple: peakMultiple(db, r.token), url: EXPLORER.token(r.token),
+  }));
 
   const feeRecipient = (l.creator_fee_recipient as string | null) ?? null;
   // Amounts are denominated in the launch's quote asset, which is often a 6-decimal stablecoin or a
@@ -187,6 +200,7 @@ export function buildCard(db: DB, token: string): Card | null {
         blocksAfterLaunch: x.blocksAfterLaunch, onExemptList: x.wasExempt, url: EXPLORER.address(x.address),
       })),
       snipeTaxTotal: fq(cs.snipeTaxTotalWei),
+      peakMultiple: cs.peakMultiple,
       topWallets: cs.positions.slice(0, 10).map((p) => ({
         address: p.address, inAmount: fq(p.boughtWei), outAmount: fq(p.soldWei),
         multiple: p.multiple, url: EXPLORER.address(p.address),
@@ -207,10 +221,11 @@ export function buildCard(db: DB, token: string): Card | null {
     creatorHistory: {
       priorLaunches: prior.c,
       priorGraduations: priorGrad.c,
-      recent: recent.map((r) => ({
-        token: r.token, symbol: r.symbol, ts: r.ts,
-        graduated: Boolean(r.graduated), url: EXPLORER.token(r.token),
-      })),
+      bestPeak: history.reduce<Card["creatorHistory"]["bestPeak"]>((best, r) =>
+        r.peakMultiple !== null && (best === null || r.peakMultiple > best.multiple)
+          ? { symbol: r.symbol, token: r.token, multiple: r.peakMultiple } : best, null),
+      unread: history.filter((r) => r.peakMultiple === null).length,
+      recent: history,
     },
   };
 }

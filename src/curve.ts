@@ -82,6 +82,35 @@ export async function indexCurve(
   return out;
 }
 
+/**
+ * The highest price the curve ever traded at, as a multiple of its first trade.
+ *
+ * Deliberately a ratio, not a market cap in dollars. Every trade carries what was paid and what came
+ * back, so a price falls straight out of the log — but turning that into "$1.4M" needs the quote
+ * asset's price in dollars, and half of launches are quoted in a tokenised stock. That number can
+ * only come from an off-chain feed, which this tool does not have and does not want. A ratio needs
+ * neither an oracle nor the asset's decimals: both sides scale identically, so a USDG launch whose
+ * prices read 4.8e-18 still reports a clean x8.30.
+ *
+ * It is what happened, not a forecast. Null when the curve has not been indexed, or traded too
+ * little to have a peak worth naming.
+ */
+export function peakMultiple(db: DB, token: string): number | null {
+  const rows = db.prepare(
+    "SELECT quote_wei, token_amt FROM curve_trades WHERE token = ? AND side = 'buy' ORDER BY block, log_index",
+  ).all(token) as Array<{ quote_wei: string; token_amt: string }>;
+
+  const prices: number[] = [];
+  for (const r of rows) {
+    const tokens = Number(r.token_amt);
+    if (!(tokens > 0)) continue;
+    const p = Number(r.quote_wei) / tokens;
+    if (p > 0 && Number.isFinite(p)) prices.push(p);
+  }
+  if (prices.length < 2) return null;
+  return Math.max(...prices) / prices[0];
+}
+
 export type Sniper = { address: string; taxWei: string; boughtWei: string; blocksAfterLaunch: number; wasExempt: boolean };
 export type Position = {
   address: string; boughtWei: string; soldWei: string; netTokens: string;
@@ -97,6 +126,8 @@ export type CurveStats = {
   snipers: Sniper[];
   snipeTaxTotalWei: string;
   lastPrice: number | null;
+  /** Highest traded price as a multiple of the first trade. Observed, never predicted. */
+  peakMultiple: number | null;
   positions: Position[];
 };
 
@@ -111,7 +142,7 @@ export function curveStats(db: DB, token: string, launchBlock: number): CurveSta
     | { to_block: number; trades: number } | undefined;
   if (!state) {
     return { indexed: false, trades: 0, buys: 0, sells: 0, buyersFirstMinute: 0, buyersTotal: 0,
-      coBuyersInLaunchTx: [], snipers: [], snipeTaxTotalWei: "0", lastPrice: null, positions: [] };
+      coBuyersInLaunchTx: [], snipers: [], snipeTaxTotalWei: "0", lastPrice: null, peakMultiple: null, positions: [] };
   }
 
   const rows = db.prepare(
@@ -183,6 +214,7 @@ export function curveStats(db: DB, token: string, launchBlock: number): CurveSta
     snipers,
     snipeTaxTotalWei: snipeRows.reduce((s, r) => s + BigInt(r.amount_wei), 0n).toString(),
     lastPrice,
+    peakMultiple: peakMultiple(db, token),
     positions,
   };
 }

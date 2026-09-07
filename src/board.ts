@@ -163,6 +163,44 @@ function stats(): Record<string, unknown> {
   return body;
 }
 
+/**
+ * Reads the curves of a creator's earlier launches, in the background, a few at a time.
+ *
+ * A peak is only knowable from that token's own trades, and those live on its own curve address, so
+ * "what is the best this creator ever did" costs one read per earlier launch. A creator with fifty
+ * of them would hold a card open for half a minute, which is not a trade worth making: the card
+ * answers now with the peaks already known and says how many it has not read, and the rest arrive
+ * before the next time anyone looks at this creator.
+ */
+const CREATOR_PEAKS_PER_OPEN = 6;
+async function backfillCreatorPeaks(token: string): Promise<void> {
+  const rows = db.prepare(`
+    SELECT x.token, x.curve, x.block FROM launches x
+    WHERE x.deployer = (SELECT deployer FROM launches WHERE token = ?)
+      AND x.token != ?
+      AND x.token NOT IN (SELECT token FROM curve_indexed)
+    ORDER BY x.block DESC LIMIT ?`).all(token, token, CREATOR_PEAKS_PER_OPEN) as
+    Array<{ token: string; curve: string; block: number }>;
+  if (!rows.length) return;
+
+  try {
+    const head = Number(await logsClient.getBlockNumber());
+    for (const r of rows) {
+      if (indexing.has(r.token)) continue;
+      indexing.add(r.token);
+      try {
+        await indexCurve(db, r.token, r.curve, r.block, Math.min(head, r.block + 900_000));
+      } catch {
+        // One unreadable curve must not stop the rest.
+      } finally {
+        indexing.delete(r.token);
+      }
+    }
+  } catch {
+    // No head, no backfill; the next card open tries again.
+  }
+}
+
 const json = (res: import("node:http").ServerResponse, body: unknown, code = 200): void => {
   const s = JSON.stringify(body);
   res.writeHead(code, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(s) });
@@ -334,6 +372,8 @@ const server = createServer(async (req, res) => {
       })();
       await Promise.race([work, sleep(1500)]);
     }
+
+    void backfillCreatorPeaks(token);
 
     const card = buildCard(db, token);
     if (!card) { json(res, { error: "unknown token" }, 404); return; }
