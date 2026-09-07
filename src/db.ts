@@ -191,6 +191,9 @@ CREATE TABLE IF NOT EXISTS predictions (
   scored_at    INTEGER NOT NULL,
   age_at_score INTEGER NOT NULL,
   probability  REAL NOT NULL,
+  -- The model's own opinion, before any live correction. The probability column above is the claim
+  -- as shown; this is what a refit is fitted against, so a correction is never measured on itself.
+  raw_probability REAL,
   rank         INTEGER NOT NULL,
   of           INTEGER NOT NULL,
   model_id     TEXT NOT NULL,
@@ -216,6 +219,10 @@ export type DB = DatabaseSync;
  */
 const MIGRATIONS: Array<{ table: string; column: string; ddl: string }> = [
   { table: "launches", column: "symbol_key", ddl: "ALTER TABLE launches ADD COLUMN symbol_key TEXT" },
+  // The model's own opinion, before any live correction was applied to it. `probability` stays the
+  // number that was shown, because that is the claim; this is what the correction must be refitted
+  // against, or each pass would correct an already-corrected score and drift downward unnoticed.
+  { table: "predictions", column: "raw_probability", ddl: "ALTER TABLE predictions ADD COLUMN raw_probability REAL" },
 ];
 
 /**

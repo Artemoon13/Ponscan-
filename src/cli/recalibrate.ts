@@ -16,7 +16,11 @@ const db = openDb();
 grade(db);
 
 const id = modelId();
-const rows = settled(db, id).map((r) => ({ probability: r.probability, label: r.label as 0 | 1 }));
+// Fitted against the model's own opinion, never against a number a previous correction already
+// moved. Older rows predate the column and were never corrected, so their shown value is the raw one.
+const claims = settled(db, id);
+const rows = claims.map((r) => ({ probability: r.raw_probability ?? r.probability, label: r.label as 0 | 1 }));
+const shownRows = claims.map((r) => ({ probability: r.probability, label: r.label as 0 | 1 }));
 
 console.log(`\nmodel ${id}: ${rows.length} settled claims scored by it\n`);
 
@@ -26,12 +30,14 @@ if (rows.length < MIN_CLAIMS) {
   process.exit(0);
 }
 
-const said = rows.reduce((s, r) => s + r.probability, 0) / rows.length;
+const raw = rows.reduce((s, r) => s + r.probability, 0) / rows.length;
+const said = shownRows.reduce((s, r) => s + r.probability, 0) / shownRows.length;
 const was = rows.reduce((s, r) => s + r.label, 0) / rows.length;
 const fit = fitLive(rows);
 
-console.log(`  it said   ${(100 * said).toFixed(2)}%`);
-console.log(`  it was    ${(100 * was).toFixed(2)}%`);
+console.log(`  the model thought  ${(100 * raw).toFixed(2)}%`);
+if (Math.abs(said - raw) > 1e-9) console.log(`  the board showed   ${(100 * said).toFixed(2)}%   (a correction was already in force)`);
+console.log(`  it was             ${(100 * was).toFixed(2)}%`);
 
 if (!fit) {
   console.log("\n  the correction came out beyond what a two-parameter nudge should carry.");
@@ -41,7 +47,7 @@ if (!fit) {
 }
 
 const after = rows.reduce((s, r) => s + applyLive(fit, r.probability), 0) / rows.length;
-console.log(`  corrected ${(100 * after).toFixed(2)}%   (slope ${fit.a.toFixed(3)}, shift ${fit.b.toFixed(3)})`);
+console.log(`  would show         ${(100 * after).toFixed(2)}%   (slope ${fit.a.toFixed(3)}, shift ${fit.b.toFixed(3)})`);
 
 const existing = liveFor(id);
 if (existing) console.log(`\n  replacing a correction fitted ${Math.round((Date.now() / 1000 - existing.fittedAt) / 60)} min ago on ${existing.n} claims`);
@@ -52,6 +58,6 @@ if (!WRITE) {
   process.exit(0);
 }
 
-saveLive({ modelId: id, a: fit.a, b: fit.b, n: rows.length, fittedAt: Math.floor(Date.now() / 1000), saidBefore: said, wasBefore: was });
+saveLive({ modelId: id, a: fit.a, b: fit.b, n: rows.length, fittedAt: Math.floor(Date.now() / 1000), saidBefore: raw, wasBefore: was });
 console.log("\n  written to data/calibration.json; the board picks it up on its next request.\n");
 db.close();
