@@ -270,6 +270,15 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .envt td.v{color:var(--ink);white-space:nowrap}
 .envt td.d{color:var(--t55);font-family:Geist,sans-serif;font-size:12.5px;line-height:1.45}
 /* the honest banner for a page describing something that does not exist yet */
+/* The coin page splits the other way round from the reading pages: the chart wants the width and
+   the side card is a fixed rail, where a document wants a measured column of prose and whatever is
+   left. Sharing one rule had the chart at 58% of the page and the rail at 34%. */
+.coincols{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:36px;margin-top:26px;align-items:start}
+@media (max-width:1040px){.coincols{grid-template-columns:1fr}}
+.tf{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--l08);border-radius:7px;background:var(--bg2)}
+.tf button{border:0;background:transparent;color:var(--t55);border-radius:5px;padding:4px 11px;font:600 11px var(--mono);cursor:pointer}
+.tf button.on{background:var(--lime);color:#111}
+.tf button:hover:not(.on){color:var(--ink)}
 .coinhd{display:flex;align-items:center;gap:10px;font:11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
 .coinhd .st{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--lime)}
 .coinhd .st .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite}
@@ -287,7 +296,7 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .chartbar{display:flex;align-items:center;gap:12px;margin-top:26px;font:11px var(--mono);color:var(--t45)}
 .chartbar .src{margin-left:auto}
 .chart{margin-top:10px;border:1px solid var(--l08);border-radius:9px;background:var(--bg2);padding:14px 14px 8px}
-.chart svg{display:block;width:100%;height:230px}
+.chart svg{display:block;width:100%;height:280px}
 .chart .ax{display:flex;justify-content:space-between;margin-top:6px;font:10.5px var(--mono);color:var(--t35)}
 .rng{display:flex;align-items:center;gap:12px;margin-top:14px;font:11px var(--mono);color:var(--t45)}
 .rng .bar{position:relative;flex:1;height:2px;background:var(--l15);border-radius:2px}
@@ -836,9 +845,9 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
 
     <div class="strip" id="coin-strip"></div>
 
-    <div class="cols2">
+    <div class="coincols">
       <div>
-        <div class="chartbar"><span id="coin-chart-lbl">on the curve</span><span class="src">read from this database &middot; not an API</span></div>
+        <div class="chartbar"><span class="tf" id="coin-tf"></span><span id="coin-chart-lbl"></span><span class="src">read from this database &middot; not an API</span></div>
         <div class="chart"><div id="coin-chart"></div><div class="ax" id="coin-ax"></div></div>
         <div class="rng" id="coin-rng"></div>
 
@@ -1560,62 +1569,100 @@ async function loadCoin() {
  * trades in the pool, and the pool stream is folded to a high, low and last the moment it is read.
  * Charting the part we have and labelling it beats interpolating the part we do not.
  */
+/**
+ * The price, over a window the reader picks.
+ *
+ * Two sources meeting at graduation: the curve's own trades, where a price falls out of every log,
+ * and the pool's bars afterwards. "all" shows both and runs from four thousand dollars to two and a
+ * half million, which needs a log axis or the curve flattens into the bottom row of pixels. The
+ * shorter windows are pool-only and near enough linear, so they get a linear one and read the way a
+ * price chart is expected to.
+ */
+const TF = [
+  { k: "6h", label: "6h", blocks: 214146 },
+  { k: "24h", label: "24h", blocks: 856582 },
+  { k: "all", label: "all", blocks: null },
+];
+let coinTf = "6h";
+
 function drawCoinChart(d) {
   const host = $("coin-chart"), ax = $("coin-ax"), rng = $("coin-rng"), lbl = $("coin-chart-lbl");
 
-  // The whole life of the price, from two sources that meet at graduation: the curve's own trades,
-  // where a price falls out of every log, and the pool's bars afterwards. Both are read here, not
-  // fetched from anyone.
-  const curve = (d.curve || []).filter((p) => p && p.usd > 0).map((p) => ({ b: p.b, usd: p.usd, pool: false }));
-  const pool = (d.pool2 && d.pool2.bars || []).filter((p) => p && p.usd > 0).map((p) => ({ b: p.b, usd: p.usd, pool: true }));
-  const pts = curve.concat(pool);
+  const curve = (d.curve || []).filter((p) => p && p.usd > 0);
+  const pool = ((d.pool2 && d.pool2.bars) || []).filter((p) => p && p.usd > 0);
+
+  $("coin-tf").innerHTML = TF.map((f) =>
+    '<button data-tf="' + f.k + '"' + (f.k === coinTf ? ' class="on"' : "") + ">" + f.label + "</button>").join("");
+  $("coin-tf").querySelectorAll("button").forEach((b) => {
+    b.onclick = () => { coinTf = b.dataset.tf; drawCoinChart(d); };
+  });
+
+  const win = TF.find((f) => f.k === coinTf) || TF[0];
+  const head = pool.length ? pool[pool.length - 1].b : (curve.length ? curve[curve.length - 1].b : 0);
+  const pts = win.blocks === null ? curve.concat(pool) : pool.filter((p) => p.b >= head - win.blocks);
+  const logScale = win.blocks === null;
 
   if (pts.length < 2) {
-    host.innerHTML = '<div style="height:230px;display:flex;align-items:center;justify-content:center;color:var(--t35);font:12px var(--mono)">nothing read for this token yet</div>';
-    ax.textContent = ""; rng.innerHTML = ""; lbl.textContent = "price";
+    host.innerHTML = '<div style="height:280px;display:flex;align-items:center;justify-content:center;color:var(--t35);font:12px var(--mono)">nothing read for this window</div>';
+    ax.textContent = ""; rng.innerHTML = ""; lbl.textContent = "";
     return;
   }
 
-  const W = 1000, H = 230, pad = { l: 8, r: 66, t: 12, b: 10 };
+  const W = 1000, H = 280, pad = { l: 8, r: 78, t: 14, b: 12 };
   const lo = Math.min(...pts.map((p) => p.usd)), hi = Math.max(...pts.map((p) => p.usd));
-  // Log scale, because this price runs from four thousand dollars to two and a half million and a
-  // linear axis would flatten the entire curve into the bottom pixel.
-  const L = (v) => Math.log10(Math.max(v, 1e-9));
-  const lo2 = L(lo), span = L(hi) - lo2 || 1;
+  const L = (v) => (logScale ? Math.log10(Math.max(v, 1e-9)) : v);
+  const lo2 = L(lo), span = (L(hi) - lo2) || 1;
   const x = (i) => pad.l + (i * (W - pad.l - pad.r)) / (pts.length - 1);
   const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (L(v) - lo2) / span);
 
-  const path = (arr, from) => arr.map((p, k) => (k ? "L" : "M") + x(from + k).toFixed(1) + " " + y(p.usd).toFixed(1)).join(" ");
-  const whole = path(pts, 0);
-  const area = whole + " L" + x(pts.length - 1).toFixed(1) + " " + (H - pad.b) + " L" + pad.l + " " + (H - pad.b) + " Z";
+  const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.usd).toFixed(1)).join(" ");
+  const area = line + " L" + x(pts.length - 1).toFixed(1) + " " + (H - pad.b) + " L" + pad.l + " " + (H - pad.b) + " Z";
 
-  const ticks = [0, 1, 2, 3].map((k) => 10 ** (lo2 + (span * k) / 3));
-  const grid = ticks.map((v) => {
+  // Four labelled gridlines, each naming a price the chart reaches, on the right where the design
+  // puts them.
+  const grid = [0, 1, 2, 3].map((k) => {
+    const v = logScale ? 10 ** (lo2 + (span * k) / 3) : lo2 + (span * k) / 3;
     const yy = y(v).toFixed(1);
     return '<line x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + yy + '" y2="' + yy + '" stroke="rgba(255,255,255,.07)" stroke-dasharray="2 4"/>' +
-      '<text x="' + (W - pad.r + 8) + '" y="' + (Number(yy) + 3.5) + '" fill="rgba(255,255,255,.35)" font-family="ui-monospace,monospace" font-size="11">' + usd(v) + "</text>";
+      '<text x="' + (W - pad.r + 9) + '" y="' + (Number(yy) + 3.5) + '" fill="rgba(255,255,255,.35)" font-family="ui-monospace,monospace" font-size="11">' +
+      (logScale ? usd(v) : "$" + (v / d.supply).toPrecision(2)) + "</text>";
   }).join("");
 
-  // Where the curve ended and the pool began, marked rather than smoothed over.
-  const gx = curve.length && pool.length ? x(curve.length - 1).toFixed(1) : null;
-  const mark = gx === null ? "" :
-    '<line x1="' + gx + '" x2="' + gx + '" y1="' + pad.t + '" y2="' + (H - pad.b) +
-    '" stroke="rgba(255,255,255,.22)" stroke-dasharray="3 3"/>' +
-    '<text x="' + (Number(gx) + 6) + '" y="' + (pad.t + 12) + '" fill="rgba(255,255,255,.4)" font-family="ui-monospace,monospace" font-size="10">reached the pool</text>';
+  const gi = logScale && curve.length && pool.length ? curve.length - 1 : -1;
+  const mark = gi < 0 ? "" : (() => {
+    const gx = x(gi).toFixed(1);
+    return '<line x1="' + gx + '" x2="' + gx + '" y1="' + pad.t + '" y2="' + (H - pad.b) +
+      '" stroke="rgba(255,255,255,.22)" stroke-dasharray="3 3"/>' +
+      '<text x="' + (Number(gx) + 6) + '" y="' + (pad.t + 12) + '" fill="rgba(255,255,255,.4)" font-family="ui-monospace,monospace" font-size="10">reached the pool</text>';
+  })();
 
   host.innerHTML =
-    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="price from launch to now">' +
+    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="price">' +
     '<defs><linearGradient id="cg" x1="0" x2="0" y1="0" y2="1">' +
     '<stop offset="0%" stop-color="#ccff00" stop-opacity=".34"/><stop offset="100%" stop-color="#ccff00" stop-opacity="0"/>' +
     "</linearGradient></defs>" + grid +
     '<path d="' + area + '" fill="url(#cg)"/>' +
-    '<path d="' + whole + '" fill="none" stroke="#ccff00" stroke-width="1.6" stroke-linejoin="round"/>' + mark +
+    '<path d="' + line + '" fill="none" stroke="#ccff00" stroke-width="1.6" stroke-linejoin="round"/>' + mark +
     "</svg>";
 
-  lbl.textContent = curve.length + " curve trades \u00b7 " + pool.length + " pool bars \u00b7 log scale";
-  ax.innerHTML = "<span>launch</span><span>" + usd(pts[0].usd) + " \u2192 " + usd(pts[pts.length - 1].usd) + "</span><span>now</span>";
+  // Times along the bottom, from block numbers: the chain runs at a known rate, so a block converts
+  // without another request.
+  const SEC_PER_BLOCK = 86400 / 856582;
+  const clock = (b) => {
+    const dt = new Date(Date.now() - (head - b) * SEC_PER_BLOCK * 1000);
+    return dt.toTimeString().slice(0, 5);
+  };
+  ax.innerHTML = logScale
+    ? "<span>launch</span><span>" + usd(pts[0].usd) + " \u2192 " + usd(pts[pts.length - 1].usd) + "</span><span>now</span>"
+    : [0, 0.25, 0.5, 0.75, 1].map((f) => "<span>" + clock(pts[Math.round(f * (pts.length - 1))].b) + "</span>").join("");
+
+  lbl.textContent = logScale
+    ? curve.length + " curve trades \u00b7 " + pool.length + " pool bars \u00b7 log scale"
+    : pts.length + " pool bars";
+
   const at = ((L(pts[pts.length - 1].usd) - lo2) / span) * 100;
-  rng.innerHTML = '<span>low ' + usd(lo) + '</span><span class="bar"><i style="left:' + at.toFixed(1) + '%"></i></span><span>high ' + usd(hi) + "</span>";
+  const money = (v) => (logScale ? usd(v) : "$" + (v / d.supply).toPrecision(2));
+  rng.innerHTML = '<span>low ' + money(lo) + '</span><span class="bar"><i style="left:' + at.toFixed(1) + '%"></i></span><span>high ' + money(hi) + "</span>";
 }
 
 /* ── model page ── */
