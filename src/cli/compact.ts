@@ -86,6 +86,14 @@ if (vacuum && dropped) {
   const t = Date.now();
   db.exec("VACUUM");
   console.log(`  vacuumed in ${((Date.now() - t) / 1000).toFixed(1)}s`);
+  // A vacuum in WAL mode rewrites the whole database through the write-ahead log, and SQLite leaves
+  // that log sitting at its high-water mark. After one nightly run the log stood at 471 MB beside a
+  // 473 MB database: the compaction meant to save disk had quietly doubled it, and every figure
+  // reported above was true and beside the point. Folding the log back costs a second.
+  const cp = db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get() as { busy: number } | undefined;
+  console.log(cp && cp.busy
+    ? "  a reader still holds the write-ahead log; it folds back on the next run"
+    : "  write-ahead log folded back and truncated");
 } else if (dropped) {
   console.log(`
 Pass --vacuum to hand the freed pages back to the filesystem; SQLite keeps them otherwise.`);
