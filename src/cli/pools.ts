@@ -88,13 +88,37 @@ if (oldestGrad.b === null) {
 const oldest = db.prepare("SELECT min(init_block) b FROM pools").get() as { b: number | null };
 if (oldest.b === null) { console.log("\nno pools to follow yet"); db.close(); process.exit(0); }
 
-const saved = Number(getMeta(db, "pool_swaps_to_block") ?? 0);
-// Never start later than the oldest pool, or the tokens resolved in this run would begin life
-// already past their own history.
-const from = saved > 0 ? Math.min(saved + 1, oldest.b) : oldest.b;
+/**
+ * Where to resume, from the range already covered rather than from a single mark.
+ *
+ * The stream is contiguous, so what matters is the whole interval it has read, not just its end.
+ * Clamping the start to the oldest pool on every run looked like caution and was the opposite: the
+ * oldest pool never moves, so the minimum was always that block and the checkpoint could never take
+ * effect. Every restart began the six-million-block sweep again from the beginning, which meant a
+ * pass measured in hours had to survive in a single attempt to leave anything behind at all.
+ *
+ * Both ends are kept now. A pool discovered below the covered range still forces a restart from its
+ * own beginning, which was the real worry; anything else continues from where reading stopped.
+ */
+const savedTo = Number(getMeta(db, "pool_swaps_to_block") ?? 0);
+const savedFrom = Number(getMeta(db, "pool_swaps_from_block") ?? 0);
+
+const belowCovered = savedFrom > 0
+  ? (db.prepare("SELECT min(init_block) b FROM pools WHERE init_block < ?").get(savedFrom) as { b: number | null }).b
+  : null;
+
+const from = savedTo === 0 ? oldest.b
+  : belowCovered !== null ? belowCovered
+  : savedTo + 1;
+
+if (belowCovered !== null) {
+  console.log(`  covered range began at ${savedFrom.toLocaleString()}, but a pool opens at ${belowCovered.toLocaleString()}; restarting there`);
+}
 const to = Math.min(head, from + maxBlocks - 1);
 
 console.log(`\nreading pool swaps, blocks ${from.toLocaleString()}..${to.toLocaleString()} (head ${head.toLocaleString()}, ${(head - to).toLocaleString()} behind)`);
+// The covered range keeps its original start unless this run reaches below it.
+setMeta(db, "pool_swaps_from_block", String(savedFrom > 0 && from > savedFrom ? savedFrom : from));
 const t0 = Date.now();
 // Checkpointed per chunk rather than at the end. This pass covers millions of blocks and takes over
 // an hour; recording progress only on success meant an interruption at minute eighty threw away
@@ -102,7 +126,8 @@ const t0 = Date.now();
 const r = await indexPoolSwaps(db, from, to, chunk, (upTo, swaps) => {
   setMeta(db, "pool_swaps_to_block", String(upTo));
   const done = upTo - from + 1, span = to - from + 1;
-  process.stdout.write(`  ${(100 * done / span).toFixed(1)}%  ${swaps.toLocaleString()} swaps  `);
+  process.stdout.write(`
+  ${(100 * done / span).toFixed(1)}%  ${swaps.toLocaleString()} swaps  `);
 });
 const secs = (Date.now() - t0) / 1000;
 
