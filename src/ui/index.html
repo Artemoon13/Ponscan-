@@ -3,395 +3,680 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>poolitzer</title>
+<title>Poolitzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0e1013; --panel:#15181d; --line:#242932; --ink:#e6e9ef; --dim:#8b94a3;
-    --up:#3fb950; --down:#f0883e; --accent:#58a6ff;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:13px/1.5 ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
-  header{display:flex;align-items:baseline;gap:16px;padding:14px 18px;border-bottom:1px solid var(--line)}
-  h1{font-size:14px;margin:0;letter-spacing:.08em;text-transform:uppercase}
-  .stats{color:var(--dim);font-size:12px}
-  .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:0;height:calc(100vh - 49px)}
-  .list,.card{overflow-y:auto;padding:12px 18px}
-  .card{border-left:1px solid var(--line)}
-  table{width:100%;border-collapse:collapse}
-  th{position:sticky;top:0;background:var(--bg);text-align:left;font-weight:400;color:var(--dim);
-    font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:6px 8px;border-bottom:1px solid var(--line)}
-  td{padding:7px 8px;border-bottom:1px solid #1b1f26;vertical-align:top}
-  tr.row{cursor:pointer}
-  tr.row:hover td{background:#1a1e25}
-  tr.row.sel td{background:#1d232c}
-  .p{font-variant-numeric:tabular-nums;font-weight:600}
-  .rank{color:var(--dim);font-variant-numeric:tabular-nums}
-  .sym{font-weight:600}
-  .nm{color:var(--dim)}
-  .reasons{margin:2px 0 0;padding:0;list-style:none;color:var(--dim);font-size:12px}
-  .reasons li:before{content:"+ ";color:var(--up)}
-  .reasons li.down:before{content:"- ";color:var(--down)}
-  .empty{color:var(--dim);padding:40px 8px;text-align:center}
-  h2{font-size:13px;margin:0 0 2px;letter-spacing:.04em}
-  .muted{color:var(--dim)}
-  .big{font-size:30px;font-variant-numeric:tabular-nums;font-weight:600;line-height:1.1}
-  section{margin:18px 0 0;padding-top:14px;border-top:1px solid var(--line)}
-  section h3{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin:0 0 8px;font-weight:400}
-  dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}
-  dt{color:var(--dim)}
-  dd{margin:0;overflow-wrap:anywhere}
-  a{color:var(--accent);text-decoration:none}
-  a:hover{text-decoration:underline}
-  .tag{display:inline-block;padding:1px 6px;border:1px solid var(--line);border-radius:3px;font-size:11px;color:var(--dim)}
-  .tag.good{color:var(--up);border-color:#1d4327}
-  .tag.warn{color:var(--down);border-color:#4a3320}
-  .addr{font-size:12px}
-  .contract{display:flex;align-items:center;gap:8px;margin:6px 0 2px;padding:6px 8px;
-    background:#11151a;border:1px solid var(--line);border-radius:4px}
-  .contract code{flex:1;font-size:12px;color:var(--ink);overflow-wrap:anywhere;user-select:all}
-  .contract button{background:none;border:1px solid var(--line);border-radius:3px;color:var(--dim);
-    font:inherit;font-size:11px;padding:2px 8px;cursor:pointer;white-space:nowrap}
-  .contract button:hover{color:var(--ink);border-color:#3a4250}
-  .contract a{font-size:11px;white-space:nowrap}
-  .stale{display:none;padding:6px 18px;font-size:12px;border-bottom:1px solid var(--line)}
-  .stale.warn{display:block;background:#2a1f12;color:#f0b878;border-bottom-color:#4a3320}
-  .stale.bad{display:block;background:#2c1618;color:#f08a8a;border-bottom-color:#4a2325}
-  .loading{color:var(--dim);padding:28px 8px}
-  .loading .bar{height:10px;background:#171b21;border-radius:3px;margin:8px 0;
-    animation:pulse 1.1s ease-in-out infinite}
-  .loading .bar:nth-child(2){width:60%}
-  .loading .bar:nth-child(3){width:85%}
-  .loading .bar:nth-child(4){width:40%}
-  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:.8}}
-  ul.plain{list-style:none;margin:0;padding:0}
-  ul.plain li{padding:3px 0;border-bottom:1px solid #1b1f26}
-  .disclaimer{color:var(--dim);font-size:11px;padding:10px 18px;border-top:1px solid var(--line)}
-  .modes{margin-left:auto;display:flex;gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden}
-  .modes button{background:none;border:0;color:var(--dim);font:inherit;font-size:12px;
-    padding:4px 12px;cursor:pointer}
-  .modes button:hover{color:var(--ink)}
-  .modes button[aria-pressed="true"]{background:#1d232c;color:var(--ink)}
-  .shown{color:var(--dim);font-size:11px;padding:0 8px 8px}
-  tr.row.fresh td{animation:landed 2.5s ease-out}
-  @keyframes landed{from{background:#1c2b1f}to{background:transparent}}
+:root{
+  --bg:#0b0c09;--bg2:#0e0f0b;--bg3:#050603;--ink:#e8eadf;--lime:#ccff00;--lime2:#e4ff66;--red:#ff6b57;--amber:#e8b83a;--green:#7ee787;
+  --l04:rgba(255,255,255,.04);--l05:rgba(255,255,255,.05);--l06:rgba(255,255,255,.06);--l07:rgba(255,255,255,.07);--l08:rgba(255,255,255,.08);
+  --l10:rgba(255,255,255,.1);--l12:rgba(255,255,255,.12);--l14:rgba(255,255,255,.14);--l15:rgba(255,255,255,.15);--l18:rgba(255,255,255,.18);
+  --t35:rgba(255,255,255,.35);--t4:rgba(255,255,255,.4);--t45:rgba(255,255,255,.45);--t5:rgba(255,255,255,.5);--t55:rgba(255,255,255,.55);
+  --t6:rgba(255,255,255,.6);--t65:rgba(255,255,255,.65);--t7:rgba(255,255,255,.7);--t75:rgba(255,255,255,.75);--t8:rgba(255,255,255,.8);
+  --mono:'Geist Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Geist,system-ui,sans-serif;min-width:1100px;font-size:14px}
+a{color:var(--lime);text-decoration:none}a:hover{color:var(--lime2)}
+code,.mono{font-family:var(--mono)}
+button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer;padding:0}
+@keyframes ps-flash{0%{background:rgba(204,255,0,.5)}100%{background:rgba(204,255,0,0)}}
+@keyframes ps-in{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+@keyframes ps-pulse{0%,100%{box-shadow:0 0 0 0 rgba(204,255,0,0)}50%{box-shadow:0 0 0 3px rgba(204,255,0,.25)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+.app{min-height:100vh;display:flex;flex-direction:column}
+[hidden]{display:none!important}
+
+/* ── nav ── */
+.nav{height:56px;display:flex;align-items:center;padding:0 40px;gap:28px;border-bottom:1px solid var(--l10);flex:none;position:sticky;top:0;background:var(--bg);z-index:5}
+.brand{display:flex;align-items:center;gap:12px;cursor:pointer;color:var(--ink)}
+.mark{width:22px;height:22px;background:var(--lime);border-radius:5px 5px 12px 5px}
+.brand b{font-size:19px;letter-spacing:-.02em}
+.links{display:flex;gap:26px;font-size:16px;align-self:stretch;align-items:stretch}
+.links a{display:flex;align-items:center;cursor:pointer;padding-top:2px;color:var(--t65);border-bottom:2px solid transparent}
+.links a.on{color:var(--ink);border-bottom-color:var(--lime)}
+.spacer{flex:1}
+.live{display:flex;align-items:center;gap:8px;font:500 11px var(--mono);color:var(--t55);white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:ps-pulse 1.6s infinite;flex:none}
+.live.warn .dot{background:var(--amber);animation:none}.live.bad .dot{background:var(--red);animation:none}
+.btn{padding:8px 14px;border-radius:6px;background:var(--lime);color:#111;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-block}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.2);color:var(--ink);font-weight:500;font-family:var(--mono)}
+.btn.big{padding:13px 20px;border-radius:7px;font-size:14px}
+
+/* ── home ── */
+.wrap{max-width:1280px;margin:0 auto;padding:0 40px}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:48px;padding:72px 0 56px;align-items:center}
+.eyebrow{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--lime)}
+h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;text-wrap:balance}
+.ctas{display:flex;gap:12px;margin-top:32px}
+.kpis{display:flex;gap:28px;margin-top:40px;font-size:12.5px;color:var(--t55)}
+.kpis b{display:block;font:600 22px var(--mono);color:var(--ink);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.shot{border:1px solid var(--l12);border-radius:10px;overflow:hidden;background:var(--bg2);box-shadow:0 30px 80px rgba(0,0,0,.5);cursor:pointer;display:block;color:var(--ink)}
+.shot-bar{height:36px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid var(--l08);font:500 10.5px var(--mono);color:var(--t45)}
+.shot-bar i{width:8px;height:8px;border-radius:50%;background:var(--l15);display:inline-block}
+.shot-head,.shot-row{display:grid;grid-template-columns:64px 1fr 48px 48px;gap:0 10px;padding:0 14px;align-items:center;border-bottom:1px solid var(--l06)}
+.shot-head{height:28px;font:500 9.5px var(--mono);color:var(--t4);text-transform:uppercase;letter-spacing:.06em}
+.shot-row{height:44px}
+.shot-row .p{font:600 14px var(--mono)}
+.shot-row .nm{display:flex;gap:6px;align-items:baseline;font-size:12.5px;min-width:0}
+.shot-row .nm span{color:var(--t4);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shot-row .r1{display:block;font-size:10.5px;color:var(--t5);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shot-row .rk{font:500 11px var(--mono);text-align:right;color:var(--t6)}
+.shot-row .ag{font:500 11px var(--mono);text-align:right;color:var(--t45)}
+.tokencard{border:1px solid rgba(204,255,0,.45);border-radius:12px;background:linear-gradient(180deg,rgba(204,255,0,.08),rgba(204,255,0,.02));padding:28px 32px;display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center;cursor:pointer;color:var(--ink)}
+.tokencard .hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.coin{width:32px;height:32px;border-radius:50%;background:var(--lime);display:flex;align-items:center;justify-content:center;color:#111;font:700 12px var(--mono)}
+.pill{font:500 11px var(--mono);padding:3px 8px;border-radius:4px;background:var(--lime);color:#111}
+.contract{margin-top:16px;display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--l14);border-radius:8px;padding:12px 14px;font:500 14px var(--mono);min-width:0}
+.contract .addr{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.contract .k{color:var(--t45)}
+.tiles{display:grid;grid-template-columns:repeat(2,140px);gap:10px}
+.tile{border:1px solid var(--l12);border-radius:8px;padding:12px 14px;background:var(--bg)}
+.tile .k{font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45)}
+.tile .v{font:600 18px var(--mono);margin-top:6px}
+.tile .s{font-size:11px;color:var(--t5);margin-top:3px}
+.how{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;padding:56px 0 0}
+.how .n{font:500 11px var(--mono);color:var(--lime)}
+.how .t{font-weight:600;font-size:16px;margin-top:8px}
+.how p{font-size:13px;line-height:1.55;color:var(--t6);margin:8px 0 0}
+.two{margin:48px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.box{border:1px solid var(--l12);border-radius:10px;padding:22px 24px}
+.box .hd{display:flex;justify-content:space-between;align-items:center}
+.box b{font-size:15px}
+.box .sub{font:500 11px var(--mono);color:var(--t5)}
+.term{margin-top:14px;background:var(--bg3);border-radius:7px;padding:14px 16px;font:12.5px/1.8 var(--mono);color:var(--t75)}
+.term .d{color:var(--t35)}.term .c{color:var(--lime)}
+.keys{margin-top:18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:12px}
+.keys div{background:var(--l05);border-radius:6px;padding:10px 12px}
+.keys b{display:block;font:600 16px var(--mono)}
+.keys span{color:var(--t5);margin-top:3px;display:block}
+.foot{margin:48px 0 0;padding:18px 0 28px;border-top:1px solid var(--l08);display:flex;justify-content:space-between;font-size:12px;color:var(--t45)}
+.foot span{display:flex;gap:18px}
+
+/* ── board ── */
+.board{flex:1;display:grid;grid-template-columns:minmax(620px,1fr) 6px var(--panelW,400px);min-height:0;height:calc(100vh - 56px)}
+.board.dragging{user-select:none}
+.list{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--l10);min-height:0}
+.lhead{display:flex;align-items:center;gap:10px;padding:0 24px;height:52px;border-bottom:1px solid var(--l08);flex:none}
+.lhead b{font-weight:600;font-size:15px;white-space:nowrap}
+.lhead .m{font:12px var(--mono);color:var(--t5);white-space:nowrap}
+.lhead .live{margin-left:6px;font-size:10.5px;color:var(--lime)}
+.stale{display:none;padding:8px 24px;font:500 12px var(--mono);border-bottom:1px solid var(--l08)}
+.stale.warn{display:block;color:var(--amber);background:rgba(232,184,58,.08)}
+.stale.bad{display:block;color:var(--red);background:rgba(255,107,87,.1)}
+.filters{display:flex;align-items:center;gap:6px;padding:0 24px;height:40px;border-bottom:1px solid var(--l08);flex:none;font-size:11.5px;white-space:nowrap;overflow:hidden}
+.f{padding:5px 10px;border-radius:4px;cursor:pointer;border:1px solid var(--l15);color:var(--ink)}
+.f.on{background:var(--lime);color:#111;border-color:var(--lime);font-weight:600}
+.f.mono{font:500 11px var(--mono)}
+.shown{font:11px var(--mono);color:var(--t4);margin-left:8px}
+.cols,.row{display:grid;grid-template-columns:52px 150px 76px 44px minmax(0,1fr) 84px 56px;gap:0 12px;padding:0 24px;align-items:center}
+.cols{height:32px;font:500 10px var(--mono);color:var(--t45);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--l08);flex:none}
+.cols .r,.row .r{text-align:right}
+.rows{overflow:auto;flex:1}
+.row{height:44px;font-size:12.5px;border-bottom:1px solid var(--l06);cursor:pointer}
+.row:hover{background:rgba(204,255,0,.07)}
+.row.top{background:rgba(204,255,0,.05);box-shadow:inset 3px 0 0 var(--lime)}
+.row.sel{background:rgba(204,255,0,.1)}
+.row.fresh{animation:ps-flash .7s ease-out forwards,ps-in .2s ease-out}
+.row .t{font:11px var(--mono);color:var(--t5);display:flex;flex-direction:column;line-height:1.2}
+.row .t i{font-style:normal;color:var(--lime);font-size:9.5px;font-weight:600;letter-spacing:.04em}
+.row .tk{display:flex;align-items:center;gap:8px;min-width:0}
+.cdot{width:20px;height:20px;border-radius:50%;flex:none}
+.row .tk b{font-weight:600}
+.row .tk .a{font:11px var(--mono);color:var(--t45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .p{font:700 12.5px var(--mono);display:flex;justify-content:flex-end;align-items:center;gap:6px}
+.topb{font:700 9px var(--mono);padding:1px 4px;border-radius:2px;background:var(--lime);color:#111;letter-spacing:.04em}
+.row .rk{font:12.5px var(--mono);color:var(--t7)}
+.chips{display:flex;gap:5px;min-width:0;overflow:hidden}
+.chips span{font-size:10.5px;padding:2px 6px;border-radius:3px;background:var(--l07);white-space:nowrap}
+.chips span.g{background:rgba(126,231,135,.15);color:var(--green)}
+.row .sb{font:12.5px var(--mono)}
+.row .ag{font:11px var(--mono);color:var(--t45)}
+.empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:13px;text-align:center;padding:40px}
+.divider{cursor:col-resize;background:var(--l04);border-left:1px solid var(--l10);display:flex;align-items:center;justify-content:center}
+.divider:hover,.board.dragging .divider{background:rgba(204,255,0,.35)}
+.divider i{width:2px;height:28px;border-radius:1px;background:var(--t35)}
+.panel{display:flex;flex-direction:column;overflow:hidden;font-size:12px;min-height:0;min-width:0}
+.phead{height:52px;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid var(--l08);flex:none}
+.phead b{font-weight:600;font-size:13px;flex:none}
+.phead .nm{color:var(--t45);font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phead .t{font:11px var(--mono);color:var(--t5);flex:none}
+.grade{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px 0 6px;border-radius:5px;border:1px solid var(--gb,var(--l15));background:var(--gbg,transparent);white-space:nowrap;flex:none}
+.grade i{width:20px;height:20px;border-radius:4px;background:var(--gc,var(--t5));color:#111;display:flex;align-items:center;justify-content:center;font:700 12px var(--mono);font-style:normal}
+.grade span{font:600 11px var(--mono);color:var(--gc,var(--t5))}
+.ptop{padding:20px 20px 16px;border-bottom:1px solid var(--l08);flex:none}
+.bigs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.big{border-radius:6px;padding:12px 14px;height:76px;display:flex;flex-direction:column;justify-content:space-between}
+.big.lime{background:var(--lime);color:#111}
+.big.line{border:1px solid rgba(204,255,0,.5)}
+.big .k{font:500 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;opacity:.7}
+.big.line .k{color:var(--t5);opacity:1}
+.big .v{font:600 32px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.big.line .v{color:var(--lime)}
+.big .v small{font-size:14px;letter-spacing:0;opacity:.7}
+.reasons{display:flex;flex-direction:column;gap:8px;margin-top:16px;line-height:1.4}
+.reasons div{display:grid;grid-template-columns:12px 1fr;gap:8px}
+.reasons i{font-style:normal;font-family:var(--mono)}
+.reasons .up i{color:var(--lime)}.reasons .down i{color:var(--red)}
+.pbody{overflow:auto;flex:1}
+.fact{display:grid;grid-template-columns:112px minmax(0,1fr) 12px;gap:12px;padding:0 20px;height:36px;border-bottom:1px solid var(--l05);align-items:center}
+.fact .k{color:var(--t5)}
+.fact .v{font:11.5px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fact .v.warn{color:var(--red)}.fact .v.amb{color:var(--amber)}
+.fact a.x{font-family:var(--mono);text-align:right}
+.soc{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px;padding:0 20px;height:44px;border-bottom:1px solid var(--l05);align-items:center}
+.soc .k{color:var(--t5)}
+.soc .b{display:flex;gap:6px}
+.soc a{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:5px;border:1px solid var(--l18);color:var(--ink);font:600 11.5px Geist,sans-serif}
+.soc a b{font:700 12px var(--mono)}
+.soc .none{font:500 11.5px var(--mono);color:var(--red)}
+.sec{padding:14px 20px 12px;display:flex;align-items:center;gap:10px}
+.sec .k{font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45)}
+.sec .v{font:500 11px var(--mono);color:var(--t7);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sec a{font:11px var(--mono)}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 20px 14px}
+.stat3 div{background:var(--l05);border-radius:6px;padding:10px}
+.stat3 div.lime{background:rgba(204,255,0,.12)}
+.stat3 b{display:block;font:700 20px/1 var(--mono)}
+.stat3 div.lime b{color:var(--lime)}
+.stat3 span{font-size:11px;color:var(--t5);margin-top:4px;display:block}
+.thead{height:32px;display:grid;grid-template-columns:60px minmax(0,1fr) 90px 12px;gap:12px;align-items:center;padding:0 20px;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45);border-bottom:1px solid var(--l08)}
+.trow{display:grid;grid-template-columns:60px minmax(0,1fr) 90px 12px;gap:12px;padding:0 20px;height:36px;border-bottom:1px solid var(--l05);align-items:center}
+.trow b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .w{color:var(--t55);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .o{font:600 12px var(--mono);text-align:right;white-space:nowrap}
+.trow .o.g{color:var(--lime)}.trow .o.n{color:var(--t45)}
+.trow a{font-family:var(--mono);text-align:right}
+.note{padding:0 20px 16px;font-size:12px;color:var(--t45)}
+.copy{padding:20px 20px 24px}
+.copy button{display:flex;align-items:center;justify-content:center;gap:10px;height:48px;width:100%;border-radius:8px;background:var(--lime);color:#111;font:700 14px var(--mono);letter-spacing:-.01em}
+.copy button.done{background:var(--ink)}
+.copy .full{margin-top:8px;text-align:center;font:500 11px var(--mono);color:var(--t4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list2{padding:0 20px 8px}
+.li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;height:32px;align-items:center;border-bottom:1px solid var(--l05);font:11.5px var(--mono)}
+.li .m{color:var(--t5);white-space:nowrap}
+.li .x{font-size:10px;padding:1px 5px;border-radius:2px;background:var(--l07);color:var(--t6);margin-left:6px}
+.li .x.g{background:rgba(126,231,135,.15);color:var(--green)}
+.li .x.r{background:rgba(255,107,87,.15);color:var(--red)}
+.li .x.l{background:rgba(204,255,0,.15);color:var(--lime)}
+
+/* ── model / token ── */
+.page{padding:32px 40px;max-width:1280px;margin:0 auto;width:100%}
+.page.narrow{max-width:1000px}
+.ph{display:flex;align-items:baseline;gap:14px}
+h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
+.ph .m{font:500 12px var(--mono);color:var(--t5)}
+.pipe{display:grid;grid-template-columns:repeat(4,1fr) 40px 1fr;gap:10px;margin-top:22px}
+.pipe .arrow{display:flex;align-items:center;justify-content:center;color:var(--lime);font:600 18px var(--mono)}
+.cell{border:1px solid var(--l12);border-radius:8px;padding:12px 14px}
+.cell .k{font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45)}
+.cell .t{font-weight:600;font-size:14px;margin-top:5px}
+.cell .m{font:500 11px var(--mono);color:var(--lime);margin-top:6px}
+.cell .d{font-size:11px;color:var(--t5);margin-top:3px;line-height:1.4}
+.cell.out{background:var(--lime);color:#111;border:0}
+.cell.out .k,.cell.out .m,.cell.out .d{color:#111;opacity:.7}.cell.out .t{font-weight:700}.cell.out .m{opacity:1}
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:20px}
+.metric .v{font:700 28px/1 var(--mono);letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums}
+.metric .v.lime{color:var(--lime)}.metric .v.amb{color:var(--amber)}
+.metric .d{font-size:11px;color:var(--t5);margin-top:5px}
+.two2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px}
+.pane{border:1px solid var(--l10);border-radius:8px;padding:14px 16px}
+.pane .k{font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45);margin-bottom:10px}
+.imp{display:grid;grid-template-columns:1fr 160px 40px;gap:10px;align-items:center;padding:5px 0;font-size:12px}
+.imp span:first-child{color:var(--t8)}
+.bar{height:8px;background:var(--l07);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--lime)}
+.imp .n{font:600 11.5px var(--mono);text-align:right;color:var(--t7)}
+.log{font:11.5px/1.7 var(--mono);color:var(--t7)}
+.log div{display:grid;grid-template-columns:110px 1fr;gap:10px}
+.log .t{color:var(--t35)}
+.log .lime{color:var(--lime)}.log .amb{color:var(--amber)}.log .red{color:var(--red)}
+.honest{font-size:12.5px;color:var(--t5);margin:20px 0 0;line-height:1.5;max-width:760px}
+.tok-hd{display:flex;align-items:center;gap:12px}
+.tok-hd .coin{width:40px;height:40px;font-size:14px}
+.contract.lg{margin-top:18px;background:var(--bg2);padding:14px 16px;font-size:15px}
+.tiles4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}
+.tiles4 .tile{background:transparent;padding:14px 16px}
+.tiles4 .tile .v{font-size:20px}
+.facts{margin-top:22px;border:1px solid var(--l10);border-radius:8px}
+.facts .hd{height:36px;display:flex;align-items:center;padding:0 16px;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45);border-bottom:1px solid var(--l08)}
+.facts .fact{grid-template-columns:180px minmax(0,1fr) 12px;padding:0 16px;height:38px;font-size:12.5px}
+.facts .fact .v{font-size:12px}
 </style>
 </head>
 <body>
-<header>
-  <h1>poolitzer</h1>
-  <span class="stats" id="stats">loading…</span>
-  <div class="modes">
-    <button id="m-score" aria-pressed="true">by chance</button>
-    <button id="m-new" aria-pressed="false">newest</button>
-  </div>
-</header>
+<div class="app">
 
-<div class="stale" id="stale"></div>
-<div class="wrap">
-  <div class="list">
-    <table>
-      <thead><tr><th style="width:64px">chance</th><th style="width:56px">rank</th><th>token</th><th style="width:60px">age</th></tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div class="shown" id="shown"></div>
-    <div class="empty" id="empty" hidden></div>
+<nav class="nav">
+  <a class="brand" href="#/"><span class="mark"></span><b>Poolitzer</b></a>
+  <div class="links">
+    <a href="#/board" data-nav="board">Board</a>
+    <a href="#/model" data-nav="model">Model</a>
+    <a href="#/token" data-nav="token">$POOLITZER</a>
+    <a href="https://github.com/Artemoon13/Ponscan-#readme" target="_blank" rel="noopener">Docs</a>
+    <a href="https://github.com/Artemoon13/Ponscan-" target="_blank" rel="noopener">GitHub</a>
   </div>
-  <div class="card" id="card"><div class="empty">select a launch</div></div>
-</div>
+  <div class="spacer"></div>
+  <div class="live" id="livepill"><span class="dot"></span><span id="livetxt">connecting…</span></div>
+  <a class="btn" href="#/board">Open board</a>
+</nav>
 
-<div class="disclaimer">
-  The number is a model's estimate of one thing only: whether this launch reaches its graduation
-  threshold. It is not advice, not a safety rating, and not a claim about price. Check the facts below it.
+<!-- ───────────── HOME ───────────── -->
+<section id="page-home">
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <div class="eyebrow">Open source · MIT · runs on your machine</div>
+        <h1>Every pons launch, scored the second it lands.</h1>
+        <div class="ctas">
+          <a class="btn big" href="#/board">Open the live board</a>
+          <span class="btn big ghost">git clone · npm run setup · npm run board</span>
+        </div>
+        <div class="kpis">
+          <div><b id="k-base">—</b>base graduation rate</div>
+          <div><b id="k-median">—</b>median time to graduate</div>
+          <div><b id="k-lift">—</b>top-decile lift vs base</div>
+          <div><b>0</b>keys needed</div>
+        </div>
+      </div>
+      <a class="shot" href="#/board">
+        <div class="shot-bar"><i></i><i></i><i></i><span style="margin-left:8px">localhost:4663 · live</span></div>
+        <div class="shot-head"><span>P grad</span><span>Launch</span><span style="text-align:right">Rank</span><span style="text-align:right">Age</span></div>
+        <div id="hero-rows"></div>
+      </a>
+    </div>
+
+    <a class="tokencard" href="#/token">
+      <div style="min-width:0">
+        <div class="hd"><span class="coin">P</span><b style="font-size:20px;letter-spacing:-.02em">$POOLITZER</b><span class="pill">pons v2 · Robinhood Chain</span><span style="font:500 11px var(--mono);color:var(--t55)">not launched yet</span></div>
+        <div class="contract"><span class="k">contract</span><span class="addr" style="color:var(--t45)">no address published — anything claiming to be $POOLITZER before one appears here is not ours</span></div>
+        <div style="margin-top:12px;font-size:12.5px;color:var(--t6);line-height:1.5">When it launches it will go through the same factory as every other token here, and this card will read the same on-chain facts as any other card. Until then there is nothing to buy.</div>
+      </div>
+      <div class="tiles">
+        <div class="tile"><div class="k">Status</div><div class="v" style="color:var(--t45)">—</div><div class="s">not launched</div></div>
+        <div class="tile"><div class="k">Quote asset</div><div class="v" style="color:var(--t45)">—</div><div class="s">tbd</div></div>
+        <div class="tile"><div class="k">Creator self-buy</div><div class="v" style="color:var(--t45)">—</div><div class="s">tbd</div></div>
+        <div class="tile"><div class="k">Creator tax</div><div class="v" style="color:var(--t45)">—</div><div class="s">tbd</div></div>
+      </div>
+    </a>
+
+    <div class="how">
+      <div><div class="n">01 · Stream</div><div class="t">Follows the pons v2 factory</div><p>Sees every launch within a block over a websocket, and recovers dropped sockets and restarts by re-reading the gap.</p></div>
+      <div><div class="n">02 · Facts</div><div class="t">SQLite, on your disk</div><p>Creator, self-buy, exempt wallets, fee recipient, name cluster, every trade on the curve. Every field links to its transaction.</p></div>
+      <div><div class="n">03 · Model</div><div class="t">GBDT on <span id="k-feat">23</span> leak-free features</div><p>Uses only what is known at launch. Each score comes with three reasons whose contributions sum to it exactly. Retrains on your schedule.</p></div>
+    </div>
+
+    <div class="two">
+      <div class="box">
+        <div class="hd"><b>Run it locally</b><span class="sub">Node ≥ 22.6 · no build step</span></div>
+        <div class="term">
+          <div><span class="d">$</span> git clone https://github.com/Artemoon13/Ponscan-.git &amp;&amp; cd Ponscan-</div>
+          <div><span class="d">$</span> npm install &amp;&amp; cp .env.example .env</div>
+          <div><span class="d">$</span> npm run setup <span class="d"># doctor · a week of history · last 8h decoded</span></div>
+          <div><span class="d">$</span> npm run train &amp;&amp; npm run validate</div>
+          <div><span class="d">$</span> npm run board <span class="c"># → localhost:4663</span> <span class="d">and</span> npm run watch</div>
+        </div>
+      </div>
+      <div class="box">
+        <b>Or live in the terminal</b>
+        <p style="font-size:13px;line-height:1.55;color:var(--t6);margin:10px 0 0"><code>npm run watch</code> is the same feed as a 120×40 terminal screen: launches on the left, the card on the right, every score logged before its outcome exists.</p>
+        <div class="keys">
+          <div><b>↑ ↓</b><span>select a launch</span></div>
+          <div><b>c</b><span>copy contract</span></div>
+          <div><b>f</b><span>top decile only</span></div>
+          <div><b>p</b><span>pause the feed</span></div>
+          <div><b>⏎</b><span>open in explorer</span></div>
+          <div><b>q</b><span>quit</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot"><span>Poolitzer · MIT · not a safety rating, not a price forecast, not advice</span><span><a href="https://github.com/Artemoon13/Ponscan-" target="_blank" rel="noopener">GitHub</a><a href="https://github.com/Artemoon13/Ponscan-#readme" target="_blank" rel="noopener">Docs</a><code>npm run validate</code></span></div>
+  </div>
+</section>
+
+<!-- ───────────── BOARD ───────────── -->
+<section id="page-board" hidden>
+  <div class="board" id="board">
+    <div class="list">
+      <div class="lhead"><b>Fresh launches</b><span class="m" id="lh-m">—</span><span class="live" id="lh-live"><span class="dot"></span>LIVE</span></div>
+      <div class="stale" id="stale"></div>
+      <div class="filters">
+        <span class="f on" data-f="All">All</span>
+        <span class="f" data-f="Top decile">Top decile</span>
+        <span class="f" data-f="Repeat creators">Repeat creators</span>
+        <span class="f" data-f="ETH-quoted">ETH-quoted</span>
+        <span class="shown" id="shown"></span>
+        <div class="spacer"></div>
+        <span class="f mono" id="m-score" title="ranked by score">by chance</span>
+        <span class="f mono" id="m-new" title="newest first, rank still by score">newest</span>
+        <span class="f mono" id="pause">⏸ pause</span>
+      </div>
+      <div class="cols"><span>Time</span><span>Token</span><span class="r">P grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r">Age</span></div>
+      <div class="rows" id="rows"></div>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+    <div class="divider" id="divider" title="Drag to resize"><i></i></div>
+    <div class="panel" id="panel"><div class="empty">Click a launch to open its card</div></div>
+  </div>
+</section>
+
+<!-- ───────────── MODEL ───────────── -->
+<section id="page-model" hidden>
+  <div class="page">
+    <div class="ph"><h2>Model</h2><span class="m" id="mo-h">—</span></div>
+    <div class="pipe" id="pipe"></div>
+    <div class="metrics" id="metrics"></div>
+    <div class="two2">
+      <div class="pane"><div class="k">Feature influence · mean |contribution| on the current board</div><div id="imp"></div></div>
+      <div class="pane"><div class="k">Live scoreboard · claims written before the outcome existed</div><div class="log" id="livelog"></div></div>
+    </div>
+    <p class="honest" id="honest"></p>
+  </div>
+</section>
+
+<!-- ───────────── TOKEN ───────────── -->
+<section id="page-token" hidden>
+  <div class="page narrow">
+    <div class="tok-hd"><span class="coin">P</span><h2>$POOLITZER</h2><span class="pill">pons v2 · Robinhood Chain</span></div>
+    <div class="contract lg"><span class="k">contract</span><span class="addr" style="color:var(--t45)">not launched — no address to show</span></div>
+    <div class="tiles4">
+      <div class="tile"><div class="k">Status</div><div class="v" style="color:var(--t45)">not launched</div><div class="s">this page fills in from the chain when it is</div></div>
+      <div class="tile"><div class="k">Score at launch</div><div class="v" style="color:var(--t45)">—</div><div class="s">will be logged before the outcome</div></div>
+      <div class="tile"><div class="k">Creator self-buy</div><div class="v" style="color:var(--t45)">—</div><div class="s">from the launch tx</div></div>
+      <div class="tile"><div class="k">Creator tax</div><div class="v" style="color:var(--t45)">—</div><div class="s">from the launch tx</div></div>
+    </div>
+    <div class="facts">
+      <div class="hd">Launch facts · same card as every other token</div>
+      <div class="fact"><span class="k">Launch tx</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
+      <div class="fact"><span class="k">Creator (tx.from)</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
+      <div class="fact"><span class="k">Called via</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
+      <div class="fact"><span class="k">Self-buy</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
+      <div class="fact"><span class="k">Exempt wallets</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
+      <div class="fact"><span class="k">Fee recipient</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
+      <div class="fact"><span class="k">Graduation tx</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
+    </div>
+    <p class="honest">Only an address shown here, read from the factory's <code>TokenLaunched</code> log, will ever be ours. The tool is MIT and needs no token to run.</p>
+  </div>
+</section>
+
 </div>
 
 <script>
+/* ── helpers ── */
 const $ = (id) => document.getElementById(id);
-let selected = null;
-
-/**
- * "by chance" ranks the window; "newest" reads it in launch order. The rank column means the same
- * thing in both: a launch's place by score. Seeing a fresh launch land at #12 of 2,400 is the whole
- * point of the newest view — the ordering answers "what just happened", the rank answers "does it
- * matter".
- */
-let order = localStorage.getItem("poolitzer.order") === "new" ? "new" : "score";
-/** Tokens already on screen, so an arrival can be marked as one. */
-let known = new Set();
-
-function setOrder(next) {
-  if (next === order) return;
-  order = next;
-  localStorage.setItem("poolitzer.order", order);
-  $("m-score").setAttribute("aria-pressed", String(order === "score"));
-  $("m-new").setAttribute("aria-pressed", String(order === "new"));
-  known = new Set();
-  loadFeed();
-}
-
-const age = (ts) => {
-  const s = Math.max(0, Math.floor(Date.now() / 1000) - ts);
-  if (s < 90) return s + "s";
-  if (s < 5400) return Math.round(s / 60) + "m";
-  return (s / 3600).toFixed(1) + "h";
-};
-const pct = (p) => (100 * p).toFixed(1) + "%";
-const shortAddr = (a) => a ? a.slice(0, 8) + "…" + a.slice(-6) : "—";
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const EXP_ADDR = "https://robinhoodchain.blockscout.com/address/";
-const colour = (p) => p >= 0.06 ? "var(--up)" : p >= 0.03 ? "var(--down)" : "var(--dim)";
+const short = (a) => a ? a.slice(0, 6) + "…" + a.slice(-4) : "—";
+const pct = (p) => (100 * p).toFixed(1) + "%";
+const EXP = "https://robinhoodchain.blockscout.com";
+const hhmmss = (ts) => new Date(ts * 1000).toTimeString().slice(0, 8);
+const ago = (ts) => { const s = Math.max(0, Math.floor(Date.now() / 1000) - ts); return s < 90 ? s + "s" : s < 5400 ? Math.round(s / 60) + "m" : (s / 3600).toFixed(1) + "h"; };
+const secs = (s) => s < 90 ? s + " s" : s < 5400 ? Math.round(s / 60) + " min" : (s / 3600).toFixed(1) + " h";
+const hue = (a) => { let h = 0; for (const ch of (a || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360} 55% 55%)`; };
+const pcol = (it) => it.percentile >= 90 ? "var(--lime)" : it.probability >= 0.03 ? "var(--amber)" : "var(--t5)";
 
-/**
- * Says out loud when the list is not current.
- *
- * The failure this guards against is silent: if the watcher stops, the board keeps serving the last
- * launches it saw and looks entirely healthy. Half of all graduations happen within two minutes, so
- * a list even a few minutes stale is not a slightly worse list — it is the wrong list, shown with
- * the same confidence as the right one.
- */
-function showStaleness(h) {
-  const el = $("stale");
-  if (!h) { el.className = "stale"; return; }
+/* ── state ── */
+const S = {
+  page: "home", feed: null, sel: null, card: null,
+  filter: "All", paused: false,
+  order: localStorage.getItem("poolitzer.order") === "new" ? "new" : "score",
+  known: new Set(), copiedSel: 0, panelW: Number(localStorage.getItem("poolitzer.panelW")) || 400,
+};
 
-  const behind = h.behindSec;
-  const quiet = h.watcherSeenSecAgo;
+/* ── routing ── */
+function route() {
+  const h = location.hash.replace(/^#\/?/, "");
+  const [page, arg] = h.split("/");
+  S.page = ["board", "model", "token"].includes(page) ? page : "home";
+  for (const p of ["home", "board", "model", "token"]) $("page-" + p).hidden = S.page !== p;
+  document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("on", a.dataset.nav === S.page));
+  document.body.style.overflow = S.page === "board" ? "hidden" : "";
+  if (S.page === "board" && arg && arg.startsWith("0x")) openCard(arg.toLowerCase());
+  if (S.page === "model") loadModel();
+  if (S.page === "home") loadStats();
+  loadFeed();
+  window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", route);
+
+/* ── live pill + staleness: the watcher can die silently; the list must say so ── */
+function showHealth(h, d) {
+  const pill = $("livepill"), txt = $("livetxt"), st = $("stale"), lh = $("lh-live");
   const mins = (s) => s < 90 ? `${s}s` : `${Math.round(s / 60)}m`;
-
-  if (quiet === null || quiet > 120) {
-    el.className = "stale bad";
-    el.textContent = quiet === null
+  let cls = "", msg = "";
+  if (!h || h.watcherSeenSecAgo === null || h.watcherSeenSecAgo > 120) {
+    cls = "bad"; msg = !h || h.watcherSeenSecAgo === null
       ? "The watcher has never reported in. Nothing here is live — start it with: npm run watch"
-      : `The watcher has not reported for ${mins(quiet)}. This list has stopped updating.`;
-    return;
-  }
-  if (behind !== null && behind > 120) {
-    el.className = "stale bad";
-    el.textContent = `Running ${mins(behind)} behind the chain. Launches from the last ${mins(behind)} are missing.`;
-    return;
-  }
-  if (behind !== null && behind > 30) {
-    el.className = "stale warn";
-    el.textContent = `Running ${mins(behind)} behind the chain, catching up.`;
-    return;
-  }
-  el.className = "stale";
+      : `The watcher has not reported for ${mins(h.watcherSeenSecAgo)}. This list has stopped updating.`;
+  } else if (h.behindSec !== null && h.behindSec > 120) { cls = "bad"; msg = `Running ${mins(h.behindSec)} behind the chain. Launches from the last ${mins(h.behindSec)} are missing.`; }
+  else if (h.behindSec !== null && h.behindSec > 30) { cls = "warn"; msg = `Running ${mins(h.behindSec)} behind the chain, catching up.`; }
+  pill.className = "live " + cls; lh.className = "live " + cls;
+  st.className = "stale " + cls; st.textContent = msg;
+  const when = d.modelTrainedAt ? new Date(d.modelTrainedAt * 1000).toISOString().slice(11, 16) + " UTC" : "—";
+  txt.textContent = (cls === "bad" ? "stale" : "live") + " · block " + (h && h.headBlock ? h.headBlock.toLocaleString("en-US") : "—") + " · model " + when;
 }
 
+/* ── feed ── */
 async function loadFeed() {
-  const r = await fetch("/api/feed?hours=6&sort=" + order);
-  const d = await r.json();
-  showStaleness(d.health);
-  const c = d.counts;
-  $("stats").textContent =
-    `${c.launches.toLocaleString()} launches indexed · ${c.graduations.toLocaleString()} graduated · ${c.enriched.toLocaleString()} enriched`;
+  if (S.paused && S.page === "board") return;
+  let d;
+  try { d = await (await fetch("/api/feed?hours=6&sort=" + S.order)).json(); } catch { return; }
+  S.feed = d;
+  showHealth(d.health, d);
+  renderHero();
+  if (S.page === "board") renderBoard();
+}
 
-  if (!d.hasModel) {
-    $("empty").hidden = false;
-    $("empty").textContent = "no model yet — run: npm run train";
-    return;
-  }
-  const tb = $("rows");
-  tb.innerHTML = "";
-  $("shown").textContent = d.inWindow
-    ? `showing ${d.shown} of ${d.inWindow.toLocaleString()} launches in the last 6 hours`
-    : "";
-  if (!d.items.length) {
-    $("empty").hidden = false;
-    $("empty").textContent = "no launches in the last 6 hours";
-    return;
-  }
+function passes(it) {
+  const m = it.meta || {};
+  if (S.filter === "Top decile") return it.percentile >= 90;
+  if (S.filter === "Repeat creators") return (m.dev_prior || 0) > 0;
+  if (S.filter === "ETH-quoted") return !!m.is_eth;
+  return true;
+}
+
+function renderHero() {
+  const d = S.feed; if (!d || !d.items) return;
+  const top = [...d.items].sort((a, b) => b.probability - a.probability).slice(0, 7);
+  $("hero-rows").innerHTML = top.map((it) => { const m = it.meta || {}; const r = it.reasons[0];
+    return `<div class="shot-row" style="${it.percentile >= 90 ? "background:rgba(204,255,0,.06)" : ""}">
+      <span class="p" style="color:${pcol(it)}">${pct(it.probability)}</span>
+      <span style="min-width:0"><span class="nm"><b>${esc(m.symbol || "?")}</b><span>${esc(m.name || "")}</span></span><span class="r1">${r ? (r.direction === "up" ? "+ " : "− ") + esc(r.text) : ""}</span></span>
+      <span class="rk">#${it.rank}</span><span class="ag">${m.ts ? ago(m.ts) : ""}</span></div>`; }).join("");
+}
+
+function renderBoard() {
+  const d = S.feed; if (!d) return;
+  $("lh-m").textContent = `${d.lastHour.launches.toLocaleString()} in the last hour · ${d.lastHour.graduated} graduated`;
+  $("m-score").classList.toggle("on", S.order === "score");
+  $("m-new").classList.toggle("on", S.order === "new");
+  document.querySelectorAll(".f[data-f]").forEach((f) => f.classList.toggle("on", f.dataset.f === S.filter));
+  $("pause").textContent = S.paused ? "▶ resume" : "⏸ pause";
+  $("shown").textContent = d.inWindow ? `showing ${d.shown} of ${d.inWindow.toLocaleString()} in the last 6h` : "";
+
+  if (!d.hasModel) { $("rows").innerHTML = ""; $("empty").hidden = false; $("empty").textContent = "no model yet — run: npm run train"; return; }
+  const items = d.items.filter(passes);
+  if (!items.length) { $("rows").innerHTML = ""; $("empty").hidden = false; $("empty").textContent = "nothing matches this filter in the last 6 hours"; return; }
   $("empty").hidden = true;
 
-  const first = known.size === 0;
-  for (const it of d.items) {
+  const first = S.known.size === 0;
+  $("rows").innerHTML = items.map((it) => {
     const m = it.meta || {};
-    const tr = document.createElement("tr");
-    // Only mark arrivals once a baseline exists, or the whole first render flashes.
-    const fresh = !first && !known.has(it.token);
-    tr.className = "row" + (it.token === selected ? " sel" : "") + (fresh ? " fresh" : "");
-    tr.dataset.token = it.token;
-    tr.onclick = () => openCard(it.token);
-    tr.innerHTML =
-      `<td class="p" style="color:${colour(it.probability)}">${pct(it.probability)}</td>` +
-      `<td class="rank">#${it.rank}</td>` +
-      `<td><span class="sym">${esc(m.symbol || "?")}</span> <span class="nm">${esc((m.name || "").slice(0, 30))}</span>` +
-      (m.graduated ? ' <span class="tag good">pool</span>' : "") +
-      (m.cluster_total > 1 ? ` <span class="tag" title="launches sharing this ticker (how many reached the pool)">${m.cluster_total} (${m.cluster_grad})</span>` : "") +
-      `<ul class="reasons">${it.reasons.map((x) => `<li class="${x.direction === "up" ? "up" : "down"}">${esc(x.text)}</li>`).join("")}</ul></td>` +
-      `<td class="rank">${m.ts ? age(m.ts) : ""}</td>`;
-    tb.appendChild(tr);
-  }
-  known = new Set(d.items.map((it) => it.token));
+    const fresh = !first && !S.known.has(it.token);
+    const top = it.percentile >= 90;
+    const chips = it.reasons.slice(0, 3).map((r) => `<span>${esc(r.text.length > 34 ? r.text.slice(0, 32) + "…" : r.text)}</span>`);
+    if (m.graduated) chips.unshift(`<span class="g">reached the pool${m.grad_secs ? " · " + secs(m.grad_secs) : ""}</span>`);
+    if (m.cluster_total > 1) chips.push(`<span title="launches sharing this ticker (reached the pool)">${m.cluster_total} share ticker (${m.cluster_grad})</span>`);
+    return `<div class="row${top ? " top" : ""}${it.token === S.sel ? " sel" : ""}${fresh ? " fresh" : ""}" data-token="${it.token}">
+      <span class="t"><span>${m.ts ? hhmmss(m.ts) : ""}</span><i>${fresh ? "NEW" : ""}</i></span>
+      <span class="tk"><span class="cdot" style="background:${hue(it.token)}"></span><b>${esc(m.symbol || "?")}</b><span class="a">${short(it.token)}</span></span>
+      <span class="p" style="color:${pcol(it)}">${top ? '<span class="topb">TOP</span>' : ""}${pct(it.probability)}</span>
+      <span class="rk r">#${it.rank}</span>
+      <span class="chips">${chips.join("")}</span>
+      <span class="sb r">${m.self_buy === null || m.self_buy === undefined ? '<span style="color:var(--t35)">—</span>' : esc(m.self_buy) + ' <span style="color:var(--t45);font-size:10.5px">' + esc(m.quote_symbol) + "</span>"}</span>
+      <span class="ag r" data-ts="${m.ts || 0}">${m.ts ? ago(m.ts) : ""}</span></div>`;
+  }).join("");
+  S.known = new Set(d.items.map((it) => it.token));
 }
 
-/**
- * Guards against a slow answer for a launch the reader has already clicked away from. Without it,
- * clicking three rows quickly can leave the panel showing whichever request happened to finish last.
- */
-let cardRequest = 0;
-
-async function openCard(token) {
-  selected = token;
-  const mine = ++cardRequest;
-
-  // Acknowledge the click before the network does. The panel used to sit on the previous launch
-  // until the response landed, with the row highlight already cleared, which reads as a dead click
-  // however fast the server actually is.
-  document.querySelectorAll("tr.row").forEach((t) => t.classList.remove("sel"));
-  const clicked = [...document.querySelectorAll("tr.row")].find((t) => t.dataset.token === token);
-  if (clicked) clicked.classList.add("sel");
-  $("card").innerHTML =
-    '<div class="loading"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>';
-
-  const r = await fetch("/api/token/" + token);
-  if (mine !== cardRequest) return;
-  if (!r.ok) { $("card").innerHTML = '<div class="empty">not found</div>'; return; }
-  const { card: k, score } = await r.json();
-  if (mine !== cardRequest) return;
-  const L = k.launch;
-
-  const row = (dt, dd) => `<dt>${dt}</dt><dd>${dd}</dd>`;
-  const txLink = (url, label) => `<a href="${url}" target="_blank" rel="noopener">${label}</a>`;
-
-  const exempt = k.exemptions.length
-    ? `<ul class="plain">${k.exemptions.map((e) =>
-        `<li>${txLink(e.url, shortAddr(e.address))} <span class="muted">${
-          e.seenInOtherLaunches ? "seen in " + e.seenInOtherLaunches + " other launch(es)" : "not seen elsewhere"}</span></li>`).join("")}</ul>`
-    : '<span class="muted">none declared</span>';
-
-  const history = k.creatorHistory.recent.length
-    ? `<ul class="plain">${k.creatorHistory.recent.map((h) =>
-        `<li>${txLink(h.url, esc(h.symbol || h.token.slice(0, 10)))} <span class="muted">${age(h.ts)} ago</span> ` +
-        (h.graduated ? '<span class="tag good">graduated</span>' : '<span class="tag">did not</span>') + "</li>").join("")}</ul>`
-    : '<span class="muted">no earlier launches from this creator</span>';
-
-  const C = k.cluster;
-  const clusterLabel = {
-    unique: "no other launch has used this ticker",
-    swarm: `${C.total} launches share this ticker, from ${C.distinctCreators} different creators`,
-    "repeat-spam": `${C.total} launches share this ticker, but only ${C.distinctCreators} creator${C.distinctCreators === 1 ? "" : "s"} behind them`,
-  }[C.kind];
-  const clusterTag = C.kind === "swarm" ? '<span class="tag good">crowd</span>'
-    : C.kind === "repeat-spam" ? '<span class="tag warn">one wallet repeating</span>' : "";
-  const clusterBlock = C.total > 1 ? `
-    <section><h3>same ticker</h3>
-      <div class="muted" style="margin-bottom:6px">${esc(clusterLabel)} ${clusterTag}<br>
-        ${C.before} came before this one, ${C.after} after, ${C.graduated} of the whole group reached the pool.
-        ${C.isFirstSeen ? "This was the first use of the ticker." : ""}</div>
-      <ul class="plain">${C.siblings.map((sb) =>
-        `<li>${txLink(sb.url, esc(sb.symbol || sb.token.slice(0, 10)))} <span class="muted">${age(sb.ts)} ago</span> ` +
-        (sb.graduated ? '<span class="tag good">pool</span>' : '<span class="tag">no</span>') +
-        (sb.sameCreator ? ' <span class="tag warn">same creator</span>' : "") + "</li>").join("")}</ul>
-    </section>` : "";
-
-  const T = k.trading;
-  const wallet = (a) => txLink(EXP_ADDR + a, shortAddr(a));
-  const tradingBlock = !T.indexed ? `
-    <section><h3>trading on the curve</h3><div class="muted">not indexed yet — reopen this card in a moment</div></section>`
-   : `
-    <section><h3>trading on the curve</h3>
-      <dl>
-        ${row("trades", `${T.buys} buys · ${T.sells} sells`)}
-        ${row("distinct buyers", `${T.buyersTotal} total, <b>${T.buyersFirstMinute}</b> in the first minute`)}
-        ${row("opening tax paid", T.snipers.length ? `${esc(T.snipeTaxTotal)} ${esc(L.quoteSymbol)} by ${new Set(T.snipers.map(s=>s.address)).size} wallet(s)` : '<span class="muted">nobody raced the window</span>')}
-      </dl>
-      ${T.coBuyers.length ? `<div style="margin-top:12px" class="muted">bought inside the launch transaction itself:</div>
-        <ul class="plain">${T.coBuyers.map((b)=>`<li>${wallet(b.address)} <span class="muted">${esc(b.amount)} ${esc(L.quoteSymbol)}</span></li>`).join("")}</ul>` : ""}
-      ${T.snipers.length ? `<div style="margin-top:12px" class="muted">raced the opening tax window:</div>
-        <ul class="plain">${T.snipers.slice(0,10).map((x)=>
-          `<li>${wallet(x.address)} <span class="muted">+${x.blocksAfterLaunch} blocks · paid ${esc(x.tax)} tax</span>` +
-          (x.onExemptList ? ' <span class="tag warn">was on the exempt list</span>' : "") + `</li>`).join("")}</ul>` : ""}
-      ${T.topWallets.length ? `<div style="margin-top:12px" class="muted">biggest wallets, by money put in:</div>
-        <ul class="plain">${T.topWallets.map((p)=>
-          `<li>${wallet(p.address)} <span class="muted">in ${esc(p.inAmount)} · out ${esc(p.outAmount)}</span>` +
-          (p.multiple !== null ? ` <span class="tag ${p.multiple>=1?"good":"warn"}">×${p.multiple.toFixed(2)}</span>` : "") + `</li>`).join("")}</ul>` : ""}
-    </section>`;
-
-  const feeChanges = k.fees.changes.length
-    ? `<ul class="plain">${k.fees.changes.map((c) =>
-        `<li>${shortAddr(c.prev)} → ${shortAddr(c.next)} ${txLink(c.txUrl, "tx")}</li>`).join("")}</ul>`
-    : "";
-
-  $("card").innerHTML = `
-    <h2>${esc(k.symbol || "?")} <span class="muted">${esc(k.name || "")}</span></h2>
-    <div class="contract">
-      <code id="contract-addr">${esc(k.token)}</code>
-      <button id="copy-contract">copy</button>
-      ${txLink(k.tokenUrl, "explorer")}
-      ${txLink(k.ponsUrl, "pons")}
-    </div>
-    ${score ? `<div style="margin:14px 0 2px"><span class="big" style="color:${colour(score.probability)}">${pct(score.probability)}</span>
-      <span class="muted"> chance of graduating · rank #${score.rank} of ${score.of} in the last 6h</span></div>
-      <ul class="reasons">${score.reasons.map((x) => `<li class="${x.direction === "up" ? "up" : "down"}">${esc(x.text)}</li>`).join("")}</ul>` : ""}
-    ${k.description ? `<p class="muted">${esc(k.description.slice(0, 300))}</p>` : ""}
-
-    <section><h3>launch</h3><dl>
-      ${row("transaction", txLink(L.txUrl, L.tx.slice(0, 18) + "…"))}
-      ${row("when", new Date(L.ts * 1000).toISOString().replace("T", " ").slice(0, 19) + " UTC")}
-      ${row("creator", txLink(L.creatorUrl, shortAddr(L.creator)))}
-      ${L.viaContract ? row("called via", `<span class="tag warn">${shortAddr(L.calledBy)}</span> batching contract`) : ""}
-      ${row("bought themselves", L.selfBuy === null
-        ? '<span class="muted">not declared through the router</span>'
-        : esc(L.selfBuy) + " " + esc(L.quoteSymbol))}
-      ${row("quote asset", L.isEthQuoted ? "ETH" : `${esc(L.quoteSymbol)} ${txLink("https://robinhoodchain.blockscout.com/token/" + L.quoteAsset, shortAddr(L.quoteAsset))}`)}
-      ${row("graduation needs", esc(L.threshold) + " " + esc(L.quoteSymbol))}
-      ${row("ongoing creator tax", L.creatorTaxBps === null ? '<span class="muted">unknown</span>' : (L.creatorTaxBps / 100).toFixed(2) + "%")}
-      ${L.buybackEnabled !== null ? row("buyback", L.buybackEnabled ? "enabled" : "off") : ""}
-    </dl></section>
-
-    <section><h3>wallets exempted from the opening tax</h3>
-      <div class="muted" style="margin-bottom:6px">Buys are taxed 99% at launch, decaying to zero over 3 seconds. These wallets were waived.</div>
-      ${exempt}
-    </section>
-
-    <section><h3>fees</h3><dl>
-      ${row("creator fees go to", k.fees.recipient ? txLink(k.fees.recipientUrl, shortAddr(k.fees.recipient)) : '<span class="muted">unknown</span>')}
-      ${k.fees.redirected ? row("", '<span class="tag warn">routed away from the launching wallet</span>') : ""}
-    </dl>${feeChanges}</section>
-
-    ${tradingBlock}
-
-    ${clusterBlock}
-
-    <section><h3>this creator's earlier launches</h3>
-      <div class="muted" style="margin-bottom:6px">${k.creatorHistory.priorLaunches} before this one, ${k.creatorHistory.priorGraduations} of which had graduated by launch time.</div>
-      ${history}
-    </section>
-
-    <section><h3>outcome</h3><dl>
-      ${row("phase", ["on the curve", "swept", "in the pool", "rescued"][L_phase(k)] || "?")}
-      ${k.outcome.graduated
-        ? row("graduated", txLink(k.outcome.graduationTxUrl, "tx") + (k.outcome.secondsToGraduate !== null
-            ? ` <span class="muted">after ${Math.round(k.outcome.secondsToGraduate / 60)} min</span>` : ""))
-        : row("graduated", '<span class="muted">not yet</span>')}
-    </dl></section>
-
-    ${Object.keys(k.socials).length ? `<section><h3>links</h3><ul class="plain">${
-      Object.entries(k.socials).map(([n, v]) => `<li>${esc(n)}: ${txLink(esc(v), esc(v.slice(0, 60)))}</li>`).join("")}</ul></section>` : ""}
-  `;
-
-  $("card").scrollTop = 0;
-  const copy = $("copy-contract");
-  copy.onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(k.token);
-      copy.textContent = "copied";
-    } catch {
-      // Browsers refuse clipboard access on a plain-http origin. The address is selectable either
-      // way, so say what to do rather than failing silently.
-      copy.textContent = "select it";
-    }
-    setTimeout(() => { copy.textContent = "copy"; }, 1500);
-  };
-}
-function L_phase(k) { return k.outcome.phase; }
-
-loadFeed();
+$("rows").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) location.hash = "#/board/" + r.dataset.token; });
+document.querySelectorAll(".f[data-f]").forEach((f) => f.onclick = () => { S.filter = f.dataset.f; renderBoard(); });
 $("m-score").onclick = () => setOrder("score");
 $("m-new").onclick = () => setOrder("new");
-$("m-score").setAttribute("aria-pressed", String(order === "score"));
-$("m-new").setAttribute("aria-pressed", String(order === "new"));
-setInterval(loadFeed, 15000);
+$("pause").onclick = () => { S.paused = !S.paused; renderBoard(); if (!S.paused) loadFeed(); };
+function setOrder(o) { if (o === S.order) return; S.order = o; localStorage.setItem("poolitzer.order", o); S.known = new Set(); loadFeed(); }
+
+/* ── resizable panel ── */
+$("board").style.setProperty("--panelW", S.panelW + "px");
+$("divider").addEventListener("mousedown", (e) => {
+  e.preventDefault(); const grid = $("board"); grid.classList.add("dragging");
+  const move = (ev) => { S.panelW = Math.max(380, Math.min(720, grid.getBoundingClientRect().right - ev.clientX)); grid.style.setProperty("--panelW", S.panelW + "px"); };
+  const up = () => { grid.classList.remove("dragging"); localStorage.setItem("poolitzer.panelW", S.panelW); window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+  window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+});
+
+/* ── card ── */
+async function openCard(token) {
+  S.sel = token;
+  document.querySelectorAll(".row").forEach((r) => r.classList.toggle("sel", r.dataset.token === token));
+  $("panel").innerHTML = '<div class="empty">loading the card and indexing its curve…</div>';
+  let d;
+  try { const r = await fetch("/api/token/" + token); if (!r.ok) throw 0; d = await r.json(); } catch { $("panel").innerHTML = '<div class="empty">not found</div>'; return; }
+  if (S.sel !== token) return;
+  S.card = d; renderCard();
+}
+
+function gradeOf(n, g) {
+  if (!n) return { L: "—", txt: "first launch", c: "var(--t5)", b: "var(--l15)", bg: "transparent" };
+  const r = g / n;
+  const L = r >= 0.75 ? "A" : r >= 0.5 ? "B" : g > 0 ? "C" : "D";
+  const c = r >= 0.5 ? "var(--lime)" : g > 0 ? "var(--amber)" : "var(--red)";
+  const b = r >= 0.5 ? "rgba(204,255,0,.4)" : g > 0 ? "rgba(232,184,58,.4)" : "rgba(255,107,87,.4)";
+  const bg = r >= 0.5 ? "rgba(204,255,0,.08)" : g > 0 ? "rgba(232,184,58,.08)" : "rgba(255,107,87,.08)";
+  return { L, txt: `${g}/${n} graduated`, c, b, bg };
+}
+
+function renderCard() {
+  const { card: k, score: s } = S.card; const L = k.launch, C = k.cluster, T = k.trading, H = k.creatorHistory;
+  const fact = (key, val, cls = "", href = "") => `<div class="fact"><span class="k">${key}</span><span class="v ${cls}" title="${esc(val.replace(/<[^>]+>/g, ""))}">${val}</span>${href ? `<a class="x" href="${href}" target="_blank" rel="noopener">↗</a>` : "<span></span>"}</div>`;
+  const A = (a) => `${EXP}/address/${a}`;
+  const g = gradeOf(H.priorLaunches, H.priorGraduations);
+  const calledVia = L.selfBuy !== null ? "pons router · calldata decoded"
+    : L.viaContract ? `${short(L.calledBy)} · calldata not decoded` : "not through the router · calldata not decoded";
+  const clusterTxt = C.total <= 1 ? "unique — no other launch used this ticker"
+    : `${C.kind === "swarm" ? "swarm" : "one wallet repeating"} · ${C.total} launches, ${C.graduated} reached the pool`;
+  const feesTxt = k.fees.recipient ? `${short(k.fees.recipient)}${k.fees.redirected ? " · routed away from the launcher" : " (creator)"}` : "unknown";
+  const soc = k.socials || {};
+  const hasX = soc.twitter, hasWeb = soc.website;
+  const rate = H.priorLaunches ? Math.round(100 * H.priorGraduations / H.priorLaunches) + "%" : "—";
+
+  const reasons = s ? s.reasons.map((r) => `<div class="${r.direction}"><i>${r.direction === "up" ? "+" : "−"}</i><span>${esc(r.text[0].toUpperCase() + r.text.slice(1))}</span></div>`).join("") : "";
+  const past = H.recent.length
+    ? `<div class="thead"><span>Earlier</span><span></span><span style="text-align:right">Outcome</span><span></span></div>` +
+      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago</span><span class="o ${p.graduated ? "g" : "n"}">${p.graduated ? "reached the pool" : "did not"}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
+    : `<div class="note">${H.priorLaunches === 0 ? "First launch from this wallet." : "No earlier launches on record."}</div>`;
+
+  /* sections the design does not have, kept because the tool does */
+  const trading = !T.indexed ? `<div class="note">Trading on the curve not indexed yet — reopen the card in a moment.</div>` : `
+    ${fact("Trades", `${T.buys} buys · ${T.sells} sells`)}
+    ${fact("Buyers", `${T.buyersTotal} total · <b>${T.buyersFirstMinute}</b> in the first minute`)}
+    ${fact("Opening tax paid", T.snipers.length ? `${esc(T.snipeTaxTotal)} ${esc(L.quoteSymbol)} by ${new Set(T.snipers.map((x) => x.address)).size} wallet(s)` : "nobody raced the window")}
+    ${T.coBuyers.length ? `<div class="sec"><span class="k">Bought inside the launch tx</span></div><div class="list2">${T.coBuyers.map((b) => `<div class="li"><span><a href="${A(b.address)}" target="_blank" rel="noopener">${short(b.address)}</a></span><span class="m">${esc(b.amount)} ${esc(L.quoteSymbol)}</span></div>`).join("")}</div>` : ""}
+    ${T.snipers.length ? `<div class="sec"><span class="k">Raced the 3-second window</span></div><div class="list2">${T.snipers.slice(0, 8).map((x) => `<div class="li"><span><a href="${A(x.address)}" target="_blank" rel="noopener">${short(x.address)}</a>${x.onExemptList ? '<span class="x r">on exempt list</span>' : ""}</span><span class="m">+${x.blocksAfterLaunch} blk · paid ${esc(x.tax)}</span></div>`).join("")}</div>` : ""}
+    ${T.topWallets.length ? `<div class="sec"><span class="k">Biggest wallets, by money in</span></div><div class="list2">${T.topWallets.slice(0, 8).map((p) => `<div class="li"><span><a href="${A(p.address)}" target="_blank" rel="noopener">${short(p.address)}</a>${p.multiple !== null ? `<span class="x ${p.multiple >= 1 ? "l" : "r"}">×${p.multiple.toFixed(2)}</span>` : ""}</span><span class="m">in ${esc(p.inAmount)} · out ${esc(p.outAmount)}</span></div>`).join("")}</div>` : ""}`;
+  const exemptList = k.exemptions.length ? `<div class="sec"><span class="k">Wallets exempted from the opening tax</span></div><div class="list2">${k.exemptions.map((e) => `<div class="li"><span><a href="${A(e.address)}" target="_blank" rel="noopener">${short(e.address)}</a></span><span class="m">${e.seenInOtherLaunches ? "seen in " + e.seenInOtherLaunches + " other launch(es)" : "not seen elsewhere"}</span></div>`).join("")}</div>` : "";
+  const siblings = C.total > 1 ? `<div class="sec"><span class="k">Same ticker</span><span class="v">${C.distinctCreators} creators · ${C.before} before this one</span></div><div class="list2">${C.siblings.slice(0, 8).map((sb) => `<div class="li"><span><a href="${EXP}/token/${sb.token}" target="_blank" rel="noopener">${esc(sb.symbol || short(sb.token))}</a>${sb.graduated ? '<span class="x g">pool</span>' : ""}${sb.sameCreator ? '<span class="x r">same creator</span>' : ""}</span><span class="m">${ago(sb.ts)} ago</span></div>`).join("")}</div>` : "";
+  const feeChanges = k.fees.changes.length ? `<div class="sec"><span class="k">Fee recipient changed</span></div><div class="list2">${k.fees.changes.map((c) => `<div class="li"><span>${short(c.prev)} → ${short(c.next)}</span><span class="m"><a href="${c.txUrl}" target="_blank" rel="noopener">tx ↗</a></span></div>`).join("")}</div>` : "";
+
+  $("panel").innerHTML = `
+    <div class="phead"><span class="cdot" style="background:${hue(k.token)}"></span><b>${esc(k.symbol || "?")}</b><span class="nm">${esc(k.name || "")}</span><div class="spacer"></div><span class="t">${hhmmss(L.ts)}</span>
+      <span class="grade" title="Creator record from past launches" style="--gc:${g.c};--gb:${g.b};--gbg:${g.bg}"><i>${g.L}</i><span>${g.txt}</span></span></div>
+    <div class="ptop">
+      <div class="bigs">
+        <div class="big lime"><div class="k">P graduate</div><div class="v">${s ? pct(s.probability) : "—"}</div></div>
+        <div class="big line"><div class="k">Rank · last 6h</div><div class="v">${s ? "#" + s.rank : "—"}<small> of ${s ? s.of.toLocaleString() : "—"}</small></div></div>
+      </div>
+      <div class="reasons">${reasons}</div>
+    </div>
+    <div class="pbody">
+      ${fact("Creator (tx.from)", L.creator ? short(L.creator) : "unknown", "", L.creator ? A(L.creator) : "")}
+      ${fact("Called via", calledVia, L.selfBuy === null ? "amb" : "")}
+      ${fact("Self-buy", L.selfBuy === null ? "not declared" : `${esc(L.selfBuy)} ${esc(L.quoteSymbol)}`)}
+      ${fact("Exempt wallets", k.exemptions.length === 0 ? "none" : `${k.exemptions.length} · seen elsewhere: ${k.exemptions.filter((e) => e.seenInOtherLaunches > 0).length}`, k.exemptions.length >= 3 ? "warn" : "")}
+      ${fact("Fees go to", feesTxt, k.fees.redirected ? "warn" : "", k.fees.recipient ? A(k.fees.recipient) : "")}
+      ${fact("Creator tax", L.creatorTaxBps === null ? "unknown" : (L.creatorTaxBps / 100).toFixed(2) + "%")}
+      ${fact("Quote asset", `${esc(L.quoteSymbol)} · ${L.quoteDecimals} dec${L.isEthQuoted ? "" : " · token"}`, L.isEthQuoted ? "" : "amb", L.isEthQuoted ? "" : `${EXP}/token/${L.quoteAsset}`)}
+      ${fact("Graduation needs", `${esc(L.threshold)} ${esc(L.quoteSymbol)}`)}
+      ${fact("Name cluster", clusterTxt, C.kind === "repeat-spam" ? "warn" : "")}
+      ${fact("Outcome", k.outcome.graduated ? `reached the pool${k.outcome.secondsToGraduate !== null ? " after " + secs(k.outcome.secondsToGraduate) : ""}` : ["on the curve", "swept", "in the pool", "rescued"][k.outcome.phase] || "?", "", k.outcome.graduationTxUrl || "")}
+      <div class="soc"><span class="k">Socials</span><span class="b">${hasX ? `<a href="${esc(soc.twitter)}" target="_blank" rel="noopener"><b>𝕏</b>Twitter ↗</a>` : ""}${hasWeb ? `<a href="${esc(soc.website)}" target="_blank" rel="noopener"><b>⌂</b>Website ↗</a>` : ""}${!hasX && !hasWeb ? '<span class="none">none declared</span>' : ""}</span></div>
+      <div class="sec"><span class="k">Creator</span><span class="v">${L.creator ? L.creator : "—"}</span>${L.creator ? `<a href="${A(L.creator)}" target="_blank" rel="noopener">↗</a>` : ""}</div>
+      <div class="stat3"><div><b>${H.priorLaunches}</b><span>launches before</span></div><div class="lime"><b>${H.priorGraduations}</b><span>graduated</span></div><div><b>${rate}</b><span>hit rate</span></div></div>
+      ${past}
+      <div class="sec"><span class="k">Trading on the curve</span></div>
+      ${trading}
+      ${exemptList}${siblings}${feeChanges}
+      <div class="copy"><button id="copyca">Copy contract address</button><div class="full">${k.token}</div></div>
+    </div>`;
+  $("copyca").onclick = () => { navigator.clipboard && navigator.clipboard.writeText(k.token); const b = $("copyca"); b.textContent = "Contract copied ✓"; b.classList.add("done"); setTimeout(() => { b.textContent = "Copy contract address"; b.classList.remove("done"); }, 1500); };
+}
+
+/* ── home stats ── */
+async function loadStats() {
+  let d; try { d = await (await fetch("/api/stats")).json(); } catch { return; }
+  $("k-base").textContent = d.baseRate === null ? "—" : (100 * d.baseRate).toFixed(1) + "%";
+  $("k-median").textContent = d.medianSecToGraduate === null ? "—" : d.medianSecToGraduate < 600 ? d.medianSecToGraduate + " s" : Math.round(d.medianSecToGraduate / 60) + " min";
+  $("k-lift").textContent = d.decileLift === null ? "—" : d.decileLift.toFixed(2) + "×";
+}
+
+/* ── model page ── */
+async function loadModel() {
+  let d; try { d = await (await fetch("/api/model")).json(); } catch { return; }
+  const v = d.validation, live = d.live;
+  const when = d.trainedAt ? new Date(d.trainedAt * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC" : "no model yet";
+  $("mo-h").textContent = `model ${d.modelId} · trained ${when} · ${d.featureCount} features`;
+  $("k-feat").textContent = d.featureCount;
+  const cell = (k, t, m, dd, out = false) => `<div class="cell${out ? " out" : ""}"><div class="k">${k}</div><div class="t">${t}</div><div class="m">${m}</div><div class="d">${dd}</div></div>`;
+  $("pipe").innerHTML =
+    cell("01 · stream", "Listening to the factory", "websocket + catch-up reads", "every TokenLaunched, LaunchSwept and PoolGraduated") +
+    cell("02 · facts", "Local SQLite", v ? v.rows.toLocaleString() + " launches in the trained window" : "—", "creator, self-buy, exemptions, fees, curve trades, outcome") +
+    cell("03 · features", `${d.featureCount} features`, "at T+0", "only what is known when the launch lands") +
+    cell("04 · training", "npm run train", v ? "validated " + new Date(v.at * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "run: npm run validate", "rolling-origin folds, time-ordered, never random") +
+    `<div class="arrow">→</div>` +
+    cell("Output", "P(graduates)", `GBDT · ${d.featureCount} features`, "exact contribution split → 3 reasons", true);
+  const M = (k, val, dd, cls = "") => `<div class="cell metric"><div class="k">${k}</div><div class="v ${cls}">${val}</div><div class="d">${dd}</div></div>`;
+  $("metrics").innerHTML = v ? [
+    M("ROC-AUC", v.roc.mean.toFixed(3), `mean of ${v.folds.length} rolling folds`),
+    M("Top-decile lift", v.decile.mean.toFixed(2) + "×", `sd ${v.decile.sd.toFixed(2)} · worst ${v.decile.worst.toFixed(2)}×`, "lime"),
+    M("Base rate", (100 * v.positives / v.rows).toFixed(2) + "%", "launches that graduate, trained window"),
+    M("Window", `${Math.round((v.window.to - v.window.from) / 3600)} h`, new Date(v.window.from * 1000).toISOString().slice(5, 16).replace("T", " ") + " → " + new Date(v.window.to * 1000).toISOString().slice(11, 16) + " UTC"),
+    M("Folds at chance", `${v.atChance} / ${v.folds.length}`, `worst ROC ${v.roc.worst.toFixed(3)} · disclosed`, v.atChance ? "amb" : ""),
+  ].join("") : `<div class="cell" style="grid-column:1/-1;color:var(--t5)">No validation on record. Run <code>npm run validate</code> and this fills in with what it printed.</div>`;
+  const max = d.importance.length ? d.importance[0].value : 1;
+  $("imp").innerHTML = d.importance.slice(0, 12).map((f) => `<div class="imp"><span>${f.name.replace(/_/g, " ")}</span><span class="bar"><i style="width:${(100 * f.value / max).toFixed(0)}%"></i></span><span class="n">${f.value.toFixed(3)}</span></div>`).join("") || `<div style="color:var(--t5)">no launches on the board to measure against</div>`;
+  const row = (t, m, c = "") => `<div><span class="t">${t}</span><span class="${c}">${m}</span></div>`;
+  const sc = live.thisModel.score, all = live.allModels.score;
+  $("livelog").innerHTML = [
+    row("this model", `${live.thisModel.n} claims settled`),
+    sc ? row("top decile", `${sc.topDecileHits} of ${sc.topDecileN} graduated · ${sc.topDecileLift.toFixed(2)}× base`, sc.topDecileLift >= 2 ? "lime" : sc.topDecileLift >= 1 ? "amb" : "red") : row("top decile", "fewer than 20 settled claims — nothing to report yet", "amb"),
+    sc ? row("ROC-AUC", sc.rocAuc.toFixed(3), sc.rocAuc >= 0.6 ? "lime" : sc.rocAuc >= 0.55 ? "amb" : "red") : "",
+    sc ? row("base rate", (100 * sc.baseRate).toFixed(2) + "%") : "",
+    row("all models", `${live.allModels.n} settled${all ? " · " + all.topDecileLift.toFixed(2) + "× top decile" : ""}`),
+    row("pending", `${live.pending} claims inside the 4-hour horizon`),
+    row("check it", `npm run verify — exports the log and recomputes these from the file`, "lime"),
+  ].join("");
+  $("honest").textContent = v
+    ? `Honest note: across ${v.folds.length} rolling-origin folds the top decile graduated at ${v.decile.mean.toFixed(2)}× the base rate on average, ` +
+      (v.atChance ? `but ${v.atChance} fold${v.atChance > 1 ? "s were" : " was"} no better than chance (worst ROC ${v.roc.worst.toFixed(3)}). ` : "and every fold beat chance. ") +
+      `The live scoreboard on the right is the only number here written before its outcome existed. Run npm run validate after every retrain.`
+    : "Run npm run validate to see how the model holds up across time-ordered folds.";
+}
+
+/* ── ages tick without a refetch ── */
+setInterval(() => document.querySelectorAll("[data-ts]").forEach((el) => { const t = Number(el.dataset.ts); if (t) el.textContent = ago(t); }), 1000);
+setInterval(loadFeed, 5000);
+route();
 </script>
 </body>
 </html>

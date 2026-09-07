@@ -1,18 +1,23 @@
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildCard } from "./card.ts";
-import { datasetAgeSec, loadModel, scoreOne, scoreRecent, type FeedOrder } from "./score.ts";
+import { dataset, datasetAgeSec, FEATURES, loadModel, scoreOne, scoreRecent, type FeedOrder } from "./score.ts";
 import { getMeta, openDb } from "./db.ts";
+import { contributions } from "./model/gbdt.ts";
+import { grade, modelId, pending, score as scoreLog, settled } from "./track.ts";
+import { formatUnits } from "./quote.ts";
 import { BLOCKS_PER_DAY } from "./config.ts";
 import { CFG } from "./config.ts";
 import { indexCurve } from "./curve.ts";
-import { logsClient } from "./chain.ts";
+import { logsClient, sleep } from "./chain.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
 let model = loadModel();
+/** Tokens whose curve is being read right now, so two opens of one card cost one read. */
+const indexing = new Set<string>();
 
 const SEC_PER_BLOCK = 86400 / BLOCKS_PER_DAY;
 
@@ -67,6 +72,41 @@ function overLimit(req: import("node:http").IncomingMessage): boolean {
   return seen.n > RATE_LIMIT;
 }
 
+/**
+ * The headline figures on the front page, measured from this database rather than typed in. Cached
+ * for a minute: they move slowly and the median needs a sort.
+ */
+let statsCache: { at: number; body: Record<string, unknown> } | null = null;
+function stats(): Record<string, unknown> {
+  if (statsCache && Date.now() - statsCache.at < 60_000) return statsCache.body;
+  const now = Math.floor(Date.now() / 1000);
+  const week = now - 7 * 86400;
+  const c = db.prepare(`
+    SELECT (SELECT count(*) FROM launches WHERE ts >= ?) launches,
+           (SELECT count(*) FROM graduations WHERE ts >= ?) graduations,
+           (SELECT count(*) FROM launches WHERE ts >= ?) launches24h,
+           (SELECT count(*) FROM launches) total,
+           (SELECT count(*) FROM launches WHERE enriched_at IS NOT NULL) enriched`,
+  ).get(week, week, now - 86400) as Record<string, number>;
+  const secs = (db.prepare(`
+    SELECT g.ts - l.ts s FROM graduations g JOIN launches l USING(token) WHERE l.ts >= ? AND g.ts >= l.ts ORDER BY s`,
+  ).all(week) as Array<{ s: number }>).map((r) => r.s);
+  const validation = JSON.parse(getMeta(db, "validation_json") ?? "null");
+  const body = {
+    baseRate: c.launches ? c.graduations / c.launches : null,
+    medianSecToGraduate: secs.length ? secs[Math.floor(secs.length / 2)] : null,
+    launches24h: c.launches24h,
+    launchesWeek: c.launches,
+    graduationsWeek: c.graduations,
+    total: c.total,
+    enriched: c.enriched,
+    decileLift: validation?.decile?.mean ?? null,
+    validatedAt: validation?.at ?? null,
+  };
+  statsCache = { at: Date.now(), body };
+  return body;
+}
+
 const json = (res: import("node:http").ServerResponse, body: unknown, code = 200): void => {
   const s = JSON.stringify(body);
   res.writeHead(code, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(s) });
@@ -83,6 +123,52 @@ const server = createServer(async (req, res) => {
 
   if (url.pathname === "/api/health") { json(res, health()); return; }
 
+  if (url.pathname === "/api/stats") { json(res, stats()); return; }
+
+  if (url.pathname === "/api/model") {
+    model = loadModel();
+    const path = "./data/model.json";
+    const id = modelId(path);
+    const trainedAt = existsSync(path) ? Math.floor(statSync(path).mtimeMs / 1000) : null;
+
+    // Global influence: mean absolute contribution over the launches currently on the board. The
+    // feed's matrix is already cached, so this costs a pass over a few thousand rows, not a rebuild.
+    let importance: Array<{ name: string; value: number }> = [];
+    if (model) {
+      const rows = dataset(db, Math.floor(Date.now() / 1000) - 6 * 3600).slice(-3000);
+      const acc = new Float64Array(FEATURES.length);
+      for (const r of rows) {
+        const { contribs } = contributions(model, r.x);
+        for (let i = 0; i < acc.length; i++) acc[i] += Math.abs(contribs[i]);
+      }
+      importance = FEATURES.map((name, i) => ({ name, value: rows.length ? acc[i] / rows.length : 0 }))
+        .sort((a, b) => b.value - a.value)
+        .filter((f) => f.value > 0.0005);
+    }
+
+    // Two kinds of evidence, kept apart on purpose. Validation is retrospective and comes from
+    // `npm run validate`; the live log is claims written before their outcome existed, graded by
+    // the chain. They answer different questions and must never be averaged together.
+    const validation = JSON.parse(getMeta(db, "validation_json") ?? "null");
+    grade(db);
+    const thisModel = settled(db, id);
+    const everything = settled(db);
+    const toRows = (xs: typeof thisModel) => xs.map((r) => ({ probability: r.probability, label: r.label as 0 | 1 }));
+    json(res, {
+      modelId: id,
+      trainedAt,
+      featureCount: FEATURES.length,
+      importance,
+      validation,
+      live: {
+        thisModel: { n: thisModel.length, score: scoreLog(toRows(thisModel)) },
+        allModels: { n: everything.length, score: scoreLog(toRows(everything)) },
+        pending: pending(db),
+      },
+    });
+    return;
+  }
+
   if (url.pathname === "/") {
     const html = readFileSync(join(here, "ui", "index.html"));
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -96,19 +182,46 @@ const server = createServer(async (req, res) => {
     const hours = Number(url.searchParams.get("hours") ?? 6);
     const order: FeedOrder = url.searchParams.get("sort") === "new" ? "new" : "score";
     const rows = model ? scoreRecent(db, model, hours, 150, order) : [];
+    const now = Math.floor(Date.now() / 1000);
+    // Everything a row or a filter needs, in one query: the quote asset for "ETH-quoted", the
+    // creator's prior record for "repeat creators" and the grade badge, and the self-buy in the
+    // launch's own units rather than a 1e18 float that reads as zero for a stablecoin.
     const meta = db.prepare(`
-      SELECT l.token, l.symbol, l.name, l.ts, l.exempt_count, l.initial_buy_eth, l.phase,
+      SELECT l.token, l.symbol, l.name, l.ts, l.exempt_count, l.initial_buy_wei, l.pair_token, l.phase,
+             l.launch_sender, l.deployer, l.creator_tax_bps, l.creator_fee_recipient, l.socials_json,
+             q.symbol AS quote_symbol, q.decimals AS quote_decimals,
              (l.token IN (SELECT token FROM graduations)) AS graduated,
+             (SELECT g.ts - l.ts FROM graduations g WHERE g.token = l.token) AS grad_secs,
              (SELECT count(*) FROM launches x WHERE x.symbol_key = l.symbol_key) AS cluster_total,
              (SELECT count(*) FROM launches x JOIN graduations g2 ON g2.token = x.token
-                WHERE x.symbol_key = l.symbol_key) AS cluster_grad
-      FROM launches l WHERE l.ts >= ?`).all(Math.floor(Date.now() / 1000) - hours * 3600) as Array<Record<string, unknown>>;
+                WHERE x.symbol_key = l.symbol_key) AS cluster_grad,
+             (SELECT count(*) FROM launches x WHERE x.deployer = l.deployer AND x.block < l.block) AS dev_prior,
+             (SELECT count(*) FROM launches x JOIN graduations g3 ON g3.token = x.token
+                WHERE x.deployer = l.deployer AND g3.ts < l.ts) AS dev_prior_grad
+      FROM launches l LEFT JOIN quote_assets q ON q.address = l.pair_token
+      WHERE l.ts >= ?`).all(now - hours * 3600) as Array<Record<string, unknown>>;
+    const ZERO = "0x0000000000000000000000000000000000000000";
+    for (const m of meta) {
+      const eth = m.pair_token === ZERO;
+      const dec = eth ? 18 : Number(m.quote_decimals ?? 18);
+      m.quote_symbol = eth ? "ETH" : (m.quote_symbol ?? "?");
+      m.quote_decimals = dec;
+      m.self_buy = m.initial_buy_wei === null ? null : formatUnits(BigInt(m.initial_buy_wei as string), dec);
+      m.is_eth = eth;
+      delete m.initial_buy_wei;
+    }
     const byToken = new Map(meta.map((m) => [m.token as string, m]));
+    const hour = db.prepare(`
+      SELECT count(*) n, sum(token IN (SELECT token FROM graduations)) g FROM launches WHERE ts >= ?`,
+    ).get(now - 3600) as { n: number; g: number | null };
 
     json(res, {
       hasModel: model !== null,
       health: health(),
       order,
+      lastHour: { launches: hour.n, graduated: hour.g ?? 0 },
+      headBlock: Number(getMeta(db, "live_head_block") ?? 0) || null,
+      modelTrainedAt: existsSync("./data/model.json") ? Math.floor(statSync("./data/model.json").mtimeMs / 1000) : null,
       // The feed is capped, and a list that silently hides two thousand launches reads as if it
       // were the whole window. The UI says so out loud, so this has to come back with it.
       shown: rows.length,
@@ -128,17 +241,28 @@ const server = createServer(async (req, res) => {
       | { curve: string; block: number } | undefined;
     if (!row) { json(res, { error: "unknown token" }, 404); return; }
 
-    // Curve trades are pulled the first time a card is opened, then cached. One eth_getLogs covers
-    // the whole life of a launch, so this costs a single call and never repeats for the same token.
+    // Curve trades are pulled the first time a card is opened, then cached. The read is one
+    // eth_getLogs and usually lands well under a second — but a busy curve or a rate-limited endpoint
+    // can hold it for far longer, and a card that shows nothing until then reads as broken. So the
+    // card waits briefly and answers with what it has; the read finishes in the background and the
+    // next open has the trades. The panel already says "not indexed yet" for exactly this case.
     const done = db.prepare("SELECT to_block FROM curve_indexed WHERE token = ?").get(token) as
       | { to_block: number } | undefined;
-    try {
-      const head = Number(await logsClient.getBlockNumber());
-      const from = done ? done.to_block + 1 : row.block;
-      const to = Math.min(head, row.block + 900_000); // about a day of blocks after launch
-      if (to > from) await indexCurve(db, token, row.curve, from, to);
-    } catch {
-      // A card is still worth showing without its trades; the section says so.
+    if (!indexing.has(token)) {
+      indexing.add(token);
+      const work = (async () => {
+        try {
+          const head = Number(await logsClient.getBlockNumber());
+          const from = done ? done.to_block + 1 : row.block;
+          const to = Math.min(head, row.block + 900_000); // about a day of blocks after launch
+          if (to > from) await indexCurve(db, token, row.curve, from, to);
+        } catch {
+          // A card is still worth showing without its trades; the section says so.
+        } finally {
+          indexing.delete(token);
+        }
+      })();
+      await Promise.race([work, sleep(1500)]);
     }
 
     const card = buildCard(db, token);

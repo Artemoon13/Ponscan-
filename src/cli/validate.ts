@@ -1,4 +1,4 @@
-import { openDb } from "../db.ts";
+import { openDb, setMeta } from "../db.ts";
 import { buildDataset, dropCensored, FEATURES } from "../features.ts";
 import { evaluate, fullyEnrichedWindow } from "../model/train.ts";
 import { calibrate, train } from "../model/gbdt.ts";
@@ -66,4 +66,18 @@ console.log(
     : `\n${atChance} of ${results.length} folds scored at or near chance (ROC < 0.55). The model works on average` +
       "\nbut stops working in some stretches, so treat a single score as weaker evidence than the mean suggests.",
 );
+
+// The board's Model page shows these same numbers. Persisting them here means the page reads what
+// this command actually printed, instead of either recomputing six folds per page view or, worse,
+// showing a figure nobody ran.
+setMeta(db, "validation_json", JSON.stringify({
+  at: Math.floor(Date.now() / 1000),
+  window: w,
+  rows: rows.length,
+  positives: rows.filter((r) => r.label).length,
+  folds: results,
+  roc: { mean: mean(rocs), sd: sd(rocs), worst: Math.min(...rocs) },
+  decile: { mean: mean(decs), sd: sd(decs), worst: Math.min(...decs) },
+  atChance,
+}));
 db.close();
