@@ -11,7 +11,17 @@
  * which is where the three reasons on a card come from.
  */
 
+/**
+ * Which loss the boosting minimises.
+ *
+ * `logistic` answers "will this happen" and its raw score is a log-odds, so it passes through a
+ * sigmoid and Platt scaling. `squared` answers "how much", and its raw score is already the
+ * prediction — running that through a sigmoid would squash a peak multiple into a probability.
+ */
+export type Objective = "logistic" | "squared";
+
 export type GbdtParams = {
+  objective: Objective;
   rounds: number;
   learningRate: number;
   maxDepth: number;
@@ -24,6 +34,7 @@ export type GbdtParams = {
 };
 
 export const DEFAULT_PARAMS: GbdtParams = {
+  objective: "logistic",
   rounds: 300,
   learningRate: 0.06,
   maxDepth: 4,
@@ -41,6 +52,7 @@ type TreeNode =
   | { leaf: false; feature: number; threshold: number; cover: number; left: TreeNode; right: TreeNode };
 
 export type GbdtModel = {
+  objective: Objective;
   base: number;
   learningRate: number;
   trees: TreeNode[];
@@ -154,25 +166,32 @@ export function rawScore(model: GbdtModel, x: Float64Array): number {
   return z;
 }
 
-/** Calibrated probability of the positive class. */
+/**
+ * The model's answer for one row: a calibrated probability under logistic loss, and the predicted
+ * value itself under squared loss, where a sigmoid would be nonsense.
+ */
 export function predict(model: GbdtModel, x: Float64Array): number {
   const z = rawScore(model, x);
+  if (model.objective === "squared") return z;
   if (!model.calibration) return sigmoid(z);
   return sigmoid(model.calibration.a * z + model.calibration.b);
 }
 
 export function train(
-  X: Float64Array[], y: Uint8Array, featureNames: string[], params: Partial<GbdtParams> = {},
+  X: Float64Array[], y: ArrayLike<number>, featureNames: string[], params: Partial<GbdtParams> = {},
 ): GbdtModel {
   const p = { ...DEFAULT_PARAMS, ...params };
   const n = X.length;
   const nf = featureNames.length;
   const rand = mulberry32(p.seed);
+  const squared = p.objective === "squared";
 
-  let pos = 0;
-  for (let i = 0; i < n; i++) pos += y[i];
-  const rate = Math.min(1 - 1e-6, Math.max(1e-6, pos / n));
-  const base = Math.log(rate / (1 - rate));
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += y[i];
+  // Logistic starts from the log-odds of the positive class; squared starts from the mean, so the
+  // first tree corrects a residual rather than the whole magnitude.
+  const rate = Math.min(1 - 1e-6, Math.max(1e-6, sum / n));
+  const base = squared ? sum / n : Math.log(rate / (1 - rate));
 
   const edges = binEdges(X, nf, p.maxBins);
   const z = new Float64Array(n).fill(base);
@@ -182,6 +201,7 @@ export function train(
 
   for (let r = 0; r < p.rounds; r++) {
     for (let i = 0; i < n; i++) {
+      if (squared) { grad[i] = z[i] - y[i]; hess[i] = 1; continue; }
       const pr = sigmoid(z[i]);
       grad[i] = pr - y[i];
       hess[i] = Math.max(1e-6, pr * (1 - pr));
@@ -199,7 +219,7 @@ export function train(
     for (let i = 0; i < n; i++) z[i] += p.learningRate * walk(tree, X[i]);
   }
 
-  return { base, learningRate: p.learningRate, trees, featureNames, calibration: null };
+  return { objective: p.objective, base, learningRate: p.learningRate, trees, featureNames, calibration: null };
 }
 
 /** Platt scaling on held-out rows. Fitted by Newton steps on the logistic likelihood. */
