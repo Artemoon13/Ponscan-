@@ -8,6 +8,11 @@ import type { DB } from "./db.ts";
 
 export type Scored = {
   token: string;
+  /**
+   * The model's own probability, before any live correction. The card shows `probability`; this is
+   * what a refit must be fitted against, or a correction would be measured on top of itself.
+   */
+  rawProbability: number;
   /** Launch time, so the caller can order by recency without a second query. */
   ts: number;
   probability: number;
@@ -143,13 +148,14 @@ export function scoreRecent(
 
   const c = live();
   const scored = rows
-    .map((r) => ({ token: r.token, ts: r.ts, x: r.x, p: shown(predict(model, r.x), c) }))
+    .map((r) => { const raw = predict(model, r.x); return { token: r.token, ts: r.ts, x: r.x, raw, p: shown(raw, c) }; })
     .sort((a, b) => b.p - a.p);
 
   const ranked = scored.map((s, i) => ({
     token: s.token,
     ts: s.ts,
     x: s.x,
+    rawProbability: s.raw,
     probability: s.p,
     rank: i + 1,
     of: scored.length,
@@ -182,11 +188,13 @@ export function scoreOne(db: DB, model: GbdtModel, token: string, windowHours = 
 
   const c = live();
   const peers = rows.filter((r) => r.ts >= cutoff).map((r) => shown(predict(model, r.x), c));
-  const p = shown(predict(model, me.x), c);
+  const raw = predict(model, me.x);
+  const p = shown(raw, c);
   const better = peers.filter((q) => q > p).length;
   return {
     token: me.token,
     ts: me.ts,
+    rawProbability: raw,
     probability: p,
     rank: better + 1,
     of: Math.max(peers.length, 1),

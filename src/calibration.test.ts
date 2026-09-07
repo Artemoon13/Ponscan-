@@ -84,3 +84,30 @@ test("a well-calibrated model is left roughly alone", () => {
   const after = rows.reduce((s, r) => s + applyLive(fit, r.probability), 0) / rows.length;
   assert.ok(Math.abs(after - said) < 0.01, `moved a good model by ${(after - said).toFixed(4)}`);
 });
+
+test("a fit taken from already-corrected scores throws the correction away", () => {
+  // The real failure is not drift but oscillation. The stored correction is absolute — the board
+  // applies it to the model's raw score — while a refit that reads the shown value is fitted on
+  // numbers that correction already moved. Those look well calibrated, so the refit comes back as
+  // roughly the identity, and storing it undoes the correction entirely. The board overstates again,
+  // the next pass refits it back, and the printed number swings between two answers forever while
+  // the ranking, and therefore every dashboard, looks perfectly stable.
+  const rows = overstating(6000);
+  const good = fitLive(rows);
+  assert.ok(good);
+
+  const corrected = rows.map((r) => ({ probability: applyLive(good, r.probability), label: r.label }));
+  const fromShown = fitLive(corrected);
+  assert.ok(fromShown);
+
+  const was = rows.reduce((s, r) => s + r.label, 0) / rows.length;
+  const withGood = rows.reduce((s, r) => s + applyLive(good, r.probability), 0) / rows.length;
+  const withWrong = rows.reduce((s, r) => s + applyLive(fromShown, r.probability), 0) / rows.length;
+
+  assert.ok(Math.abs(withGood - was) < 0.004, "the fit from raw scores should land on the truth");
+  assert.ok(
+    Math.abs(withWrong - was) > Math.abs(withGood - was) * 3,
+    `a fit from shown scores should be far worse when applied to raw ones: ` +
+    `truth ${was.toFixed(4)}, from raw ${withGood.toFixed(4)}, from shown ${withWrong.toFixed(4)}`,
+  );
+});

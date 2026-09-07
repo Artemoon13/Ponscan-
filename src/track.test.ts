@@ -32,7 +32,7 @@ process.on("exit", () => {
 
 const T0 = 1_800_000_000;
 const scored = (token: string, probability: number) => ({
-  token, probability, rank: 1, of: 10, percentile: 100, reasons: [],
+  token, ts: T0, probability, rawProbability: probability, rank: 1, of: 10, percentile: 100, reasons: [],
 });
 
 function addLaunch(token: string, ts: number): void {
@@ -116,4 +116,22 @@ test("scoring the log matches hand arithmetic", () => {
 
 test("too small a log reports nothing rather than a flattering number", () => {
   assert.equal(score([{ probability: 0.9, label: 1 }, { probability: 0.1, label: 0 }]), null);
+});
+
+test("a fresh database gets the raw-probability column too", () => {
+  // Migrations only touch tables that already exist, so a column added to an old database has to be
+  // added to the schema as well or new installs quietly lack it. The failure is not subtle once it
+  // happens, but it happens on somebody else's machine rather than this one.
+  const cols = (db.prepare("PRAGMA table_info(predictions)").all() as Array<{ name: string }>).map((c) => c.name);
+  assert.ok(cols.includes("raw_probability"), `predictions has: ${cols.join(", ")}`);
+});
+
+test("a claim records the model's own score as well as the one shown", () => {
+  addLaunch("0xboth", T0);
+  const s = { ...scored("0xboth", 0.02), rawProbability: 0.05 };
+  assert.equal(record(db, s, T0, "m2", T0 + 5), true);
+  const row = db.prepare("SELECT probability, raw_probability FROM predictions WHERE token = ?").get("0xboth") as
+    { probability: number; raw_probability: number };
+  assert.equal(row.probability, 0.02, "the claim is what was shown");
+  assert.equal(row.raw_probability, 0.05, "and the model's own opinion is kept beside it");
 });

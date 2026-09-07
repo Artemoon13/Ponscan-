@@ -43,6 +43,8 @@ export type Prediction = {
   scored_at: number;
   age_at_score: number;
   probability: number;
+  /** Null for claims written before this column existed; those were never corrected. */
+  raw_probability: number | null;
   rank: number;
   of: number;
   model_id: string;
@@ -59,10 +61,11 @@ export function record(db: DB, s: Scored, launchTs: number, model: string, now =
   if (age > MAX_AGE_SEC || age < 0) return false;
 
   const res = db.prepare(`
-    INSERT INTO predictions (token, launch_ts, scored_at, age_at_score, probability, rank, of, model_id, reasons_json)
-    VALUES (?,?,?,?,?,?,?,?,?)
+    INSERT INTO predictions (token, launch_ts, scored_at, age_at_score, probability, raw_probability, rank, of, model_id, reasons_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(token) DO NOTHING`).run(
-    s.token, launchTs, now, age, s.probability, s.rank, s.of, model, JSON.stringify(s.reasons),
+    s.token, launchTs, now, age, s.probability, s.rawProbability ?? s.probability,
+    s.rank, s.of, model, JSON.stringify(s.reasons),
   );
   return Number(res.changes) > 0;
 }
@@ -86,7 +89,7 @@ export function grade(db: DB, now = Math.floor(Date.now() / 1000)): number {
 }
 
 export function settled(db: DB, modelFilter?: string): Prediction[] {
-  const sql = `SELECT token, launch_ts, scored_at, age_at_score, probability, rank, of, model_id, graded_at, label
+  const sql = `SELECT token, launch_ts, scored_at, age_at_score, probability, raw_probability, rank, of, model_id, graded_at, label
                FROM predictions WHERE label IS NOT NULL${modelFilter ? " AND model_id = ?" : ""}
                ORDER BY launch_ts`;
   const stmt = db.prepare(sql);
