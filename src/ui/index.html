@@ -114,8 +114,19 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .box .hd{display:flex;justify-content:space-between;align-items:center}
 .box b{font-size:15px}
 .box .sub{font:500 11px var(--mono);color:var(--t5)}
-.term{margin-top:14px;background:var(--bg3);border-radius:7px;padding:14px 16px;font:12.5px/1.8 var(--mono);color:var(--t75)}
+.term{margin-top:14px;background:var(--bg3);border-radius:7px;padding:10px 8px 10px 16px;font:12.5px/1.8 var(--mono);color:var(--t75)}
 .term .d{color:var(--t35)}.term .c{color:var(--lime)}
+.cmd{display:grid;grid-template-columns:minmax(0,1fr) 62px;gap:8px;align-items:start;border-radius:4px;padding:1px 6px 1px 0;margin:0 -6px 0 0}
+.cmd:hover{background:rgba(204,255,0,.06)}
+.cmd .txt{min-width:0;overflow-wrap:anywhere}
+.cmd .cp{opacity:0;justify-self:end;align-self:center;font:500 10.5px var(--mono);color:var(--t5);border:1px solid var(--l12);border-radius:4px;padding:2px 7px;background:var(--bg2);white-space:nowrap;transition:opacity .12s,color .12s,border-color .12s}
+.cmd:hover .cp,.cmd .cp:focus-visible{opacity:1}
+.cmd .cp:hover{color:var(--lime);border-color:rgba(204,255,0,.45)}
+.cmd .cp.done{opacity:1;color:#111;background:var(--lime);border-color:var(--lime)}
+.copyall{font:500 10.5px var(--mono);color:var(--t5);border:1px solid var(--l12);border-radius:4px;padding:3px 9px;background:transparent;white-space:nowrap;transition:color .12s,border-color .12s,background .12s}
+.copyall:hover{color:var(--lime);border-color:rgba(204,255,0,.45)}
+.copyall.done{color:#111;background:var(--lime);border-color:var(--lime)}
+.box .hd .right{display:flex;align-items:center;gap:12px}
 .keys{margin-top:18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:12px}
 .keys div{background:var(--l05);border-radius:6px;padding:10px 12px}
 .keys b{display:block;font:600 16px var(--mono)}
@@ -300,7 +311,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <h1>Every pons launch, scored the second it lands.</h1>
         <div class="ctas">
           <a class="btn btn-lg" href="#/board">Open the live board</a>
-          <span class="btn btn-lg ghost">git clone · npm run setup · npm run board</span>
+          <button class="btn btn-lg ghost" id="copy-quick" title="Copy the whole sequence">git clone · npm run setup · npm run board</button>
         </div>
         <div class="kpis">
           <div><b id="k-base">—</b>base graduation rate</div>
@@ -340,13 +351,13 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
 
     <div class="two">
       <div class="box">
-        <div class="hd"><b>Run it locally</b><span class="sub">Node ≥ 22.6 · no build step</span></div>
-        <div class="term">
-          <div><span class="d">$</span> git clone https://github.com/Artemoon13/Ponscan-.git &amp;&amp; cd Ponscan-</div>
-          <div><span class="d">$</span> npm install &amp;&amp; cp .env.example .env</div>
-          <div><span class="d">$</span> npm run setup <span class="d"># doctor · a week of history · last 8h decoded</span></div>
-          <div><span class="d">$</span> npm run train &amp;&amp; npm run validate</div>
-          <div><span class="d">$</span> npm run board <span class="c"># → localhost:4663</span> <span class="d">and</span> npm run watch</div>
+        <div class="hd"><b>Run it locally</b><span class="right"><span class="sub">Node ≥ 22.6 · no build step</span><button class="copyall" id="copy-all">Copy all</button></span></div>
+        <div class="term" id="term">
+          <div class="cmd" data-cmd="git clone https://github.com/Artemoon13/Ponscan-.git &amp;&amp; cd Ponscan-"><span class="txt"><span class="d">$</span> git clone https://github.com/Artemoon13/Ponscan-.git &amp;&amp; cd Ponscan-</span><button class="cp">copy</button></div>
+          <div class="cmd" data-cmd="npm install &amp;&amp; cp .env.example .env"><span class="txt"><span class="d">$</span> npm install &amp;&amp; cp .env.example .env</span><button class="cp">copy</button></div>
+          <div class="cmd" data-cmd="npm run setup"><span class="txt"><span class="d">$</span> npm run setup <span class="d"># doctor · a week of history · last 8h decoded</span></span><button class="cp">copy</button></div>
+          <div class="cmd" data-cmd="npm run train &amp;&amp; npm run validate"><span class="txt"><span class="d">$</span> npm run train &amp;&amp; npm run validate</span><button class="cp">copy</button></div>
+          <div class="cmd" data-cmd="npm run board"><span class="txt"><span class="d">$</span> npm run board <span class="c"># → localhost:4663</span> <span class="d">and</span> npm run watch</span><button class="cp">copy</button></div>
         </div>
       </div>
       <div class="box">
@@ -446,6 +457,40 @@ const ago = (ts) => { const s = Math.max(0, Math.floor(Date.now() / 1000) - ts);
 const secs = (s) => s < 90 ? s + " s" : s < 5400 ? Math.round(s / 60) + " min" : (s / 3600).toFixed(1) + " h";
 const hue = (a) => { let h = 0; for (const ch of (a || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360} 55% 55%)`; };
 const pcol = (it) => it.percentile >= 90 ? "var(--lime)" : it.probability >= 0.03 ? "var(--amber)" : "var(--t5)";
+
+/**
+ * Copy, with a fallback.
+ *
+ * navigator.clipboard exists only in a secure context. localhost counts as one, but the deploy guide
+ * puts this board on a LAN address over plain http, where the API is simply undefined — and a copy
+ * button that silently does nothing is worse than no button. The textarea path is the old way and
+ * still works there.
+ */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(text); return true; }
+  } catch { /* fall through */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:-1000px;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch { return false; }
+}
+
+/** Swaps a button's label to confirm, then puts it back. */
+async function copyWithFeedback(btn, text, label = "copy", done = "copied ✓") {
+  const ok = await copyText(text);
+  btn.textContent = ok ? done : "press ⌘/Ctrl+C";
+  btn.classList.toggle("done", ok);
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => { btn.textContent = label; btn.classList.remove("done"); }, 1600);
+}
 
 /* ── state ── */
 const S = {
@@ -713,6 +758,18 @@ async function loadModel() {
       `The live scoreboard on the right is the only number here written before its outcome existed. Run npm run validate after every retrain.`
     : "Run npm run validate to see how the model holds up across time-ordered folds.";
 }
+
+/* ── copy affordances on the install block ── */
+const allCommands = () => [...document.querySelectorAll("#term .cmd")].map((c) => c.dataset.cmd).join("\n");
+document.querySelectorAll("#term .cmd .cp").forEach((btn) => {
+  btn.onclick = () => copyWithFeedback(btn, btn.closest(".cmd").dataset.cmd);
+});
+$("copy-all").onclick = () => copyWithFeedback($("copy-all"), allCommands(), "Copy all", "Copied ✓");
+// The hero button shows an abbreviated sequence; it copies the real commands, not the summary.
+$("copy-quick").onclick = function () {
+  const label = "git clone · npm run setup · npm run board";
+  copyWithFeedback(this, allCommands(), label, "Commands copied ✓");
+};
 
 /* ── ages tick without a refetch ── */
 setInterval(() => document.querySelectorAll("[data-ts]").forEach((el) => { const t = Number(el.dataset.ts); if (t) el.textContent = ago(t); }), 1000);
