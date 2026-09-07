@@ -81,9 +81,31 @@ before(async () => {
   }
 });
 
-after(() => {
-  board?.kill();
-  rmSync(dir, { recursive: true, force: true });
+after(async () => {
+  // Wait for the child to actually be gone before deleting its database.
+  //
+  // kill() only asks. On Windows the request and the exit are far enough apart that rmSync arrives
+  // while the board still holds the file open, and a directory holding an open file cannot be
+  // removed: the suite passed every assertion and then failed its own teardown with EPERM. Linux
+  // unlinks an open file happily, so this only ever went red on the platform it is developed on.
+  if (board && board.exitCode === null) {
+    await new Promise<void>((resolve) => {
+      const done = (): void => resolve();
+      board?.once("exit", done);
+      board?.kill();
+      setTimeout(done, 5_000).unref();
+    });
+  }
+  // And the handle can outlive the process by a moment, so the removal gets a few attempts.
+  for (let i = 0; ; i++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if (i >= 10) throw e;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
 });
 
 test("serves the page itself", async () => {
