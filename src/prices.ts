@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { tradePrices } from "./curve.ts";
 import type { DB } from "./db.ts";
 
 /**
@@ -81,27 +82,20 @@ export function formatUsd(v: number | null): string {
 /**
  * Launch and peak market cap for one token, straight from its curve trades.
  *
- * Prices come from the trades themselves: each buy records what was paid and what came back, scaled
- * by both sides' decimals so a 6-decimal stablecoin and an 18-decimal stock give comparable figures.
+ * Prices come from the trades themselves — buys and sells alike, each recording what was paid and
+ * what came back — scaled by both sides' decimals so a 6-decimal stablecoin and an 18-decimal stock
+ * give comparable figures.
  */
 export function capsFor(db: DB, token: string, quoteSymbol: string | null, quoteDecimals: number): {
   launchUsd: number | null; peakUsd: number | null; peakMultiple: number | null;
 } {
-  const rows = db.prepare(
-    "SELECT quote_wei, token_amt FROM curve_trades WHERE token = ? AND side = 'buy' ORDER BY block, log_index",
-  ).all(token) as Array<{ quote_wei: string; token_amt: string }>;
+  const raw = tradePrices(db, token);
+  if (!raw.length) return { launchUsd: null, peakUsd: null, peakMultiple: null };
 
-  const prices: number[] = [];
-  for (const r of rows) {
-    const tokens = Number(r.token_amt) / 1e18;
-    if (!(tokens > 0)) continue;
-    const p = (Number(r.quote_wei) / 10 ** quoteDecimals) / tokens;
-    if (p > 0 && Number.isFinite(p)) prices.push(p);
-  }
-  if (prices.length < 2) return { launchUsd: null, peakUsd: null, peakMultiple: null };
-
-  const first = prices[0];
-  const peak = Math.max(...prices);
+  // Raw prices are quote units per token unit; this lifts them to whole quote per whole token.
+  const scale = 1e18 / 10 ** quoteDecimals;
+  const first = raw[0] * scale;
+  const peak = Math.max(...raw) * scale;
   return {
     launchUsd: marketCapUsd(first, quoteSymbol),
     peakUsd: marketCapUsd(peak, quoteSymbol),

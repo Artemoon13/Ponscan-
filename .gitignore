@@ -17,3 +17,4 @@ data/predictions.jsonl
 
 # Working plan for the launch, not part of the repo.
 LAUNCH-PLAN.md
+tmp/

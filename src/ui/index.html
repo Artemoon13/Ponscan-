@@ -665,9 +665,14 @@ function renderCard() {
   const rate = H.priorLaunches ? Math.round(100 * H.priorGraduations / H.priorLaunches) + "%" : "—";
 
   const reasons = s ? s.reasons.map((r) => `<div class="${r.direction}"><i>${r.direction === "up" ? "+" : "−"}</i><span>${esc(r.text[0].toUpperCase() + r.text.slice(1))}</span></div>`).join("") : "";
+  // Their highest climbers across every curve of theirs that has been read, not just the recent ten.
+  const bestList = (H.topPeaks && H.topPeaks.length)
+    ? `<div class="thead"><span>Their best launches</span><span></span><span style="text-align:right">Peak reached</span><span></span></div>` +
+      H.topPeaks.map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">highest of ${H.priorLaunches} launch${H.priorLaunches === 1 ? "" : "es"}${H.unread ? " · " + H.unread + " not read yet" : ""}</span><span class="o ${p.multiple >= 3 ? "g" : ""}">${(p.usd ? esc(p.usd) + " " : "") + "×" + p.multiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
+    : "";
   const past = H.recent.length
     ? `<div class="thead"><span>Earlier</span><span></span><span style="text-align:right">Peak reached</span><span></span></div>` +
-      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? "—" : (p.peakUsd ? esc(p.peakUsd) + " " : "") + "×" + p.peakMultiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
+      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? (p.read ? "no trades" : "reading…") : (p.peakUsd ? esc(p.peakUsd) + " " : "") + "×" + p.peakMultiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
     : `<div class="note">${H.priorLaunches === 0 ? "First launch from this wallet." : "No earlier launches on record."}</div>`;
 
   /* sections the design does not have, kept because the tool does */
@@ -675,7 +680,7 @@ function renderCard() {
     ${fact("Trades", `${T.buys} buys · ${T.sells} sells`)}
     ${fact("Buyers", `${T.buyersTotal} total · <b>${T.buyersFirstMinute}</b> in the first minute`)}
     ${fact("Opening tax paid", T.snipers.length ? `${esc(T.snipeTaxTotal)} ${esc(L.quoteSymbol)} by ${new Set(T.snipers.map((x) => x.address)).size} wallet(s)` : "nobody raced the window")}
-    ${fact("Peak reached", T.peakMultiple === null ? "too few trades to have a peak" : `${T.peakUsd ? esc(T.peakUsd) + " · " : ""}×${T.peakMultiple.toFixed(2)} above its first trade`)}
+    ${fact("Peak reached", T.peakMultiple === null ? "nothing has traded on the curve yet" : `${T.peakUsd ? esc(T.peakUsd) + " · " : ""}×${T.peakMultiple.toFixed(2)} above its first trade`)}
     ${T.coBuyers.length ? `<div class="sec"><span class="k">Bought inside the launch tx</span></div><div class="list2">${T.coBuyers.map((b) => `<div class="li"><span><a href="${A(b.address)}" target="_blank" rel="noopener">${short(b.address)}</a></span><span class="m">${esc(b.amount)} ${esc(L.quoteSymbol)}</span></div>`).join("")}</div>` : ""}
     ${T.snipers.length ? `<div class="sec"><span class="k">Raced the 3-second window</span></div><div class="list2">${T.snipers.slice(0, 8).map((x) => `<div class="li"><span><a href="${A(x.address)}" target="_blank" rel="noopener">${short(x.address)}</a>${x.onExemptList ? '<span class="x r">on exempt list</span>' : ""}</span><span class="m">+${x.blocksAfterLaunch} blk · paid ${esc(x.tax)}</span></div>`).join("")}</div>` : ""}
     ${T.topWallets.length ? `<div class="sec"><span class="k">Biggest wallets, by money in</span></div><div class="list2">${T.topWallets.slice(0, 8).map((p) => `<div class="li"><span><a href="${A(p.address)}" target="_blank" rel="noopener">${short(p.address)}</a>${p.multiple !== null ? `<span class="x ${p.multiple >= 1 ? "l" : "r"}">×${p.multiple.toFixed(2)}</span>` : ""}</span><span class="m">in ${esc(p.inAmount)} · out ${esc(p.outAmount)}</span></div>`).join("")}</div>` : ""}`;
@@ -712,6 +717,7 @@ function renderCard() {
       <div class="sec"><span class="k">Creator</span><span class="v">${L.creator ? L.creator : "—"}</span>${L.creator ? `<a href="${A(L.creator)}" target="_blank" rel="noopener">↗</a>` : ""}</div>
       <div class="stat3"><div><b>${H.priorLaunches}</b><span>launches before</span></div><div class="lime"><b>${H.priorGraduations}</b><span>graduated · ${rate}</span></div>
         <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? (H.bestPeak.usd ? esc(H.bestPeak.usd) : "×" + H.bestPeak.multiple.toFixed(1)) : "—"}</b><span>${H.bestPeak ? "best peak · ×" + H.bestPeak.multiple.toFixed(1) + " · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread ? "reading " + H.unread + " curves…" : "no peaks yet"}</span></div></div>
+      ${bestList}
       ${past}
       <div class="sec"><span class="k">Trading on the curve</span></div>
       ${trading}

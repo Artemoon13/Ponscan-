@@ -11,7 +11,7 @@ import { formatUnits } from "./quote.ts";
 import { BLOCKS_PER_DAY } from "./config.ts";
 import { CFG } from "./config.ts";
 import { indexCurve } from "./curve.ts";
-import { logsClient, sleep } from "./chain.ts";
+import { logsClient, sleep, stateClient, withRetry } from "./chain.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const db = openDb();
@@ -173,6 +173,23 @@ function stats(): Record<string, unknown> {
  * before the next time anyone looks at this creator.
  */
 const CREATOR_PEAKS_PER_OPEN = 6;
+
+/**
+ * The chain head, retried, from the endpoint that is generous about being asked.
+ *
+ * Every background read here starts by asking how high the chain is. Asking the log endpoint without
+ * a retry meant one 429 threw, the enclosing catch swallowed it, and the whole backfill silently did
+ * nothing — a creator with sixty-five launches sat at zero curves read while the card politely said
+ * it was still reading them.
+ */
+async function chainHead(): Promise<number> {
+  try {
+    return Number(await withRetry(() => stateClient.getBlockNumber()));
+  } catch {
+    return Number(await withRetry(() => logsClient.getBlockNumber()));
+  }
+}
+
 async function backfillCreatorPeaks(token: string): Promise<void> {
   const rows = db.prepare(`
     SELECT x.token, x.curve, x.block FROM launches x
@@ -183,21 +200,23 @@ async function backfillCreatorPeaks(token: string): Promise<void> {
     Array<{ token: string; curve: string; block: number }>;
   if (!rows.length) return;
 
+  let head: number;
   try {
-    const head = Number(await logsClient.getBlockNumber());
-    for (const r of rows) {
-      if (indexing.has(r.token)) continue;
-      indexing.add(r.token);
-      try {
-        await indexCurve(db, r.token, r.curve, r.block, Math.min(head, r.block + 900_000));
-      } catch {
-        // One unreadable curve must not stop the rest.
-      } finally {
-        indexing.delete(r.token);
-      }
-    }
+    head = await chainHead();
   } catch {
-    // No head, no backfill; the next card open tries again.
+    return; // genuinely unreachable right now; the next card open tries again
+  }
+
+  for (const r of rows) {
+    if (indexing.has(r.token)) continue;
+    indexing.add(r.token);
+    try {
+      await indexCurve(db, r.token, r.curve, r.block, Math.min(head, r.block + 900_000));
+    } catch {
+      // One unreadable curve must not stop the rest.
+    } finally {
+      indexing.delete(r.token);
+    }
   }
 }
 
@@ -360,7 +379,7 @@ const server = createServer(async (req, res) => {
       indexing.add(token);
       const work = (async () => {
         try {
-          const head = Number(await logsClient.getBlockNumber());
+          const head = await chainHead();
           const from = done ? done.to_block + 1 : row.block;
           const to = Math.min(head, row.block + 900_000); // about a day of blocks after launch
           if (to > from) await indexCurve(db, token, row.curve, from, to);

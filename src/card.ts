@@ -1,7 +1,7 @@
 import { EXPLORER } from "./config.ts";
 import { formatUnits, quoteFromCache } from "./quote.ts";
 import { curveStats, peakMultiple, type CurveStats } from "./curve.ts";
-import { capsFor, formatUsd, startingCapUsd } from "./prices.ts";
+import { capsFor, formatUsd, marketCapUsd, startingCapUsd } from "./prices.ts";
 import { loadAthModel, predictAthFor } from "./ath-score.ts";
 import type { DB } from "./db.ts";
 
@@ -88,13 +88,64 @@ export type Card = {
   outcome: { phase: number; graduated: boolean; graduationTx: string | null; graduationTxUrl: string | null; secondsToGraduate: number | null };
   creatorHistory: {
     priorLaunches: number; priorGraduations: number;
-    /** Best observed peak across the earlier launches whose curves have been read. Null if none have. */
-    bestPeak: { symbol: string | null; token: string; multiple: number; usd: string | null } | null;
+    /** Best observed peak across every earlier launch whose curve has been read. Null if none have. */
+    bestPeak: PastPeak | null;
+    /** That creator's three highest-climbing launches, best first. */
+    topPeaks: PastPeak[];
     /** How many of `recent` still have no curve data, so the card can say so instead of implying zero. */
     unread: number;
-    recent: Array<{ token: string; symbol: string | null; ts: number; graduated: boolean; peakMultiple: number | null; peakUsd: string | null; url: string }>;
+    recent: Array<{ token: string; symbol: string | null; ts: number; graduated: boolean; peakMultiple: number | null; peakUsd: string | null; read: boolean; url: string }>;
   };
 };
+
+
+/**
+ * A creator's highest-climbing launches, across everything of theirs that has been read.
+ *
+ * The card lists the ten most recent launches, and for a while the "best peak" was taken from that
+ * list — which for a wallet with sixty-five launches meant "best of the last ten" under a label that
+ * promised all-time. On the busiest creator in this database the honest scan finds x11.30 where the
+ * recent-ten scan found nothing near it.
+ *
+ * One pass rather than a query per launch: a window function picks each curve's first trade and its
+ * highest, and the ratio falls out of the group. Measured at 2 ms for a creator with 65 launches and
+ * 22 ms for one with 2,541, which is affordable on the request path where sixty-five separate reads
+ * would not have been.
+ *
+ * "Read" is the limit, not "launched". Curves are pulled on demand, so this ranks what is known, and
+ * the card reports separately how many of the creator's curves nobody has looked at yet.
+ */
+export type PastPeak = { token: string; symbol: string | null; multiple: number; usd: string | null; url: string };
+
+function topPeaks(db: DB, deployer: string, beforeBlock: number, limit: number): PastPeak[] {
+  const rows = db.prepare(`
+    WITH p AS (
+      SELECT c.token, CAST(c.quote_wei AS REAL) / CAST(c.token_amt AS REAL) px,
+             row_number() OVER (PARTITION BY c.token ORDER BY c.block, c.log_index) rn
+      FROM curve_trades c
+      WHERE c.token IN (SELECT token FROM launches WHERE deployer = ? AND block < ?)
+        AND CAST(c.token_amt AS REAL) > 0 AND CAST(c.quote_wei AS REAL) > 0
+    )
+    SELECT p.token, l.symbol, l.pair_token,
+           max(p.px) peak, max(CASE WHEN p.rn = 1 THEN p.px END) first
+    FROM p JOIN launches l ON l.token = p.token
+    GROUP BY p.token`).all(deployer, beforeBlock) as
+    Array<{ token: string; symbol: string | null; pair_token: string; peak: number; first: number }>;
+
+  return rows
+    .filter((r) => r.first > 0 && r.peak > 0 && Number.isFinite(r.peak / r.first))
+    .map((r) => {
+      const q = quoteFromCache(db, r.pair_token);
+      // Raw prices are quote units per token unit; this lifts them to whole quote per whole token.
+      const usd = marketCapUsd(r.peak * (1e18 / 10 ** q.decimals), q.symbol);
+      return {
+        token: r.token, symbol: r.symbol, multiple: r.peak / r.first,
+        usd: usd === null ? null : formatUsd(usd), url: EXPLORER.token(r.token),
+      };
+    })
+    .sort((a, b) => b.multiple - a.multiple)
+    .slice(0, limit);
+}
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
@@ -166,18 +217,24 @@ export function buildCard(db: DB, token: string): Card | null {
    * Curves are read per token on demand, so an earlier launch nobody has opened yet has no peak
    * rather than a peak of zero; the card counts those separately and says so.
    */
+  const wasRead = db.prepare("SELECT 1 x FROM curve_indexed WHERE token = ?");
   const history = recent.map((r) => {
     const q = quoteFromCache(db, r.pair_token);
     const caps = capsFor(db, r.token, q.symbol, q.decimals);
     return {
       token: r.token, symbol: r.symbol, ts: r.ts, graduated: Boolean(r.graduated),
       peakMultiple: caps.peakMultiple, peakUsd: caps.peakUsd === null ? null : formatUsd(caps.peakUsd),
+      // Whether anyone has pulled this curve yet. Without it a blank peak is ambiguous: it reads the
+      // same whether the curve is still being fetched or was fetched and found no trades at all.
+      read: Boolean(wasRead.get(r.token)),
       url: EXPLORER.token(r.token),
     };
   });
 
   // The multiple is what the model predicts; dollars come from the near-constant starting cap, so a
   // launch with no trades yet still gets a figure instead of only a ratio.
+  const best = topPeaks(db, deployer, Number(l.block), 3);
+
   const athModel = loadAthModel();
   const athRaw = athModel ? predictAthFor(db, athModel, t) : null;
   const startCap = startingCapUsd(db, quote.symbol, quote.decimals);
@@ -272,10 +329,10 @@ export function buildCard(db: DB, token: string): Card | null {
     creatorHistory: {
       priorLaunches: prior.c,
       priorGraduations: priorGrad.c,
-      bestPeak: history.reduce<Card["creatorHistory"]["bestPeak"]>((best, r) =>
-        r.peakMultiple !== null && (best === null || r.peakMultiple > best.multiple)
-          ? { symbol: r.symbol, token: r.token, multiple: r.peakMultiple, usd: r.peakUsd } : best, null),
-      unread: history.filter((r) => r.peakMultiple === null).length,
+      bestPeak: best[0] ?? null,
+      topPeaks: best,
+      unread: (db.prepare(`SELECT count(*) c FROM launches WHERE deployer = ? AND block < ?
+        AND token NOT IN (SELECT token FROM curve_indexed)`).get(deployer, l.block) as { c: number }).c,
       recent: history,
     },
   };

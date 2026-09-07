@@ -92,12 +92,35 @@ export async function indexCurve(
  * neither an oracle nor the asset's decimals: both sides scale identically, so a USDG launch whose
  * prices read 4.8e-18 still reports a clean x8.30.
  *
- * It is what happened, not a forecast. Null when the curve has not been indexed, or traded too
- * little to have a peak worth naming.
+ * It is what happened, not a forecast. Null only when the curve has no trades at all — a launch
+ * that traded exactly once peaked at the price it opened at, which is x1.00 and worth saying.
  */
 export function peakMultiple(db: DB, token: string): number | null {
+  const prices = tradePrices(db, token);
+  if (!prices.length) return null;
+  return Math.max(...prices) / prices[0];
+}
+
+/**
+ * Every price the curve traded at, in raw quote units per raw token unit, in order.
+ *
+ * Both sides count. A sell carries a price exactly as a buy does — quote out over tokens in — and
+ * reading only buys threw away half the price path. That mattered most for the launches a creator
+ * bought and dumped themselves: one buy, one sell, and a peak that came back empty because a second
+ * price was demanded and the sell was not allowed to be one. Those launches are precisely the ones a
+ * reader wants counted, because a serial launcher's record is mostly made of them.
+ *
+ * The tax does not need netting out. It is charged against the token side, not the quote side:
+ * measured over 1,178 taxed opening trades it is 1.3% of `quote_wei` at the median and 11.2% at the
+ * worst, and netting it moves the implied price from 0.92x to 0.90x of the first post-window trade.
+ * An opening buy is not the 100x outlier the 99% headline rate would suggest.
+ *
+ * Raw units on purpose: the factor between raw and whole units is constant within a launch, so it
+ * cancels in any ratio and multiplies out cleanly when a caller wants dollars.
+ */
+export function tradePrices(db: DB, token: string): number[] {
   const rows = db.prepare(
-    "SELECT quote_wei, token_amt FROM curve_trades WHERE token = ? AND side = 'buy' ORDER BY block, log_index",
+    "SELECT quote_wei, token_amt FROM curve_trades WHERE token = ? ORDER BY block, log_index",
   ).all(token) as Array<{ quote_wei: string; token_amt: string }>;
 
   const prices: number[] = [];
@@ -107,8 +130,7 @@ export function peakMultiple(db: DB, token: string): number | null {
     const p = Number(r.quote_wei) / tokens;
     if (p > 0 && Number.isFinite(p)) prices.push(p);
   }
-  if (prices.length < 2) return null;
-  return Math.max(...prices) / prices[0];
+  return prices;
 }
 
 export type Sniper = { address: string; taxWei: string; boughtWei: string; blocksAfterLaunch: number; wasExempt: boolean };
