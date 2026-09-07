@@ -52,7 +52,12 @@ button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer
 .btn:focus-visible{outline:2px solid var(--lime2);outline-offset:2px}
 .btn.ghost{background:transparent;border-color:rgba(255,255,255,.2);color:var(--ink);font-weight:500;font-family:var(--mono)}
 .btn.ghost:hover{background:var(--l07);border-color:var(--l18);color:var(--ink)}
-.btn.big{padding:14px 22px;border-radius:7px;font-size:14px}
+/**
+ * Named `btn-lg`, not `btn big`. `.big` is the card's stat tile, which sets a fixed 76px height and
+ * a column layout; a button carrying both classes inherited the tile's height and stood twice as
+ * tall as its own text. A one-word modifier cannot collide with another component's base class.
+ */
+.btn-lg{padding:14px 22px;border-radius:7px;font-size:14px}
 .brand:hover{color:var(--ink)}
 .brand:hover .mark{background:var(--lime2)}
 .links a:hover{color:var(--ink)}
@@ -294,8 +299,8 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <div class="eyebrow">Open source · MIT · runs on your machine</div>
         <h1>Every pons launch, scored the second it lands.</h1>
         <div class="ctas">
-          <a class="btn big" href="#/board">Open the live board</a>
-          <span class="btn big ghost">git clone · npm run setup · npm run board</span>
+          <a class="btn btn-lg" href="#/board">Open the live board</a>
+          <span class="btn btn-lg ghost">git clone · npm run setup · npm run board</span>
         </div>
         <div class="kpis">
           <div><b id="k-base">—</b>base graduation rate</div>
