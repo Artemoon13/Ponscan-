@@ -260,6 +260,8 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .stat3 b{display:block;font:700 20px/1 var(--mono)}
 .stat3 div.lime b{color:var(--lime)}
 .stat3 span{font-size:11px;color:var(--t5);margin-top:4px;display:block}
+.thead .lbl{grid-column:1/3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.thead .lbl i{font-style:normal;color:var(--t35);margin-left:10px}
 .thead{height:32px;display:grid;grid-template-columns:60px minmax(0,1fr) 116px 12px;gap:12px;align-items:center;padding:0 20px;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45);border-bottom:1px solid var(--l08)}
 .trow{display:grid;grid-template-columns:60px minmax(0,1fr) 116px 12px;gap:12px;padding:0 20px;height:36px;border-bottom:1px solid var(--l05);align-items:center}
 .trow b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -806,11 +808,11 @@ function renderCard() {
   const reasons = s ? s.reasons.map((r) => `<div class="${r.direction}"><i>${r.direction === "up" ? "+" : "−"}</i><span>${esc(r.text[0].toUpperCase() + r.text.slice(1))}</span></div>`).join("") : "";
   // Their highest climbers across every curve of theirs that has been read, not just the recent ten.
   const bestList = (H.topPeaks && H.topPeaks.length)
-    ? `<div class="thead"><span>Their best launches</span><span class="w">${(H.priorLaunches - H.unread) + "/" + H.priorLaunches + " read"}</span><span style="text-align:right">Peak reached</span><span></span></div>` +
+    ? `<div class="thead"><span class="lbl">Their best launches<i>${(H.priorLaunches - H.unread) + "/" + H.priorLaunches + " read"}</i></span><span style="text-align:right">Peak reached</span><span></span></div>` +
       H.topPeaks.map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.multiple >= 3 ? "g" : ""}">${p.usd ? esc(p.usd) : "×" + p.multiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
     : "";
   const past = H.recent.length
-    ? `<div class="thead"><span>Earlier</span><span></span><span style="text-align:right">Peak reached</span><span></span></div>` +
+    ? `<div class="thead"><span class="lbl">Earlier</span><span style="text-align:right">Peak reached</span><span></span></div>` +
       H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? (p.read ? "no trades" : "not read") : (p.peakUsd ? esc(p.peakUsd) : "×" + p.peakMultiple.toFixed(2))}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
     : `<div class="note">${H.priorLaunches === 0 ? "First launch from this wallet." : "No earlier launches on record."}</div>`;
 
