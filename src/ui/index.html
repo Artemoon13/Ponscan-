@@ -92,9 +92,18 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .tile .k{font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45)}
 .tile .v{font:600 18px var(--mono);margin-top:6px}
 .tile .s{font-size:11px;color:var(--t5);margin-top:3px}
-.how{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;padding:56px 0 0}
-.how .n{font:500 11px var(--mono);color:var(--lime)}
-.how .t{font-weight:600;font-size:17px;margin-top:10px;letter-spacing:-.01em}
+/**
+ * Three steps of one pipeline, so they are numbered and joined by arrows: the order is the content,
+ * not decoration. The oversized numeral sits behind the text as the block's own weight — with the
+ * small print gone the headings had nothing holding them to the page.
+ */
+.how{display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr;gap:0;padding:64px 0 0;align-items:stretch}
+.step{position:relative;overflow:hidden;border:1px solid var(--l12);border-radius:10px;background:linear-gradient(160deg,rgba(204,255,0,.045),rgba(204,255,0,0) 60%);padding:26px 28px 30px;display:flex;flex-direction:column;justify-content:flex-end;min-height:168px;transition:border-color .15s,background .15s}
+.step:hover{border-color:rgba(204,255,0,.4);background:linear-gradient(160deg,rgba(204,255,0,.09),rgba(204,255,0,0) 65%)}
+.step .num{position:absolute;top:-12px;right:14px;font:700 88px/1 var(--mono);color:rgba(204,255,0,.09);letter-spacing:-.05em;pointer-events:none;user-select:none}
+.step .lbl{font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.14em;color:var(--lime);position:relative}
+.step .t{font:600 21px/1.25 Geist,sans-serif;letter-spacing:-.02em;margin-top:12px;position:relative;text-wrap:balance}
+.how .join{display:flex;align-items:center;justify-content:center;color:rgba(204,255,0,.45);font:600 15px var(--mono)}
 .two{margin:48px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .box{border:1px solid var(--l12);border-radius:10px;padding:22px 24px}
 .box .hd{display:flex;justify-content:space-between;align-items:center}
@@ -317,9 +326,11 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
     </a>
 
     <div class="how">
-      <div><div class="n">01 · Stream</div><div class="t">Follows the pons v2 factory</div></div>
-      <div><div class="n">02 · Facts</div><div class="t">SQLite, on your disk</div></div>
-      <div><div class="n">03 · Model</div><div class="t">GBDT on <span id="k-feat">23</span> leak-free features</div></div>
+      <div class="step"><span class="num">01</span><div class="lbl">Stream</div><div class="t">Follows the pons v2 factory</div></div>
+      <div class="join">→</div>
+      <div class="step"><span class="num">02</span><div class="lbl">Facts</div><div class="t">SQLite, on your disk</div></div>
+      <div class="join">→</div>
+      <div class="step"><span class="num">03</span><div class="lbl">Model</div><div class="t">GBDT on <span id="k-feat">23</span> leak-free features</div></div>
     </div>
 
     <div class="two">
