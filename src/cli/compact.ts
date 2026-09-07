@@ -66,25 +66,28 @@ if (dry) {
 }
 
 const del = db.prepare("DELETE FROM curve_trades WHERE token = ?");
-let done = 0, skipped = 0, dropped = 0;
+let done = 0, empty = 0, busy = 0, dropped = 0;
 for (const t of targets) {
   // One token per transaction: the summary and the deletion land together or not at all, so an
   // interruption can leave a summary that still has its rows but never rows without a summary.
   db.exec("BEGIN");
   try {
-    if (!summariseCurve(db, t.token, t.block)) { db.exec("ROLLBACK"); skipped++; continue; }
+    if (!summariseCurve(db, t.token, t.block)) { db.exec("ROLLBACK"); empty++; continue; }
     dropped += Number(del.run(t.token).changes);
     db.exec("COMMIT");
     done++;
   } catch (e) {
-    db.exec("ROLLBACK");
-    skipped++;
+    // Almost always a busy lock rather than a broken curve: a backfill writing trades holds the
+    // database, and the next run folds these without trouble. Counted apart from the curves that
+    // genuinely have nothing to summarise, because one means wait and the other means never.
+    try { db.exec("ROLLBACK"); } catch { /* the transaction is already gone */ }
+    busy++;
   }
   if (done % 500 === 0) process.stdout.write(`\r  ${done} folded, ${dropped.toLocaleString()} rows dropped  `);
 }
 
 const rowsAfter = (db.prepare("SELECT count(*) c FROM curve_trades").get() as { c: number }).c;
-console.log(`\r  ${done} curves folded, ${skipped} skipped, ${dropped.toLocaleString()} trade rows dropped${" ".repeat(20)}`);
+console.log(`\r  ${done} curves folded, ${dropped.toLocaleString()} trade rows dropped${empty ? `, ${empty} had nothing to summarise` : ""}${busy ? `, ${busy} left for the next run (database busy)` : ""}${" ".repeat(20)}`);
 console.log(`  curve_trades: ${rowsBefore.toLocaleString()} -> ${rowsAfter.toLocaleString()}`);
 // Deleting rows frees pages inside the file without shrinking the file, so the saving stays
 // invisible until the database is rewritten. VACUUM takes an exclusive lock and needs room for a
