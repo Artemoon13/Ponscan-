@@ -1,0 +1,86 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { applyLive, fitLive, MIN_CLAIMS, SLOPE_RANGE } from "./calibration.ts";
+
+/**
+ * The correction has one job and one prohibition: move the printed probability toward what happened,
+ * and never change the order of the list. The prohibition is the important one — the ranking is the
+ * whole product, and a calibration bug that quietly reordered it would be invisible on a card.
+ */
+
+const sigmoid = (z: number): number => 1 / (1 + Math.exp(-z));
+
+function rng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/** Claims from a model that overstates: it says `p`, the truth is a smaller number. */
+function overstating(n: number, seed = 5): Array<{ probability: number; label: 0 | 1 }> {
+  const rand = rng(seed);
+  const rows: Array<{ probability: number; label: 0 | 1 }> = [];
+  for (let i = 0; i < n; i++) {
+    const p = 0.005 + rand() * 0.1;
+    const truth = sigmoid(Math.log(p / (1 - p)) - 0.7);
+    rows.push({ probability: p, label: rand() < truth ? 1 : 0 });
+  }
+  return rows;
+}
+
+test("refuses to fit on too few claims", () => {
+  assert.equal(fitLive(overstating(MIN_CLAIMS - 1)), null);
+});
+
+test("pulls an overstating model back toward what happened", () => {
+  const rows = overstating(6000);
+  const fit = fitLive(rows);
+  assert.ok(fit);
+
+  const said = rows.reduce((s, r) => s + r.probability, 0) / rows.length;
+  const was = rows.reduce((s, r) => s + r.label, 0) / rows.length;
+  const after = rows.reduce((s, r) => s + applyLive(fit, r.probability), 0) / rows.length;
+
+  assert.ok(said > was, "the fixture should overstate, or this test proves nothing");
+  assert.ok(
+    Math.abs(after - was) < Math.abs(said - was),
+    `correction moved the wrong way: said ${said}, was ${was}, after ${after}`,
+  );
+  assert.ok(Math.abs(after - was) < 0.004, `still off by ${(after - was).toFixed(4)}`);
+});
+
+test("never changes the order of the list", () => {
+  const fit = fitLive(overstating(6000));
+  assert.ok(fit);
+  const ps = Array.from({ length: 400 }, (_, i) => 0.0005 + (i / 400) * 0.6);
+  const after = ps.map((p) => applyLive(fit, p));
+  for (let i = 1; i < after.length; i++) {
+    assert.ok(after[i] > after[i - 1], `reordered at ${i}: ${after[i - 1]} then ${after[i]}`);
+  }
+});
+
+test("refuses a correction too large for a two-parameter nudge to be honest", () => {
+  // Labels unrelated to the scores: no slope can fix that, and rescaling would hide it.
+  const rand = rng(9);
+  const rows = Array.from({ length: 4000 }, () => ({
+    probability: 0.9 + rand() * 0.09,
+    label: (rand() < 0.001 ? 1 : 0) as 0 | 1,
+  }));
+  const fit = fitLive(rows);
+  assert.ok(fit === null || (fit.a >= SLOPE_RANGE[0] && fit.a <= SLOPE_RANGE[1]));
+});
+
+test("a well-calibrated model is left roughly alone", () => {
+  const rand = rng(11);
+  const rows = Array.from({ length: 6000 }, () => {
+    const p = 0.005 + rand() * 0.1;
+    return { probability: p, label: (rand() < p ? 1 : 0) as 0 | 1 };
+  });
+  const fit = fitLive(rows);
+  assert.ok(fit);
+  const said = rows.reduce((s, r) => s + r.probability, 0) / rows.length;
+  const after = rows.reduce((s, r) => s + applyLive(fit, r.probability), 0) / rows.length;
+  assert.ok(Math.abs(after - said) < 0.01, `moved a good model by ${(after - said).toFixed(4)}`);
+});

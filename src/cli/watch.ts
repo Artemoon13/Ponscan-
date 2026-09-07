@@ -25,8 +25,30 @@ const ONCE = argv.includes("--once");
 const PLAIN = argv.includes("--plain") || (!ONCE && (!process.stdout.isTTY || !process.stdin.isTTY));
 
 const db = openDb();
-const model = loadModel();
-const MODEL_ID = modelId();
+
+/**
+ * The model is re-read when its file changes, not pinned at startup.
+ *
+ * The board already reloads per request, so a watcher holding yesterday's model in memory makes the
+ * two disagree from the moment the nightly retrain lands until somebody restarts the service. That
+ * happened on the first night: for two hours the board showed one model's numbers while the log
+ * recorded another's. A log whose whole purpose is to record what was shown cannot be the one thing
+ * showing something else.
+ */
+const MODEL_PATH = "./data/model.json";
+let model = loadModel();
+let MODEL_ID = modelId();
+let modelMtime = existsSync(MODEL_PATH) ? statSync(MODEL_PATH).mtimeMs : 0;
+
+function refreshModel(): void {
+  const mtime = existsSync(MODEL_PATH) ? statSync(MODEL_PATH).mtimeMs : 0;
+  if (mtime === modelMtime) return;
+  modelMtime = mtime;
+  model = loadModel();
+  const was = MODEL_ID;
+  MODEL_ID = modelId();
+  if (MODEL_ID !== was) console.log(`\x1b[2mmodel changed ${was} -> ${MODEL_ID}; claims from here on are logged under the new one\x1b[0m`);
+}
 
 // Claims settle four hours out, so a watcher left running grades its own backlog as it goes.
 setInterval(() => { try { grade(db); } catch { /* a locked write retries on the next tick */ } }, 60_000).unref();
@@ -77,6 +99,7 @@ let onItem: (it: Item) => void = () => {};
 let onGrad: (token: string) => void = () => {};
 
 async function drain(): Promise<void> {
+  refreshModel();
   if (draining || queue.length === 0) return;
   draining = true;
   const batch = queue.splice(0, queue.length);
