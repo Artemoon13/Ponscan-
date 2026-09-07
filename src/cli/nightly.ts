@@ -19,6 +19,9 @@ const steps: Array<[string, string[]]> = [
   ["enrich-window", ["--hours", "20", "--workers", "6"]],
   ["curves", ["--limit", "4000", "--min-age-hours", "4", "--max-age-hours", "168"]],
   ["pools", ["--max-blocks", "900000"]],
+  // Before the retrain, so the fit is stamped with the model that actually produced the claims. The
+  // model trained a minute later inherits it, which is the whole point: it faces the same market.
+  ["recalibrate", []],
   ["train", []],
   // Housekeeping last, once the night's reading is in. Folding a curve costs its per-transaction
   // detail and nothing else: checked across every curve in the database, the summary reports the

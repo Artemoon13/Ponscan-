@@ -102,8 +102,38 @@ export function saveLive(c: LiveCalibration, path = "./data/calibration.json"): 
   writeFileSync(path, JSON.stringify(c, null, 2) + "\n");
 }
 
-/** The correction to use, or null when there is none for this model. */
-export function liveFor(modelId: string, path?: string): LiveCalibration | null {
+/**
+ * How stale an inherited correction may be before it is dropped.
+ *
+ * A correction is a statement about the market, and a three-day-old statement about a market that
+ * turns over twenty-eight thousand launches a day is no longer evidence.
+ */
+export const MAX_INHERIT_SEC = 3 * 24 * 3600;
+
+/**
+ * The correction to use, and whether it was fitted against this model or an earlier one.
+ *
+ * Refusing a correction stamped with another model is right in principle and was wrong in practice,
+ * because it can never be satisfied. A model needs five hundred settled claims, a claim takes four
+ * hours to settle, and a nightly retrain replaces the model every twenty-four: by the time a fit is
+ * possible, the model it describes has already been retired. The board therefore ran uncorrected
+ * from the day the correction was written, printing 7.06% where 2.51% happened.
+ *
+ * So a fit from a recent model is inherited rather than discarded. What it corrects is drift between
+ * the base rate a model was fitted on and the one the market is running at, and the model trained
+ * last night on nearly the same days inherits that gap along with everything else. The alternative
+ * is not a purer number, it is a number that is three times too high.
+ *
+ * `inherited` travels with it so the model page can say which it is, and the correction is still
+ * monotone either way: the ranking, the shortlist and every lift figure are untouched.
+ */
+export function liveFor(
+  modelId: string,
+  path?: string,
+  now = Math.floor(Date.now() / 1000),
+): (LiveCalibration & { inherited: boolean }) | null {
   const c = loadLive(path);
-  return c && c.modelId === modelId ? c : null;
+  if (!c) return null;
+  if (c.modelId === modelId) return { ...c, inherited: false };
+  return now - c.fittedAt <= MAX_INHERIT_SEC ? { ...c, inherited: true } : null;
 }
