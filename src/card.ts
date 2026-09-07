@@ -150,27 +150,55 @@ function topPeaks(db: DB, deployer: string, beforeBlock: number, limit: number):
            a.peak, a.first
     FROM agg a JOIN launches l ON l.token = a.token
     LEFT JOIN graduations g ON g.token = a.token`).all(deployer, beforeBlock) as
-    Array<{ token: string; symbol: string | null; ts: number; pair_token: string; graduated: number; peak: number; first: number }>;
+    Array<{ token: string; symbol: string | null; ts: number; pair_token: string; graduated: number; peak: number | null; first: number | null }>;
+
+  /**
+   * Launches that only the pool knows about.
+   *
+   * The query above starts from curves, so a graduated token whose curve nobody has read never
+   * entered the ranking at all, however far it went afterwards. That is not a rare corner: curves
+   * are read on demand and pools are swept wholesale, so a busy creator can easily have five
+   * graduated tokens with pool peaks and not one read curve among them. One such creator had their
+   * best launch reported as $32K on the card while the board row said $522K, and the board was
+   * right.
+   *
+   * Merged here rather than in SQL because a pool price comes out of sqrtPriceX96, which is
+   * arithmetic SQLite is not going to do.
+   */
+  const seen = new Set(rows.map((r) => r.token));
+  for (const r of db.prepare(`
+    SELECT l.token, l.symbol, l.ts, l.pair_token
+    FROM pool_peaks k JOIN pools p ON p.pool_id = k.pool_id JOIN launches l ON l.token = p.token
+    WHERE l.deployer = ? AND l.block < ?`).all(deployer, beforeBlock) as
+    Array<{ token: string; symbol: string | null; ts: number; pair_token: string }>) {
+    if (seen.has(r.token)) continue;
+    rows.push({ ...r, graduated: 1, peak: null, first: null });
+  }
 
   return rows
-    .filter((r) => r.first > 0 && r.peak > 0 && Number.isFinite(r.peak / r.first))
     .map((r) => {
       const q = quoteFromCache(db, r.pair_token);
+      const hasCurve = r.peak !== null && r.first !== null && r.first > 0 && r.peak > 0;
       // Raw prices are quote units per token unit; this lifts them to whole quote per whole token.
       const scale = 1e18 / 10 ** q.decimals;
-      const curveUsd = marketCapUsd(r.peak * scale, q.symbol);
-      const launchUsd = marketCapUsd(r.first * scale, q.symbol);
+      const curveUsd = hasCurve ? marketCapUsd((r.peak as number) * scale, q.symbol) : null;
+      const launchUsd = hasCurve ? marketCapUsd((r.first as number) * scale, q.symbol) : null;
       // For a launch that graduated, the curve high is the threshold it had to clear and the real
       // high is in the pool, so the larger of the two is what answers "how far did it get".
-      const inPool = r.graduated ? poolCaps(db, r.token, q.symbol)?.peakUsd ?? null : null;
+      const pool = r.graduated ? poolCaps(db, r.token, q.symbol) : null;
+      const inPool = pool?.peakUsd ?? null;
       const usd = curveUsd === null ? inPool : inPool === null ? curveUsd : Math.max(curveUsd, inPool);
+      // Without a curve there is no launch price to measure against, so the pool's own opening
+      // stands in: it is the price the curve handed over at.
+      const base = launchUsd ?? pool?.openUsd ?? null;
       return {
         token: r.token, symbol: r.symbol, ts: r.ts, graduated: Boolean(r.graduated),
-        multiple: usd !== null && launchUsd ? usd / launchUsd : r.peak / r.first,
+        multiple: usd !== null && base ? usd / base : hasCurve ? (r.peak as number) / (r.first as number) : 1,
         cap: usd,
         usd: usd === null ? null : formatUsd(usd), url: EXPLORER.token(r.token),
       };
     })
+    .filter((r) => r.cap !== null || r.multiple > 1)
     // Ranked by the cap it actually reached, not by how far it ran: against a graduation bar near
     // $50K, "got to $40K" says more about a creator than "tripled off a $2K open". Launches quoted
     // in an asset with no price in the book cannot be ranked that way and sort below those that can.
