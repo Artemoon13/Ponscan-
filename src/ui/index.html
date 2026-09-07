@@ -152,7 +152,7 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .big.line{border:1px solid rgba(204,255,0,.5)}
 .big .k{font:500 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;opacity:.7}
 .big.line .k{color:var(--t5);opacity:1}
-.big .v{font:600 32px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.big .v{font:600 32px/1 var(--mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .big.line .v{color:var(--lime)}
 .big .v small{font-size:14px;letter-spacing:0;opacity:.7}
 .reasons{display:flex;flex-direction:column;gap:8px;margin-top:16px;line-height:1.4}
@@ -595,7 +595,7 @@ function renderCard() {
     <div class="ptop">
       <div class="bigs">
         <div class="big lime"><div class="k">P graduate</div><div class="v">${s ? pct(s.probability) : "—"}</div></div>
-        <div class="big line"><div class="k">Rank · last 6h</div><div class="v">${s ? "#" + s.rank : "—"}<small> of ${s ? s.of.toLocaleString() : "—"}</small></div></div>
+        <div class="big line"><div class="k">Rank · of ${s ? s.of.toLocaleString() : "—"} in 6h</div><div class="v">${s ? "#" + s.rank : "—"}</div></div>
       </div>
       <div class="reasons">${reasons}</div>
     </div>
