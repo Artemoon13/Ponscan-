@@ -18,7 +18,13 @@
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:Geist,system-ui,sans-serif;min-width:1100px;font-size:14px}
-a{color:var(--lime);text-decoration:none}a:hover{color:var(--lime2)}
+/**
+ * Hover is scoped to plain links on purpose. `a:hover{color}` outranks a class rule, so it used to
+ * repaint every anchor-shaped component too: lime text on a lime button, and a whole card turning
+ * lime because its wrapper happens to be a link. Components below state their own hover.
+ */
+a{color:var(--lime);text-decoration:none;transition:color .12s,background .12s,border-color .12s}
+a:not(.btn):not(.brand):not(.shot):not(.tokencard):hover{color:var(--lime2)}
 code,.mono{font-family:var(--mono)}
 button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer;padding:0}
 @keyframes ps-flash{0%{background:rgba(204,255,0,.5)}100%{background:rgba(204,255,0,0)}}
@@ -40,9 +46,19 @@ button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer
 .live{display:flex;align-items:center;gap:8px;font:500 11px var(--mono);color:var(--t55);white-space:nowrap}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:ps-pulse 1.6s infinite;flex:none}
 .live.warn .dot{background:var(--amber);animation:none}.live.bad .dot{background:var(--red);animation:none}
-.btn{padding:8px 14px;border-radius:6px;background:var(--lime);color:#111;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-block}
-.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.2);color:var(--ink);font-weight:500;font-family:var(--mono)}
-.btn.big{padding:13px 20px;border-radius:7px;font-size:14px}
+.btn{padding:9px 16px;border-radius:6px;background:var(--lime);color:#111;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;line-height:1;border:1px solid var(--lime)}
+.btn:hover{background:var(--lime2);border-color:var(--lime2);color:#111}
+.btn:active{background:#b8e600;border-color:#b8e600}
+.btn:focus-visible{outline:2px solid var(--lime2);outline-offset:2px}
+.btn.ghost{background:transparent;border-color:rgba(255,255,255,.2);color:var(--ink);font-weight:500;font-family:var(--mono)}
+.btn.ghost:hover{background:var(--l07);border-color:var(--l18);color:var(--ink)}
+.btn.big{padding:14px 22px;border-radius:7px;font-size:14px}
+.brand:hover{color:var(--ink)}
+.brand:hover .mark{background:var(--lime2)}
+.links a:hover{color:var(--ink)}
+.shot:hover{color:var(--ink);border-color:rgba(204,255,0,.35)}
+.tokencard:hover{color:var(--ink);border-color:rgba(204,255,0,.75)}
+.soc a:hover{color:var(--lime);border-color:rgba(204,255,0,.5)}
 
 /* ── home ── */
 .wrap{max-width:1280px;margin:0 auto;padding:0 40px}
@@ -78,8 +94,7 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .tile .s{font-size:11px;color:var(--t5);margin-top:3px}
 .how{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;padding:56px 0 0}
 .how .n{font:500 11px var(--mono);color:var(--lime)}
-.how .t{font-weight:600;font-size:16px;margin-top:8px}
-.how p{font-size:13px;line-height:1.55;color:var(--t6);margin:8px 0 0}
+.how .t{font-weight:600;font-size:17px;margin-top:10px;letter-spacing:-.01em}
 .two{margin:48px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .box{border:1px solid var(--l12);border-radius:10px;padding:22px 24px}
 .box .hd{display:flex;justify-content:space-between;align-items:center}
@@ -110,7 +125,7 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .f.on{background:var(--lime);color:#111;border-color:var(--lime);font-weight:600}
 .f.mono{font:500 11px var(--mono)}
 .shown{font:11px var(--mono);color:var(--t4);margin-left:8px}
-.cols,.row{display:grid;grid-template-columns:52px 150px 76px 44px minmax(0,1fr) 84px 56px;gap:0 12px;padding:0 24px;align-items:center}
+.cols,.row{display:grid;grid-template-columns:52px 150px 88px 44px minmax(0,1fr) 84px 56px;gap:0 12px;padding:0 24px;align-items:center}
 .cols{height:32px;font:500 10px var(--mono);color:var(--t45);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--l08);flex:none}
 .cols .r,.row .r{text-align:right}
 .rows{overflow:auto;flex:1}
@@ -125,8 +140,8 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .cdot{width:20px;height:20px;border-radius:50%;flex:none}
 .row .tk b{font-weight:600}
 .row .tk .a{font:11px var(--mono);color:var(--t45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .p{font:700 12.5px var(--mono);display:flex;justify-content:flex-end;align-items:center;gap:6px}
-.topb{font:700 9px var(--mono);padding:1px 4px;border-radius:2px;background:var(--lime);color:#111;letter-spacing:.04em}
+.row .p{font:700 16px var(--mono);display:flex;justify-content:flex-end;align-items:center;gap:6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.topb{font:700 9px var(--mono);padding:2px 4px;border-radius:2px;background:var(--lime);color:#111;letter-spacing:.04em;line-height:1}
 .row .rk{font:12.5px var(--mono);color:var(--t7)}
 .chips{display:flex;gap:5px;min-width:0;overflow:hidden}
 .chips span{font-size:10.5px;padding:2px 6px;border-radius:3px;background:var(--l07);white-space:nowrap}
@@ -209,17 +224,17 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
 .ph .m{font:500 12px var(--mono);color:var(--t5)}
 .pipe{display:grid;grid-template-columns:repeat(4,1fr) 40px 1fr;gap:10px;margin-top:22px}
 .pipe .arrow{display:flex;align-items:center;justify-content:center;color:var(--lime);font:600 18px var(--mono)}
-.cell{border:1px solid var(--l12);border-radius:8px;padding:12px 14px}
+.cell{border:1px solid var(--l12);border-radius:8px;padding:18px 20px;display:flex;flex-direction:column}
 .cell .k{font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45)}
-.cell .t{font-weight:600;font-size:14px;margin-top:5px}
-.cell .m{font:500 11px var(--mono);color:var(--lime);margin-top:6px}
-.cell .d{font-size:11px;color:var(--t5);margin-top:3px;line-height:1.4}
+.cell .t{font-weight:600;font-size:15px;margin-top:12px;line-height:1.3;letter-spacing:-.01em}
+.cell .m{font:500 11.5px/1.45 var(--mono);color:var(--lime);margin-top:12px}
+.cell .d{font-size:11.5px;color:var(--t5);margin-top:8px;line-height:1.5}
 .cell.out{background:var(--lime);color:#111;border:0}
 .cell.out .k,.cell.out .m,.cell.out .d{color:#111;opacity:.7}.cell.out .t{font-weight:700}.cell.out .m{opacity:1}
-.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:20px}
-.metric .v{font:700 28px/1 var(--mono);letter-spacing:-.03em;margin-top:6px;font-variant-numeric:tabular-nums}
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:20px}
+.metric .v{font:700 30px/1 var(--mono);letter-spacing:-.03em;margin-top:12px;font-variant-numeric:tabular-nums}
 .metric .v.lime{color:var(--lime)}.metric .v.amb{color:var(--amber)}
-.metric .d{font-size:11px;color:var(--t5);margin-top:5px}
+.metric .d{font-size:11.5px;color:var(--t5);margin-top:10px;line-height:1.45}
 .two2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px}
 .pane{border:1px solid var(--l10);border-radius:8px;padding:14px 16px}
 .pane .k{font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45);margin-bottom:10px}
@@ -302,9 +317,9 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
     </a>
 
     <div class="how">
-      <div><div class="n">01 · Stream</div><div class="t">Follows the pons v2 factory</div><p>Sees every launch within a block over a websocket, and recovers dropped sockets and restarts by re-reading the gap.</p></div>
-      <div><div class="n">02 · Facts</div><div class="t">SQLite, on your disk</div><p>Creator, self-buy, exempt wallets, fee recipient, name cluster, every trade on the curve. Every field links to its transaction.</p></div>
-      <div><div class="n">03 · Model</div><div class="t">GBDT on <span id="k-feat">23</span> leak-free features</div><p>Uses only what is known at launch. Each score comes with three reasons whose contributions sum to it exactly. Retrains on your schedule.</p></div>
+      <div><div class="n">01 · Stream</div><div class="t">Follows the pons v2 factory</div></div>
+      <div><div class="n">02 · Facts</div><div class="t">SQLite, on your disk</div></div>
+      <div><div class="n">03 · Model</div><div class="t">GBDT on <span id="k-feat">23</span> leak-free features</div></div>
     </div>
 
     <div class="two">
