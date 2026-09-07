@@ -47,7 +47,18 @@ export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeou
 const gate = new Gate(CFG.inFlight, CFG.spacingMs);
 const headers = { "user-agent": "poolitzer/0.1 (+https://github.com/Artemoon13/Ponscan-)" };
 
-/** Retries 429 and transient network errors with exponential backoff; surfaces everything else. */
+/**
+ * Retries throttling and transient network errors with exponential backoff; surfaces everything else.
+ *
+ * A 403 counts as throttling here, which reads wrong until you notice this project sends no
+ * credentials: there is nothing for the endpoint to forbid except the traffic itself. It is what the
+ * public RPC answers after a long bulk read has leaned on it, and it clears on its own. Treating it
+ * as fatal meant an hours-long sweep died on the first one and, worse, that every card asking for a
+ * curve at that moment silently read nothing and sat on "reading" forever.
+ *
+ * It gets a slower backoff than a 429 because it is a cool-off rather than a blip: a few hundred
+ * milliseconds is what 429 wants, and this wants seconds, growing to a minute.
+ */
 export async function withRetry<T>(fn: () => Promise<T>, tries = 6, base = 800): Promise<T> {
   let last: unknown;
   for (let i = 0; i < tries; i++) {
@@ -56,9 +67,11 @@ export async function withRetry<T>(fn: () => Promise<T>, tries = 6, base = 800):
     } catch (err) {
       last = err;
       const msg = String((err as Error)?.message ?? err);
-      const retryable = /429|Too Many Requests|timeout|timed out|ETIMEDOUT|ECONNRESET|fetch failed|socket/i.test(msg);
+      const throttled = /Status:\s*403|\bForbidden\b/i.test(msg);
+      const retryable = throttled ||
+        /429|Too Many Requests|timeout|timed out|ETIMEDOUT|ECONNRESET|fetch failed|socket/i.test(msg);
       if (!retryable || i === tries - 1) throw err;
-      await sleep(base * 2 ** i);
+      await sleep(throttled ? Math.min(60_000, 5_000 * 2 ** i) : base * 2 ** i);
     }
   }
   throw last;

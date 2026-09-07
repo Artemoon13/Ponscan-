@@ -776,7 +776,7 @@ function renderCard() {
     : "";
   const past = H.recent.length
     ? `<div class="thead"><span>Earlier</span><span></span><span style="text-align:right">Peak reached</span><span></span></div>` +
-      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? (p.read ? "no trades" : "reading…") : (p.peakUsd ? esc(p.peakUsd) : "×" + p.peakMultiple.toFixed(2))}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
+      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? (p.read ? "no trades" : "not read") : (p.peakUsd ? esc(p.peakUsd) : "×" + p.peakMultiple.toFixed(2))}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
     : `<div class="note">${H.priorLaunches === 0 ? "First launch from this wallet." : "No earlier launches on record."}</div>`;
 
   /* sections the design does not have, kept because the tool does */
@@ -821,7 +821,7 @@ function renderCard() {
       <div class="soc"><span class="k">Socials</span><span class="b">${hasX ? `<a href="${esc(soc.twitter)}" target="_blank" rel="noopener"><b>𝕏</b>Twitter ↗</a>` : ""}${hasWeb ? `<a href="${esc(soc.website)}" target="_blank" rel="noopener"><b>⌂</b>Website ↗</a>` : ""}${!hasX && !hasWeb ? '<span class="none">none declared</span>' : ""}</span></div>
       <div class="sec"><span class="k">Creator</span><span class="v">${L.creator ? L.creator : "—"}</span>${L.creator ? `<a href="${A(L.creator)}" target="_blank" rel="noopener">↗</a>` : ""}</div>
       <div class="stat3"><div><b>${H.priorLaunches}</b><span>launches before</span></div><div class="lime"><b>${H.priorGraduations}</b><span>graduated · ${rate}</span></div>
-        <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? (H.bestPeak.usd ? esc(H.bestPeak.usd) : "×" + H.bestPeak.multiple.toFixed(1)) : "—"}</b><span>${H.bestPeak ? "best peak · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread ? "reading " + H.unread + " curves…" : "no peaks yet"}</span></div></div>
+        <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? (H.bestPeak.usd ? esc(H.bestPeak.usd) : "×" + H.bestPeak.multiple.toFixed(1)) : "—"}</b><span>${H.bestPeak ? "best peak · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread + " curves not read"}</span></div></div>
       ${bestList}
       ${past}
       <div class="sec"><span class="k">Trading on the curve</span></div>

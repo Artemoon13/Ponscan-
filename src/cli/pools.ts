@@ -14,7 +14,7 @@ import { quoteFromCache } from "../quote.ts";
  * history, so resolution runs first and the stream starts no later than the oldest pool it must
  * cover.
  *
- * poolitzer pools [--init-chunk N] [--chunk N] [--max-blocks N]
+ * poolitzer pools [--init-chunk N] [--chunk N] [--max-blocks N] [--spacing MS]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {
@@ -25,6 +25,9 @@ const arg = (name: string, dflt: number): number => {
 const initChunk = arg("init-chunk", 40_000);
 const chunk = arg("chunk", 2000);
 const maxBlocks = arg("max-blocks", 60_000);
+// Deliberately unhurried: this is background work, and going flat out earned a 403 that refused
+// everything, including the one curve a reader was waiting on.
+const spacing = arg("spacing", 250);
 
 const db = openDb();
 const head = Number(await withRetry(() => logsClient.getBlockNumber()));
@@ -126,9 +129,8 @@ const t0 = Date.now();
 const r = await indexPoolSwaps(db, from, to, chunk, (upTo, swaps) => {
   setMeta(db, "pool_swaps_to_block", String(upTo));
   const done = upTo - from + 1, span = to - from + 1;
-  process.stdout.write(`
-  ${(100 * done / span).toFixed(1)}%  ${swaps.toLocaleString()} swaps  `);
-});
+  process.stdout.write(`\r  ${(100 * done / span).toFixed(1)}%  ${swaps.toLocaleString()} swaps  `);
+}, spacing);
 const secs = (Date.now() - t0) / 1000;
 
 setMeta(db, "pool_swaps_to_block", String(to));
