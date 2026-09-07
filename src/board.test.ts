@@ -1,0 +1,148 @@
+import { test, before, after } from "node:test";
+import assert from "node:assert/strict";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { openDb } from "./db.ts";
+
+/**
+ * Starts the real board and asks it the questions a reader's browser asks.
+ *
+ * Every other test in this project checks a function in isolation, and on the day this file was
+ * written that turned out to leave the busiest path in the product uncovered: a shadowed name inside
+ * `scoreRecent` threw on first use, so the board started, logged its port, answered `/api/health`,
+ * and died the moment anyone loaded the list. Nothing in the suite called `scoreRecent`, so
+ * everything reported healthy while the site returned 502 for seven minutes.
+ *
+ * What this covers is narrow on purpose: that the process comes up, and that each route a browser
+ * hits returns a body of the right shape. It does not check the numbers — the model and the log have
+ * their own tests for that. Something as blunt as "does the page load" is exactly what was missing.
+ */
+
+const dir = mkdtempSync(join(tmpdir(), "poolitzer-board-"));
+/** A port unlikely to collide with a board someone is running while the tests are. */
+const PORT = 4771;
+const BASE = `http://127.0.0.1:${PORT}`;
+
+let board: ChildProcess;
+
+/**
+ * The database must contain a launch, and that is the whole point.
+ *
+ * An empty one is not enough: with nothing in the window `scoreRecent` returns early, so the ranking
+ * code never runs and the route answers 200 without having done anything. That was the first version
+ * of this file, and it passed cleanly against the very bug it was written for. A smoke test that
+ * exercises none of the work is worse than no smoke test, because it reports confidence it has not
+ * earned.
+ */
+function seed(path: string): void {
+  const db = openDb(path);
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(`INSERT INTO launches (token, curve, deployer, pair_token, launch_config_id,
+    graduation_threshold_wei, graduation_threshold_eth, block, tx, log_index, ts, first_seen_at,
+    enriched_at, launch_sender, creator_tax_bps, buyback_enabled, initial_buy_wei, initial_buy_eth,
+    exempt_count, name, symbol, description, socials_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    TOKEN, "0xc0ffee", "0xdead", "0x0000000000000000000000000000000000000000", 1,
+    "1000000000000000000", 1.0, 1000, "0xtx", 0, now - 600, now,
+    now, "0xdead", 100, 0, "10000000000000000", 0.01,
+    1, "Smoke", "SMOKE", "a launch for the board to rank", "{}",
+  );
+  db.close();
+}
+
+const TOKEN = "0x00000000000000000000000000000000000000ff";
+
+before(async () => {
+  seed(join(dir, "test.db"));
+  board = spawn(process.execPath, ["--no-warnings", "src/board.ts"], {
+    env: {
+      ...process.env,
+      BOARD_PORT: String(PORT),
+      BOARD_HOST: "127.0.0.1",
+      DB_PATH: join(dir, "test.db"),
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let stderr = "";
+  board.stderr?.on("data", (b: Buffer) => { stderr += String(b); });
+
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    if (board.exitCode !== null) throw new Error(`board exited with ${board.exitCode}:\n${stderr}`);
+    try {
+      const r = await fetch(`${BASE}/api/health`);
+      if (r.ok) return;
+    } catch { /* not listening yet */ }
+    if (Date.now() > deadline) throw new Error(`board never answered:\n${stderr}`);
+    await new Promise((r) => setTimeout(r, 200));
+  }
+});
+
+after(() => {
+  board?.kill();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("serves the page itself", async () => {
+  const r = await fetch(BASE);
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.match(html, /<html|<body|<!doctype/i, "that is not a page");
+});
+
+test("serves the feed", async () => {
+  // The route that was broken. A 200 with a body of the right shape is the whole assertion: with an
+  // empty database there is nothing to rank, and having something to rank is not what failed.
+  const r = await fetch(`${BASE}/api/feed?hours=6`);
+  // Read once: a Response body can only be consumed a single time, so taking it for the failure
+  // message and again for the parse turns a clear assertion into a confusing one about streams.
+  const body = await r.text();
+  assert.equal(r.status, 200, body);
+  const d = JSON.parse(body) as { items?: Array<{ token: string; probability: number }>; counts?: unknown };
+  assert.ok(Array.isArray(d.items), "feed carries no items array");
+  assert.ok(d.counts, "feed carries no counts");
+  // The assertion that matters: the seeded launch came back scored. Without this the route can
+  // answer 200 having ranked nothing, which is how the bug this file exists for slipped through.
+  assert.equal(d.items?.length, 1, "the seeded launch was not ranked");
+  assert.ok(typeof d.items?.[0].probability === "number", "no probability on the ranked launch");
+});
+
+test("serves the feed in both orders", async () => {
+  for (const sort of ["score", "new"]) {
+    const r = await fetch(`${BASE}/api/feed?hours=6&sort=${sort}`);
+    const body = await r.text();
+    assert.equal(r.status, 200, `sort=${sort}: ${body}`);
+    const d = JSON.parse(body) as { order?: string };
+    assert.equal(d.order, sort);
+  }
+});
+
+test("reports its own health", async () => {
+  const r = await fetch(`${BASE}/api/health`);
+  assert.equal(r.status, 200);
+  const d = await r.json() as Record<string, unknown>;
+  for (const k of ["watcherSeenSecAgo", "behindBlocks", "behindSec"]) {
+    assert.ok(k in d, `health is missing ${k}`);
+  }
+});
+
+test("serves a card for a launch it knows", async () => {
+  const r = await fetch(`${BASE}/api/token/${TOKEN}`);
+  const body = await r.text();
+  assert.equal(r.status, 200, body);
+  const d = JSON.parse(body) as { card?: { token?: string }; score?: { probability?: number } };
+  assert.equal(d.card?.token, TOKEN);
+  assert.ok(typeof d.score?.probability === "number", "card came back without a score");
+});
+
+test("says not-found for a token it has never seen, rather than falling over", async () => {
+  const r = await fetch(`${BASE}/api/token/0x0000000000000000000000000000000000000001`);
+  assert.equal(r.status, 404);
+});
+
+test("is still standing after all of that", () => {
+  assert.equal(board.exitCode, null, "the board died during the test");
+});
