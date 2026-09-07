@@ -120,6 +120,29 @@ test("serves the feed in both orders", async () => {
   }
 });
 
+test("gives a chat app something to preview, with absolute links", async () => {
+  // A preview is fetched by somebody else's server, so a relative image path means nothing to it.
+  // These placeholders being left in the page is the whole failure: it looks fine in a browser and
+  // shows nothing in Telegram.
+  const html = await (await fetch(BASE)).text();
+  assert.doesNotMatch(html, /__BASE__|__TWITTER_CARD__/, "a placeholder was left unfilled");
+  for (const prop of ["og:title", "og:description", "og:image", "og:url"]) {
+    assert.match(html, new RegExp(`property="${prop}"`), `missing ${prop}`);
+  }
+  assert.match(html, /name="twitter:card" content="(summary|summary_large_image)"/);
+  assert.match(html, new RegExp(`content="${BASE}/og.png"`), "og:image is not an absolute url");
+});
+
+test("serves the preview image", async () => {
+  const r = await fetch(`${BASE}/og.png`);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("content-type"), "image/png");
+  // The body, not the header: the response is chunked, so content-length is absent by design.
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  assert.ok(bytes.length > 1000, `preview image is ${bytes.length} bytes`);
+  assert.deepEqual([...bytes.slice(0, 4)], [0x89, 0x50, 0x4e, 0x47], "that is not a PNG");
+});
+
 test("reports its own health", async () => {
   const r = await fetch(`${BASE}/api/health`);
   assert.equal(r.status, 200);
