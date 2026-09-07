@@ -441,6 +441,9 @@ const server = createServer(async (req, res) => {
       graduationTx: g?.tx ?? null,
       secondsToGraduate: g ? g.ts - Number(l.ts) : null,
       supply: 1_000_000_000,
+      // Dexscreener addresses a pons market by its pool id, not by the token: confirmed against
+      // their own API, which returns chainId "robinhood" and that url for this token.
+      poolId: (db.prepare("SELECT pool_id FROM pools WHERE token = ?").get(tok) as { pool_id: string } | undefined)?.pool_id ?? null,
       pool: caps === null ? null : {
         openUsd: caps.openUsd, peakUsd: caps.peakUsd, lastUsd: caps.lastUsd, swaps: caps.swaps,
       },
