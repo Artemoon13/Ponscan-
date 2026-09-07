@@ -35,9 +35,12 @@ export type AthRow = Row & { logPeak: number };
  */
 export function buildAthDataset(db: DB, nowTs = Math.floor(Date.now() / 1000)): AthRow[] {
   const peaks = new Map<string, number>();
+  // Both sides, matching how a peak is measured everywhere else and how the stored summary counts.
+  // Reading only buys here meant a curve could qualify or not depending on whether it had been
+  // compacted yet, which would have made membership of the training set an artefact of housekeeping.
   const rows = db.prepare(`
     SELECT token, quote_wei, token_amt FROM curve_trades
-    WHERE side = 'buy' ORDER BY token, block, log_index`).all() as
+    ORDER BY token, block, log_index`).all() as
     Array<{ token: string; quote_wei: string; token_amt: string }>;
 
   let current = "";
@@ -58,6 +61,18 @@ export function buildAthDataset(db: DB, nowTs = Math.floor(Date.now() / 1000)): 
     count++;
   }
   flush();
+
+  // Curves folded into a summary keep their peak but no longer have the trades it came from. Their
+  // target is read straight off the summary, or the training set would shrink as compaction runs
+  // and would quietly become a sample of recent launches only.
+  for (const r of db.prepare(`
+    SELECT token, first_price, peak_price, trades FROM curve_summary
+    WHERE trades >= ? AND first_price > 0 AND peak_price > 0`).all(MIN_TRADES) as
+    Array<{ token: string; first_price: number; peak_price: number; trades: number }>) {
+    if (peaks.has(r.token)) continue;
+    const ratio = r.peak_price / r.first_price;
+    if (ratio > 0 && Number.isFinite(ratio)) peaks.set(r.token, Math.log(ratio));
+  }
 
   const out: AthRow[] = [];
   for (const row of buildDataset(db)) {

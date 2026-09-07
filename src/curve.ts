@@ -96,9 +96,32 @@ export async function indexCurve(
  * that traded exactly once peaked at the price it opened at, which is x1.00 and worth saying.
  */
 export function peakMultiple(db: DB, token: string): number | null {
+  const p = curvePrices(db, token);
+  return p === null ? null : p.peak / p.first;
+}
+
+/**
+ * The three prices that outlive a curve's individual trades.
+ *
+ * Raw rows answer while they exist, and the stored summary answers once they have been compacted
+ * away. Everything downstream asks in these terms rather than for the trades themselves, so a
+ * compacted curve keeps reporting the same peak, the same opening and the same last price it did
+ * the day it was read.
+ *
+ * Raw units throughout, quote per token, exactly as the trades were: the factor between raw and
+ * whole units is constant within a launch, so ratios taken here mean what they always meant.
+ */
+export type CurvePrices = { first: number; peak: number; last: number; trades: number };
+
+export function curvePrices(db: DB, token: string): CurvePrices | null {
   const prices = tradePrices(db, token);
-  if (!prices.length) return null;
-  return Math.max(...prices) / prices[0];
+  if (prices.length) {
+    return { first: prices[0], peak: Math.max(...prices), last: prices[prices.length - 1], trades: prices.length };
+  }
+  const s = db.prepare(
+    "SELECT first_price, peak_price, last_price, trades FROM curve_summary WHERE token = ?",
+  ).get(token) as { first_price: number; peak_price: number; last_price: number; trades: number } | undefined;
+  return s ? { first: s.first_price, peak: s.peak_price, last: s.last_price, trades: s.trades } : null;
 }
 
 /**
@@ -131,6 +154,36 @@ export function tradePrices(db: DB, token: string): number[] {
     if (p > 0 && Number.isFinite(p)) prices.push(p);
   }
   return prices;
+}
+
+/**
+ * Folds one curve down to what is read after the day it launched, ready for its trades to go.
+ *
+ * Computed from the rows while they are still there and stored whole, so nothing is approximated:
+ * what a compacted card shows is exactly what it showed before, minus the per-transaction links.
+ * That is the deliberate loss. A launch nobody has opened in a week is read for its shape, not for
+ * the hash of its fourteenth buy.
+ *
+ * Returns false for a curve with nothing to fold, which is left alone: an unread curve and an empty
+ * one are both better represented by no summary than by a summary of nothing.
+ */
+export function summariseCurve(db: DB, token: string, launchBlock: number): boolean {
+  const p = curvePrices(db, token);
+  if (p === null || !p.trades) return false;
+  const stats = curveStats(db, token, launchBlock);
+  if (!stats.indexed) return false;
+
+  db.prepare(`
+    INSERT INTO curve_summary (token, first_price, peak_price, last_price, trades, buys, sells, stats_json, compacted_at)
+    VALUES (?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(token) DO UPDATE SET
+      first_price = excluded.first_price, peak_price = excluded.peak_price, last_price = excluded.last_price,
+      trades = excluded.trades, buys = excluded.buys, sells = excluded.sells,
+      stats_json = excluded.stats_json, compacted_at = excluded.compacted_at`).run(
+    token, p.first, p.peak, p.last, stats.trades, stats.buys, stats.sells,
+    JSON.stringify(stats), Math.floor(Date.now() / 1000),
+  );
+  return true;
 }
 
 export type Sniper = { address: string; taxWei: string; boughtWei: string; blocksAfterLaunch: number; wasExempt: boolean };
@@ -170,6 +223,21 @@ export function curveStats(db: DB, token: string, launchBlock: number): CurveSta
   const rows = db.prepare(
     "SELECT side, actor, recipient, quote_wei, token_amt, block, tx FROM curve_trades WHERE token = ? ORDER BY block, log_index",
   ).all(token) as Array<{ side: string; actor: string; recipient: string; quote_wei: string; token_amt: string; block: number; tx: string }>;
+
+  // A curve that was read and then compacted has no rows and a summary instead. The summary is what
+  // this function returned on the day the rows were still there, so it is served verbatim rather
+  // than recomputed from something thinner.
+  if (!rows.length) {
+    const kept = db.prepare("SELECT stats_json FROM curve_summary WHERE token = ?").get(token) as
+      | { stats_json: string } | undefined;
+    if (kept) {
+      try {
+        return JSON.parse(kept.stats_json) as CurveStats;
+      } catch {
+        // A summary we cannot parse is worse than none; fall through and report an empty curve.
+      }
+    }
+  }
 
   const buys = rows.filter((r) => r.side === "buy");
   const sells = rows.filter((r) => r.side === "sell");

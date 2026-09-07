@@ -18,8 +18,12 @@ const steps: Array<[string, string[]]> = [
   ["backfill", ["--hours", "26"]],
   ["enrich-window", ["--hours", "20", "--workers", "6"]],
   ["curves", ["--limit", "4000", "--min-age-hours", "4", "--max-age-hours", "168"]],
-  ["pools", ["--limit", "1200", "--max-blocks", "900000"]],
+  ["pools", ["--max-blocks", "900000"]],
   ["train", []],
+  // Housekeeping last, once the night's reading is in. Folding a curve costs its per-transaction
+  // detail and nothing else: checked across every curve in the database, the summary reports the
+  // same target its trades did and rebuilds the same cards.
+  ["compact", ["--older-than-days", "7", "--vacuum"]],
 ];
 
 for (const [script, args] of steps) {

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { tradePrices } from "./curve.ts";
+import { curvePrices } from "./curve.ts";
 import type { DB } from "./db.ts";
 
 /**
@@ -89,13 +89,13 @@ export function formatUsd(v: number | null): string {
 export function capsFor(db: DB, token: string, quoteSymbol: string | null, quoteDecimals: number): {
   launchUsd: number | null; peakUsd: number | null; peakMultiple: number | null;
 } {
-  const raw = tradePrices(db, token);
-  if (!raw.length) return { launchUsd: null, peakUsd: null, peakMultiple: null };
+  const p = curvePrices(db, token);
+  if (p === null) return { launchUsd: null, peakUsd: null, peakMultiple: null };
 
   // Raw prices are quote units per token unit; this lifts them to whole quote per whole token.
   const scale = 1e18 / 10 ** quoteDecimals;
-  const first = raw[0] * scale;
-  const peak = Math.max(...raw) * scale;
+  const first = p.first * scale;
+  const peak = p.peak * scale;
   return {
     launchUsd: marketCapUsd(first, quoteSymbol),
     peakUsd: marketCapUsd(peak, quoteSymbol),
@@ -121,21 +121,30 @@ export function startingCapUsd(db: DB, quoteSymbol: string | null, quoteDecimals
   const hit = startCache.get(quoteSymbol);
   if (hit !== undefined) return hit;
 
+  // Opening prices come from whichever store still holds them: the first trade of a curve that
+  // still has its rows, or the first price kept by a curve that has been compacted. Reading only
+  // the trades would make this figure drift as older curves are folded away.
+  const asQuote = `CASE WHEN l.pair_token = '0x0000000000000000000000000000000000000000'
+                        THEN 'ETH' ELSE coalesce(q.symbol,'?') END = ?`;
   const rows = db.prepare(`
-    SELECT t.quote_wei, t.token_amt FROM curve_trades t
+    SELECT CAST(t.quote_wei AS REAL) / CAST(t.token_amt AS REAL) px
+    FROM curve_trades t
     JOIN launches l USING(token)
     LEFT JOIN quote_assets q ON q.address = l.pair_token
-    WHERE t.side = 'buy'
-      AND CASE WHEN l.pair_token = '0x0000000000000000000000000000000000000000'
-               THEN 'ETH' ELSE coalesce(q.symbol,'?') END = ?
-      AND t.rowid IN (SELECT min(rowid) FROM curve_trades WHERE side='buy' GROUP BY token)`).all(quoteSymbol) as
-    Array<{ quote_wei: string; token_amt: string }>;
+    WHERE t.side = 'buy' AND CAST(t.token_amt AS REAL) > 0 AND ${asQuote}
+      AND t.rowid IN (SELECT min(rowid) FROM curve_trades WHERE side='buy' GROUP BY token)
+    UNION ALL
+    SELECT s.first_price px
+    FROM curve_summary s
+    JOIN launches l USING(token)
+    LEFT JOIN quote_assets q ON q.address = l.pair_token
+    WHERE ${asQuote}`).all(quoteSymbol, quoteSymbol) as Array<{ px: number }>;
 
   const caps: number[] = [];
   for (const r of rows) {
-    const tokens = Number(r.token_amt) / 1e18;
-    if (!(tokens > 0)) continue;
-    const cap = marketCapUsd((Number(r.quote_wei) / 10 ** quoteDecimals) / tokens, quoteSymbol);
+    if (!(r.px > 0) || !Number.isFinite(r.px)) continue;
+    // Raw quote units per token unit, lifted to whole units on both sides.
+    const cap = marketCapUsd(r.px * (1e18 / 10 ** quoteDecimals), quoteSymbol);
     if (cap !== null && Number.isFinite(cap)) caps.push(cap);
   }
   caps.sort((a, b) => a - b);

@@ -16,6 +16,7 @@
     "enrich": "node --no-warnings src/cli/enrich.ts",
     "names": "node --no-warnings src/cli/names.ts",
     "quotes": "node --no-warnings src/cli/quotes.ts",
+    "compact": "node --no-warnings src/cli/compact.ts",
     "curves": "node --no-warnings src/cli/curves.ts",
     "train": "node --no-warnings src/cli/train.ts",
     "validate": "node --no-warnings src/cli/validate.ts",

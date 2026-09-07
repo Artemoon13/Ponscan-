@@ -128,18 +128,28 @@ export type PastPeak = { token: string; symbol: string | null; ts: number; gradu
 
 function topPeaks(db: DB, deployer: string, beforeBlock: number, limit: number): PastPeak[] {
   const rows = db.prepare(`
-    WITH p AS (
+    WITH mine AS (SELECT token FROM launches WHERE deployer = ? AND block < ?),
+    p AS (
       SELECT c.token, CAST(c.quote_wei AS REAL) / CAST(c.token_amt AS REAL) px,
              row_number() OVER (PARTITION BY c.token ORDER BY c.block, c.log_index) rn
       FROM curve_trades c
-      WHERE c.token IN (SELECT token FROM launches WHERE deployer = ? AND block < ?)
+      WHERE c.token IN (SELECT token FROM mine)
         AND CAST(c.token_amt AS REAL) > 0 AND CAST(c.quote_wei AS REAL) > 0
+    ),
+    -- Curves that still hold their trades are read from them; ones that have been folded into a
+    -- summary are read from that. Without the second arm a creator's older launches would quietly
+    -- drop out of their own ranking as compaction caught up with them.
+    agg AS (
+      SELECT token, max(px) peak, max(CASE WHEN rn = 1 THEN px END) first FROM p GROUP BY token
+      UNION ALL
+      SELECT s.token, s.peak_price, s.first_price FROM curve_summary s
+      WHERE s.token IN (SELECT token FROM mine)
+        AND NOT EXISTS (SELECT 1 FROM curve_trades t WHERE t.token = s.token)
     )
-    SELECT p.token, l.symbol, l.ts, l.pair_token, (g.token IS NOT NULL) graduated,
-           max(p.px) peak, max(CASE WHEN p.rn = 1 THEN p.px END) first
-    FROM p JOIN launches l ON l.token = p.token
-    LEFT JOIN graduations g ON g.token = p.token
-    GROUP BY p.token`).all(deployer, beforeBlock) as
+    SELECT a.token, l.symbol, l.ts, l.pair_token, (g.token IS NOT NULL) graduated,
+           a.peak, a.first
+    FROM agg a JOIN launches l ON l.token = a.token
+    LEFT JOIN graduations g ON g.token = a.token`).all(deployer, beforeBlock) as
     Array<{ token: string; symbol: string | null; ts: number; pair_token: string; graduated: number; peak: number; first: number }>;
 
   return rows

@@ -119,6 +119,30 @@ CREATE TABLE IF NOT EXISTS curve_indexed (
   indexed_at INTEGER NOT NULL
 ) STRICT;
 
+-- What a curve did, kept once its individual trades are gone.
+--
+-- Storing every trade forever does not scale: a trade costs about 490 bytes with its indexes, a
+-- read curve carries 65 of them, and 26,000 launches happen a day. Reading every curve and keeping
+-- every row would be roughly 830 MB a day. Almost none of that detail is read after the launch is
+-- a day old, but the numbers computed from it are read forever, so the numbers are what survive.
+--
+-- The scalar prices are here rather than only inside the JSON because the peak model and the
+-- creator rankings ask for them across thousands of tokens at once, and a query cannot sort on a
+-- field it has to parse first. They are raw quote units per token unit, the same scale the trades
+-- were in, so a ratio between them means what it meant before.
+CREATE TABLE IF NOT EXISTS curve_summary (
+  token        TEXT PRIMARY KEY,
+  first_price  REAL NOT NULL,
+  peak_price   REAL NOT NULL,
+  last_price   REAL NOT NULL,
+  trades       INTEGER NOT NULL,
+  buys         INTEGER NOT NULL,
+  sells        INTEGER NOT NULL,
+  -- The rest of CurveStats, computed while the rows still existed.
+  stats_json   TEXT NOT NULL,
+  compacted_at INTEGER NOT NULL
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS pools (
   token       TEXT PRIMARY KEY,
   pool_id     TEXT NOT NULL,
