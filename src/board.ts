@@ -444,6 +444,37 @@ const server = createServer(async (req, res) => {
       pool: caps === null ? null : {
         openUsd: caps.openUsd, peakUsd: caps.peakUsd, lastUsd: caps.lastUsd, swaps: caps.swaps,
       },
+      /**
+       * The price path along the curve, in dollars of market cap.
+       *
+       * This is the one real series available: every curve trade carries what was paid and what came
+       * back, so a price falls straight out of each log. It stops at graduation, because after that
+       * the token trades in the pool and the pool stream is folded to a high, low and last the moment
+       * it is read. So the chart covers the opening act honestly rather than covering everything
+       * badly, and the page labels it as such.
+       */
+      curve: (() => {
+        const rows = db.prepare(
+          "SELECT quote_wei, token_amt, ts, block FROM curve_trades WHERE token = ? ORDER BY block, log_index",
+        ).all(tok) as Array<{ quote_wei: string; token_amt: string; ts: number; block: number }>;
+        const pts: Array<{ b: number; usd: number }> = [];
+        for (const r of rows) {
+          const tokens = Number(r.token_amt);
+          if (!(tokens > 0)) continue;
+          const px = (Number(r.quote_wei) / tokens) * (1e18 / 10 ** dec);
+          const cap = marketCapUsd(px, q.symbol);
+          if (cap !== null && Number.isFinite(cap) && cap > 0) pts.push({ b: r.block, usd: cap });
+        }
+        // Thinned to something a chart can draw: a few hundred points is plenty for a line, and
+        // sending thousands would spend bandwidth on pixels nobody can tell apart.
+        const cap = 240;
+        if (pts.length <= cap) return pts;
+        const step = pts.length / cap;
+        const out: typeof pts = [];
+        for (let i = 0; i < cap; i++) out.push(pts[Math.floor(i * step)]);
+        out.push(pts[pts.length - 1]);
+        return out;
+      })(),
     });
     return;
   }

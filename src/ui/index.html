@@ -203,27 +203,30 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .rmwrap{border:1px solid var(--l08);border-radius:0 0 10px 10px;background:var(--bg2);padding:34px 24px 10px}
 /* Absolute positions on a 190px stage, the geometry the design uses: one line, marks sitting on it,
    captions alternating above and below so five of them fit without colliding. */
-.tl{position:relative;height:190px}
-.tl .line{position:absolute;left:0;right:0;top:94px;height:2px;background:var(--l15)}
-.tl .fill{position:absolute;left:0;top:94px;height:2px;background:var(--lime)}
-.tl .m{position:absolute;width:min(190px,17%);transform:translateX(-7px)}
-.tl .m .dot{position:absolute;left:0;width:14px;height:14px;border-radius:3px;border:2px solid var(--bg2);box-shadow:0 0 0 2px currentColor;background:currentColor}
-.tl .m .stem{position:absolute;left:6px;width:2px;background:currentColor}
-.tl .m .tag{font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.08em}
-.tl .m .ti{font-weight:600;font-size:16px;margin-top:4px;letter-spacing:-.01em;color:var(--ink)}
-.tl .m .de{font-size:12px;line-height:1.5;color:var(--t55);margin-top:4px;text-wrap:pretty}
-.tl .m.done{color:var(--lime)}
-.tl .m.now{color:var(--amber)}
-.tl .m.next{color:var(--t35)}
-.tl .m.next .ti{color:var(--t65)}
-.tl .m.now .dot{animation:pulse 2s infinite}
-/* Absolute placement cannot survive a narrow screen, so below the breakpoint the same milestones
-   stack as the plain list they were before. */
+.tl{position:relative;height:230px}
+.tl .line{position:absolute;left:0;right:0;top:114px;height:2px;background:var(--l15)}
+.tl .fill{position:absolute;left:0;top:114px;height:2px;background:var(--lime)}
+/* The mark sits on the rule on its own, so a caption can grow away from the line instead of into
+   it. Anchoring the upper captions by their bottom edge is the whole fix: a two-line description
+   used to push the block down onto the rule and print itself over it. */
+.tl .mk{position:absolute;width:14px;height:14px;border-radius:3px;top:108px;border:2px solid var(--bg2);box-shadow:0 0 0 2px currentColor;background:currentColor}
+.tl .st{position:absolute;width:2px;background:currentColor}
+.tl .m{position:absolute;width:min(190px,17%)}
+.tl .up{bottom:132px}
+.tl .dn{top:140px}
+.tl .tag{font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.08em}
+.tl .ti{font-weight:600;font-size:16px;margin-top:5px;letter-spacing:-.01em;color:var(--ink)}
+.tl .de{font-size:12px;line-height:1.5;color:var(--t55);margin-top:5px;text-wrap:pretty}
+.tl .done{color:var(--lime)}
+.tl .now{color:var(--amber)}
+.tl .next{color:var(--t35)}
+.tl .next .ti{color:var(--t65)}
+.tl .now.mk{animation:pulse 2s infinite}
 @media (max-width:1000px){
   .rmwrap{padding:18px}
-  .tl{height:auto;display:flex;flex-direction:column;gap:14px}
-  .tl .line,.tl .fill,.tl .m .dot,.tl .m .stem{display:none}
-  .tl .m{position:static!important;width:auto;transform:none;padding-left:12px;border-left:2px solid currentColor}
+  .tl{height:auto;display:flex;flex-direction:column;gap:16px}
+  .tl .line,.tl .fill,.tl .mk,.tl .st{display:none}
+  .tl .m{position:static!important;width:auto;padding-left:12px;border-left:2px solid currentColor}
 }
 .ship{display:flex;flex-direction:column}
 .ship .r{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:9px;align-items:baseline;padding:7px 0;border-top:1px solid var(--l06);font-size:12.5px}
@@ -266,30 +269,53 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .envt td.v{color:var(--ink);white-space:nowrap}
 .envt td.d{color:var(--t55);font-family:Geist,sans-serif;font-size:12.5px;line-height:1.45}
 /* the honest banner for a page describing something that does not exist yet */
-.coinhd{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;font:11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
-.coinpx{margin-top:10px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
-.coinpx b{font:700 46px var(--mono);letter-spacing:-.02em;color:var(--ink)}
+.coinhd{display:flex;align-items:center;gap:10px;font:11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
+.coinhd .st{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--lime)}
+.coinhd .st .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite}
+.coinpx{margin-top:12px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.coinpx b{font:700 44px var(--mono);letter-spacing:-.02em;color:var(--ink)}
 .coinpx .ch{font:600 15px var(--mono)}
 .coinpx .ch.up{color:var(--lime)}.coinpx .ch.dn{color:var(--red)}
 .coinpx .w{font:12px var(--mono);color:var(--t45)}
-.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));border:1px solid var(--l08);border-radius:9px;margin-top:20px;overflow:hidden}
-.strip div{padding:12px 14px;border-left:1px solid var(--l08)}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));border:1px solid var(--l08);border-radius:9px;margin-top:20px;overflow:hidden}
+.strip div{padding:11px 14px;border-left:1px solid var(--l08)}
 .strip div:first-child{border-left:0}
 .strip .k{font:500 9.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
 .strip .v{margin-top:5px;font:600 15px var(--mono);color:var(--ink)}
-.strip .v.dim{color:var(--t35);font-weight:500;font-size:12.5px}
+.strip .v.dim{color:var(--t35);font-weight:500;font-size:12px}
+.chartbar{display:flex;align-items:center;gap:12px;margin-top:22px;font:11px var(--mono);color:var(--t45)}
+.chartbar .src{margin-left:auto}
+.chart{margin-top:10px;border:1px solid var(--l08);border-radius:9px;background:var(--bg2);padding:14px 14px 8px}
+.chart svg{display:block;width:100%;height:230px}
+.chart .ax{display:flex;justify-content:space-between;margin-top:6px;font:10.5px var(--mono);color:var(--t35)}
+.rng{display:flex;align-items:center;gap:12px;margin-top:14px;font:11px var(--mono);color:var(--t45)}
+.rng .bar{position:relative;flex:1;height:2px;background:var(--l15);border-radius:2px}
+.rng .bar i{position:absolute;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--lime);transform:translateX(-5px)}
+.flow{position:relative;display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:0;margin-top:16px}
+.flow .s{position:relative;padding:0 16px 0 0}
+.flow .s .n{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid var(--l15);border-radius:7px;background:var(--bg2);font:600 12px var(--mono);color:var(--lime)}
+.flow .s::after{content:"";position:absolute;left:38px;right:0;top:19px;height:1px;background:var(--l15)}
+.flow .s:last-child::after{display:none}
+.flow .s b{display:block;margin-top:12px;font-size:13.5px}
+.flow .s span{display:block;margin-top:3px;font-size:12px;color:var(--t55);line-height:1.45}
+.flow .s .val{display:block;margin-top:7px;font:600 12.5px var(--mono);color:var(--lime)}
+.card2{border:1px solid var(--l08);border-radius:10px;background:var(--bg2);padding:16px 18px}
+.card2 .top{display:flex;align-items:center;gap:11px}
+.card2 .top .lg{width:38px;height:38px;border-radius:9px;background:var(--lime);color:#111;display:flex;align-items:center;justify-content:center;font:700 16px Geist,sans-serif;margin:0}
+.card2 .top b{font:700 17px Geist,sans-serif;letter-spacing:-.01em}
+.card2 .top span{display:block;margin-top:2px;font:11px var(--mono);color:var(--t45)}
+.card2 .lnks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.card2 .lnks a{padding:9px;border-radius:7px;border:1px solid var(--l15);color:var(--ink);font-weight:500;font-size:12.5px;text-align:center}
+.card2 .lnks a:hover{border-color:var(--lime);color:var(--lime)}
+.card2 .last{display:flex;justify-content:space-between;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--l06);font:11.5px var(--mono);color:var(--t45)}
 .verify{border:1px solid var(--l08);border-radius:10px;background:var(--bg2);padding:18px 20px}
-.verify h3{margin:0 0 4px;font:600 15px Geist,sans-serif;letter-spacing:-.01em;color:var(--ink)}
-.verify .r{display:grid;grid-template-columns:112px minmax(0,1fr);gap:12px;padding:8px 0;border-top:1px solid var(--l06);font:11.5px var(--mono);align-items:baseline}
+.verify .hd{display:flex;align-items:center;gap:10px}
+.verify h3{margin:0;font:600 15px Geist,sans-serif;letter-spacing:-.01em;color:var(--ink)}
+.verify .hd button{margin-left:auto;border:1px solid var(--lime);background:var(--lime);color:#111;border-radius:5px;padding:4px 10px;font:600 10.5px var(--mono);cursor:pointer}
+.verify .r{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;padding:8px 0;border-top:1px solid var(--l06);font:11.5px var(--mono);align-items:baseline}
 .verify .r .k{color:var(--t45)}
 .verify .r .v{color:var(--ink);overflow-wrap:anywhere}
 .verify .note{margin-top:12px;font:12.5px Geist,sans-serif;color:var(--t55);line-height:1.5}
-.feeflow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}
-.feeflow .s{border:1px solid var(--l08);border-radius:9px;padding:13px 15px;background:var(--bg2)}
-.feeflow .s .n{font:600 11px var(--mono);color:var(--lime);border:1px solid var(--l15);border-radius:5px;padding:2px 7px;display:inline-block}
-.feeflow .s b{display:block;margin-top:9px;font-size:13.5px}
-.feeflow .s span{display:block;margin-top:3px;font-size:12px;color:var(--t55);line-height:1.45}
-.feeflow .s .val{display:block;margin-top:7px;font:600 12.5px var(--mono);color:var(--lime)}
 .notyet{margin-top:22px;border:1px solid rgba(232,184,58,.35);background:rgba(232,184,58,.07);border-radius:9px;padding:14px 16px;font-size:13.5px;color:var(--ink);line-height:1.55}
 .notyet b{color:var(--amber)}
 .settings{display:flex;align-items:center;gap:16px;padding:0 24px;height:42px;border-bottom:1px solid var(--l08);flex:none;font-size:11.5px;color:var(--t45);white-space:nowrap;overflow-x:auto}
@@ -775,6 +801,104 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
 <section id="page-token" hidden>
   <div class="doc">
     <div id="coin-standin"></div>
+    <div class="coinhd"><span id="coin-crumb">coin</span><span class="st" id="coin-state" hidden><span class="dot"></span><span>pool open</span></span></div>
+    <div class="coinpx"><b id="coin-px">&mdash;</b><span class="ch" id="coin-ch"></span><span class="w" id="coin-fdv"></span></div>
+
+    <div class="strip" id="coin-strip"></div>
+
+    <div class="cols2">
+      <div>
+        <div class="chartbar"><span id="coin-chart-lbl">on the curve</span><span class="src">read from this database &middot; not an API</span></div>
+        <div class="chart"><div id="coin-chart"></div><div class="ax" id="coin-ax"></div></div>
+        <div class="rng" id="coin-rng"></div>
+
+        <div class="prose">
+          <h2><span class="n">&middot;</span>Where the fee goes</h2>
+          <p>Every trade in the pool pays a fee, the pons hook routes the creator's share on-chain, and it lands wherever the launch pointed it. That routing is fixed at launch and is public, so this is read from the launch itself rather than from anyone's word about it.</p>
+        </div>
+        <div class="flow" id="coin-fee"></div>
+
+        <div class="cols2" style="margin-top:34px;gap:32px;grid-template-columns:1fr 1fr">
+          <div class="prose" style="margin:0">
+            <h2 style="margin:0"><span class="n">&middot;</span>Why this coin exists</h2>
+            <p>The board runs on a node and a model that costs money to retrain every night. Rather than sell a subscription, the plan is a coin launched on the same factory the board watches, with its creator fee pointed at the cost of running it. Trading it is how the board stays free.</p>
+            <p>That is the whole arrangement. No roadmap for the token itself, no unlock, no share of anything, and nobody holding a reserved allocation.</p>
+          </div>
+          <div class="prose" style="margin:0">
+            <h2 style="margin:0"><span class="n">&middot;</span>Not on this page</h2>
+            <p>No holder count, no liquidity, no 24-hour volume, and no fee ledger. None of them are indexed: the swap stream is folded to a running high, low and last per pool the moment it is read, because 3.4 million swaps a day pass through the singleton and keeping them all is what the disk cannot afford.</p>
+            <p>A page people check before buying is the last place to start estimating, so those say so rather than showing a number nobody measured.</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card2">
+          <div class="top"><span class="lg" id="coin-lg">P</span><div><b id="coin-name">&mdash;</b><span id="coin-sub"></span></div></div>
+          <div class="lnks" id="coin-links"></div>
+          <div class="last"><span>reached the pool</span><span id="coin-last">&mdash;</span></div>
+        </div>
+        <div class="verify">
+          <div class="hd"><h3>Verify before you buy</h3><button id="coin-copy">Copy</button></div>
+          <div style="margin-top:4px;font:12px Geist,sans-serif;color:var(--t55)">Match the address, not the name. Nothing on this site asks you to connect a wallet.</div>
+          <div id="coin-verify"></div>
+          <div class="note">Every other address carrying this name is not ours.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="page-board" hidden>
+  <div class="board" id="board">
+    <div class="list">
+      <div class="lhead"><b>Fresh launches</b><span class="m" id="lh-m">—</span><span class="live" id="lh-live"><span class="dot"></span>LIVE</span></div>
+      <div class="stale" id="stale"></div>
+      <div class="filters">
+        <span class="f on" data-f="All">All</span>
+        <span class="f" data-f="Top decile">Top decile</span>
+        <span class="f" data-f="Repeat creators">Repeat creators</span>
+        <span class="f" data-f="ETH-quoted">ETH-quoted</span>
+        <span class="f mono" id="gear" title="score threshold and time window">⚙ settings</span>
+        <span class="shown" id="shown"></span>
+        <div class="spacer"></div>
+        <span class="f mono" id="m-score" title="ranked by score">by chance</span>
+        <span class="f mono" id="m-new" title="newest first, rank still by score">newest</span>
+        <span class="f mono" id="pause">⏸ pause</span>
+      </div>
+      <div class="settings" id="settings" hidden>
+        <label for="s-min">Show only at or above <input type="number" id="s-min" min="0" max="99" step="0.5"> % chance</label>
+        <label for="s-win">Window <select id="s-win"><option value="1">1 hour</option><option value="3">3 hours</option><option value="6">6 hours</option><option value="12">12 hours</option><option value="24">24 hours</option></select></label>
+        <span class="f mono" id="s-reset">Reset</span>
+        <span class="sfoot" id="s-foot"></span>
+      </div>
+      <div class="cols"><span>Time</span><span>Token</span><span class="r">Grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r" title="the highest any earlier launch by this creator ever reached">Dev ATH</span><span class="r">Age</span></div>
+      <div class="rows" id="rows"></div>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+    <div class="divider" id="divider" title="Drag to resize"><i></i></div>
+    <div class="panel" id="panel"><div class="empty">Click a launch to open its card</div></div>
+  </div>
+</section>
+
+<!-- ───────────── MODEL ───────────── -->
+<section id="page-model" hidden>
+  <div class="page">
+    <div class="ph"><h2>Model</h2><span class="m" id="mo-h">—</span></div>
+    <div class="pipe" id="pipe"></div>
+    <div class="metrics" id="metrics"></div>
+    <div class="two2">
+      <div class="pane"><div class="k">Feature influence · mean |contribution| on the current board</div><div id="imp"></div></div>
+      <div class="pane"><div class="k">Live scoreboard · claims written before the outcome existed</div><div class="log" id="livelog"></div></div>
+    </div>
+    <p class="honest" id="honest"></p>
+  </div>
+</section>
+
+<!-- ───────────── TOKEN ───────────── -->
+<section id="page-token" hidden>
+  <div class="doc">
+    <div id="coin-standin"></div>
     <div class="coinhd" id="coin-crumb">coin</div>
     <div class="coinpx"><b id="coin-px">&mdash;</b><span class="w" id="coin-fdv"></span></div>
 
@@ -1083,20 +1207,16 @@ function drawRoadmap() {
   stage.innerHTML =
     '<div class="line"></div><div class="fill" style="width:' + fillTo + '%"></div>' +
     ROAD.map((m, i) => {
-      const above = i % 2 === 0;
-      const pos = above
-        ? 'top:6px'
-        : 'top:96px';
-      const dot = above ? 'top:82px' : 'top:-9px';
-      const stem = above ? 'top:64px;height:20px' : 'top:5px;height:20px';
-      const pad = above ? '' : 'padding-top:28px;';
-      return '<div class="m ' + m.cls + '" style="left:' + at(i) + '%;' + pos + '">' +
-        '<span class="dot" style="' + dot + '"></span>' +
-        '<span class="stem" style="' + stem + '"></span>' +
-        '<div style="' + pad + '">' +
+      // The rule is at 114 on a 230 stage. Upper captions hang from 132 up, lower ones start at 140,
+      // so each has 18px of clearance whatever its description runs to.
+      const up = i % 2 === 0;
+      const stem = up ? "top:96px;height:20px" : "top:122px;height:20px";
+      return '<span class="mk ' + m.cls + '" style="left:' + at(i) + '%"></span>' +
+        '<span class="st ' + m.cls + '" style="left:calc(' + at(i) + '% + 6px);' + stem + '"></span>' +
+        '<div class="m ' + m.cls + " " + (up ? "up" : "dn") + '" style="left:' + at(i) + '%">' +
         '<div class="tag">' + esc(m.tag) + '</div>' +
         '<div class="ti">' + esc(m.title) + '</div>' +
-        '<div class="de">' + esc(m.d) + '</div></div></div>';
+        '<div class="de">' + esc(m.d) + '</div></div>';
     }).join("");
 
   $("rm-count").textContent = shipped + " of " + n + " shipped";
@@ -1438,42 +1558,63 @@ async function loadCoin() {
   const box = $("coin-standin");
   if (!d.configured || !d.found) {
     box.innerHTML = '<div class="notyet"><b>Not launched.</b> There is no $POOLITZER contract yet, so there is nothing to show here. Anything claiming to be $POOLITZER before an address appears on this page is not ours.</div>';
-    $("coin-px").textContent = "—";
     return;
   }
 
   const sym = d.symbol || short(d.token);
   box.innerHTML = d.standIn
     ? '<div class="notyet"><b>Standing in.</b> $POOLITZER has not launched, so this page is showing <b>' +
-      esc(sym) + '</b>, a token that did, read the same way every other launch on this board is read. ' +
-      'When ours launches this page points at it and nothing else here changes.</div>'
+      esc(sym) + '</b> &mdash; a token that did, read the same way every other launch on this board is read. ' +
+      'When ours launches, this page points at it and nothing else here changes.</div>'
     : "";
 
   $("coin-crumb").textContent = "coin / " + sym + " / robinhood chain 4663";
+  $("coin-state").hidden = !d.graduated;
 
   const px = d.pool && d.pool.lastUsd !== null ? d.pool.lastUsd / d.supply : null;
-  $("coin-px").textContent = px === null ? "—" : "$" + px.toPrecision(2);
+  $("coin-px").textContent = px === null ? "\u2014" : "$" + px.toPrecision(2);
+
+  // Change is measured from the opening price, not from a rolling window: no price series survives
+  // graduation, so "last 24h" is not something this can honestly claim.
+  const ch = $("coin-ch");
+  if (d.pool && d.pool.openUsd && d.pool.lastUsd !== null) {
+    const r = d.pool.lastUsd / d.pool.openUsd;
+    ch.textContent = (r >= 1 ? "+" : "") + ((r - 1) * 100).toFixed(1) + "% since the pool opened";
+    ch.className = "ch " + (r >= 1 ? "up" : "dn");
+  } else ch.textContent = "";
+
   $("coin-fdv").textContent = d.pool && d.pool.lastUsd !== null
-    ? "market cap " + usd(d.pool.lastUsd) + " · " + d.supply.toLocaleString() + " supply"
-    : "";
+    ? "market cap " + usd(d.pool.lastUsd) + " \u00b7 " + d.supply.toLocaleString() + " supply" : "";
 
   const cell = (k, v, dim) => '<div><div class="k">' + k + '</div><div class="v' + (dim ? " dim" : "") + '">' + v + "</div></div>";
   $("coin-strip").innerHTML =
-    cell("Opened at", d.pool ? usd(d.pool.openUsd) : "—") +
-    cell("Peak", d.pool ? usd(d.pool.peakUsd) : "—") +
-    cell("Now", d.pool ? usd(d.pool.lastUsd) : "—") +
-    cell("Pool swaps", d.pool ? d.pool.swaps.toLocaleString() : "—") +
-    cell("Reached the pool", d.graduated ? (d.secondsToGraduate !== null ? secs(d.secondsToGraduate) : "yes") : "not yet") +
+    cell("Opened at", d.pool ? usd(d.pool.openUsd) : "\u2014") +
+    cell("Peak", d.pool ? usd(d.pool.peakUsd) : "\u2014") +
+    cell("Now", d.pool ? usd(d.pool.lastUsd) : "\u2014") +
+    cell("Pool swaps", d.pool ? d.pool.swaps.toLocaleString() : "\u2014") +
+    cell("Pool", "Uniswap v4") +
     cell("Holders", "not indexed", true);
 
+  drawCoinChart(d);
+
   const tax = d.creatorTaxBps === null ? "unknown" : (d.creatorTaxBps / 100).toFixed(2) + "%";
+  const step = (n, b, sp, v) => '<div class="s"><span class="n">' + n + '</span><b>' + b + "</b><span>" + sp + '</span><span class="val">' + v + "</span></div>";
   $("coin-fee").innerHTML =
-    '<div class="s"><span class="n">01</span><b>Swap</b><span>every trade in the pool</span><span class="val">' + esc(tax) + " to the creator</span></div>" +
-    '<div class="s"><span class="n">02</span><b>pons hook</b><span>routes the creator fee on-chain</span><span class="val">' + esc(short(d.token)) + "</span></div>" +
-    '<div class="s"><span class="n">03</span><b>Recipient</b><span>set at launch, public</span><span class="val">' +
-      (d.feeRecipient ? esc(short(d.feeRecipient)) : "not declared") + "</span></div>" +
-    '<div class="s"><span class="n">04</span><b>Graduation</b><span>the bar this launch had to clear</span><span class="val">' +
-      (d.threshold ? esc(d.threshold) + " " + esc(d.quoteSymbol) : "—") + "</span></div>";
+    step("01", "Swap", "every trade in the pool", esc(tax) + " creator fee") +
+    step("02", "pons hook", "routes the creator fee on-chain", esc(short(d.token))) +
+    step("03", "Recipient", "set at launch, public", d.feeRecipient ? esc(short(d.feeRecipient)) : "not declared") +
+    step("04", "Graduation", "the bar it had to clear", d.threshold ? esc(d.threshold) + " " + esc(d.quoteSymbol) : "\u2014");
+
+  $("coin-lg").textContent = sym.replace(/^\$/, "").slice(0, 1).toUpperCase();
+  $("coin-name").textContent = "$" + sym.replace(/^\$/, "");
+  $("coin-sub").textContent = (d.pool && d.pool.lastUsd !== null ? "market cap " + usd(d.pool.lastUsd) + " \u00b7 " : "") + "quoted in " + d.quoteSymbol;
+  $("coin-links").innerHTML =
+    '<a href="' + EXP + "/token/" + d.token + '" target="_blank" rel="noopener">Explorer \u2197</a>' +
+    '<a href="https://www.ponsfamily.com/token/' + d.token + '" target="_blank" rel="noopener">pons \u2197</a>' +
+    '<a href="#/board/' + d.token + '">Board card</a>' +
+    '<a href="' + EXP + "/tx/" + d.launchTx + '" target="_blank" rel="noopener">Launch tx \u2197</a>';
+  $("coin-last").textContent = d.graduated
+    ? (d.secondsToGraduate !== null ? secs(d.secondsToGraduate) + " after launch" : "yes") : "not yet";
 
   const row = (k, v, href) => '<div class="r"><span class="k">' + k + '</span><span class="v">' +
     (href ? '<a href="' + href + '" target="_blank" rel="noopener">' + v + "</a>" : v) + "</span></div>";
@@ -1486,8 +1627,63 @@ async function loadCoin() {
     row("supply", d.supply.toLocaleString()) +
     row("self-buy", d.selfBuy === null ? "not declared" : esc(d.selfBuy) + " " + esc(d.quoteSymbol)) +
     row("exempt wallets", String(d.exemptCount)) +
-    row("launch tx", esc(short(d.launchTx)), EXP + "/tx/" + d.launchTx) +
-    (d.graduationTx ? row("graduation tx", esc(short(d.graduationTx)), EXP + "/tx/" + d.graduationTx) : "");
+    row("graduated", d.graduationTx ? esc(d.threshold || "") + " " + esc(d.quoteSymbol) : "not yet",
+        d.graduationTx ? EXP + "/tx/" + d.graduationTx : "");
+
+  $("coin-copy").onclick = async () => {
+    const ok = await copyText(d.token);
+    $("coin-copy").textContent = ok ? "Copied" : "Ctrl+C";
+    setTimeout(() => { $("coin-copy").textContent = "Copy"; }, 1400);
+  };
+}
+
+/**
+ * The price path, drawn from the only series that exists.
+ *
+ * Every curve trade carries what was paid and what came back, so a price falls straight out of each
+ * log and the opening act can be charted exactly. It stops at graduation: after that the token
+ * trades in the pool, and the pool stream is folded to a high, low and last the moment it is read.
+ * Charting the part we have and labelling it beats interpolating the part we do not.
+ */
+function drawCoinChart(d) {
+  const host = $("coin-chart"), ax = $("coin-ax"), rng = $("coin-rng"), lbl = $("coin-chart-lbl");
+  const pts = (d.curve || []).filter((p) => p && p.usd > 0);
+  if (pts.length < 2) {
+    host.innerHTML = '<div style="height:230px;display:flex;align-items:center;justify-content:center;color:var(--t35);font:12px var(--mono)">no curve trades read for this token yet</div>';
+    ax.textContent = ""; rng.innerHTML = ""; lbl.textContent = "on the curve";
+    return;
+  }
+
+  const W = 1000, H = 230, pad = { l: 8, r: 62, t: 12, b: 10 };
+  const lo = Math.min(...pts.map((p) => p.usd)), hi = Math.max(...pts.map((p) => p.usd));
+  const span = hi - lo || hi || 1;
+  const x = (i) => pad.l + (i * (W - pad.l - pad.r)) / (pts.length - 1);
+  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (v - lo) / span);
+
+  const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.usd).toFixed(1)).join(" ");
+  const area = line + " L" + x(pts.length - 1).toFixed(1) + " " + (H - pad.b) + " L" + pad.l + " " + (H - pad.b) + " Z";
+
+  // Four labelled gridlines, each naming a value the chart actually reaches.
+  const ticks = [0, 1, 2, 3].map((k) => lo + (span * k) / 3);
+  const grid = ticks.map((v) => {
+    const yy = y(v).toFixed(1);
+    return '<line x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + yy + '" y2="' + yy + '" stroke="rgba(255,255,255,.07)" stroke-dasharray="2 4"/>' +
+      '<text x="' + (W - pad.r + 8) + '" y="' + (Number(yy) + 3.5) + '" fill="rgba(255,255,255,.35)" font-family="ui-monospace,monospace" font-size="11">' + usd(v) + "</text>";
+  }).join("");
+
+  host.innerHTML =
+    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="price along the curve">' +
+    '<defs><linearGradient id="cg" x1="0" x2="0" y1="0" y2="1">' +
+    '<stop offset="0%" stop-color="#ccff00" stop-opacity=".38"/><stop offset="100%" stop-color="#ccff00" stop-opacity="0"/>' +
+    "</linearGradient></defs>" + grid +
+    '<path d="' + area + '" fill="url(#cg)"/>' +
+    '<path d="' + line + '" fill="none" stroke="#ccff00" stroke-width="1.6" stroke-linejoin="round"/>' +
+    "</svg>";
+
+  lbl.textContent = "on the curve \u00b7 " + pts.length + " trades, up to graduation";
+  ax.innerHTML = "<span>launch</span><span>" + usd(pts[0].usd) + " \u2192 " + usd(pts[pts.length - 1].usd) + "</span><span>graduation</span>";
+  const at = ((pts[pts.length - 1].usd - lo) / span) * 100;
+  rng.innerHTML = '<span>low ' + usd(lo) + '</span><span class="bar"><i style="left:' + at.toFixed(1) + '%"></i></span><span>high ' + usd(hi) + "</span>";
 }
 
 /* ── model page ── */
