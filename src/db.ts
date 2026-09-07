@@ -143,6 +143,31 @@ CREATE TABLE IF NOT EXISTS curve_summary (
   compacted_at INTEGER NOT NULL
 ) STRICT;
 
+-- Price, volume and fees over time, for the one coin this site is about.
+--
+-- The swap stream is folded to a high, low and last per pool because 3.4 million swaps a day pass
+-- through the singleton and keeping them all is what the disk cannot afford. That fold is right for
+-- four thousand pools and wrong for the single pool the coin page is about, which wants a shape over
+-- time. So this is the exception, and it is bounded by being an exception: one pool at roughly five
+-- minutes a bar is 288 rows a day.
+--
+-- Everything here comes out of the Swap event we already decode. It carries both amounts, the price,
+-- the pool's liquidity and its fee rate; we were reading the price and discarding the rest.
+CREATE TABLE IF NOT EXISTS coin_bars (
+  pool_id    TEXT NOT NULL,
+  bucket     INTEGER NOT NULL,
+  open_sqrt  TEXT NOT NULL,
+  hi_sqrt    TEXT NOT NULL,
+  lo_sqrt    TEXT NOT NULL,
+  close_sqrt TEXT NOT NULL,
+  swaps      INTEGER NOT NULL,
+  vol_quote  TEXT NOT NULL,
+  fee_quote  TEXT NOT NULL,
+  liquidity  TEXT NOT NULL,
+  last_block INTEGER NOT NULL,
+  PRIMARY KEY (pool_id, bucket)
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS pools (
   token       TEXT PRIMARY KEY,
   pool_id     TEXT NOT NULL,

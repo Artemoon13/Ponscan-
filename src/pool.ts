@@ -170,10 +170,15 @@ export function quotePerToken(sqrt: string | bigint, p: Pick<PoolRow, "token_is_
  * currency1 the price rises as `sqrtPriceX96` falls, so its peak is the low; where it is currency0
  * the peak is the high. Storing one end would silently invert half the pools.
  */
+/** Roughly five minutes of chain at 0.1009s a block, so a day of the coin page is 288 bars. */
+export const BAR_BLOCKS = 3000;
+
 export async function indexPoolSwaps(
   db: DB, fromBlock: number, toBlock: number, chunk = 2000,
   onChunk?: (upTo: number, swaps: number) => void,
   spacingMs = 0,
+  /** Pools to keep a time series for. One, in practice: the coin this site is about. */
+  barPool?: { poolId: string; tokenIsC1: boolean } | null,
 ): Promise<{ swaps: number; matched: number; chunks: number }> {
   const known = new Set<string>(
     (db.prepare("SELECT pool_id FROM pools").all() as Array<{ pool_id: string }>).map((r) => r.pool_id),
@@ -192,6 +197,19 @@ export async function indexPoolSwaps(
       last_block = excluded.last_block,
       swaps     = pool_peaks.swaps + excluded.swaps,
       to_block  = excluded.to_block`);
+
+  const bar = db.prepare(`
+    INSERT INTO coin_bars (pool_id, bucket, open_sqrt, hi_sqrt, lo_sqrt, close_sqrt, swaps, vol_quote, fee_quote, liquidity, last_block)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(pool_id, bucket) DO UPDATE SET
+      hi_sqrt    = CASE WHEN CAST(excluded.hi_sqrt AS REAL) > CAST(coin_bars.hi_sqrt AS REAL) THEN excluded.hi_sqrt ELSE coin_bars.hi_sqrt END,
+      lo_sqrt    = CASE WHEN CAST(excluded.lo_sqrt AS REAL) < CAST(coin_bars.lo_sqrt AS REAL) THEN excluded.lo_sqrt ELSE coin_bars.lo_sqrt END,
+      close_sqrt = excluded.close_sqrt,
+      swaps      = coin_bars.swaps + excluded.swaps,
+      vol_quote  = CAST(CAST(coin_bars.vol_quote AS REAL) + CAST(excluded.vol_quote AS REAL) AS TEXT),
+      fee_quote  = CAST(CAST(coin_bars.fee_quote AS REAL) + CAST(excluded.fee_quote AS REAL) AS TEXT),
+      liquidity  = excluded.liquidity,
+      last_block = excluded.last_block`);
 
   let swaps = 0, matched = 0, chunks = 0;
   let from = fromBlock;
@@ -225,6 +243,7 @@ export async function indexPoolSwaps(
 
     // Folded in memory first: one row per pool per chunk instead of one write per swap.
     const agg = new Map<string, { lo: bigint; hi: bigint; loB: number; hiB: number; last: bigint; lastB: number; n: number }>();
+    const bars: Array<{ bucket: number; sqrt: bigint; blk: number; vol: number; fee: number; liq: string }> = [];
     for (const l of logs) {
       const id = l.topics[1];
       if (!id || !known.has(id)) continue;
@@ -239,6 +258,21 @@ export async function indexPoolSwaps(
       const blk = Number(l.blockNumber);
       const cur = agg.get(id);
       matched++;
+
+      if (barPool && id === barPool.poolId) {
+        // Volume is measured on the quote side, which every swap reports whichever way it went, and
+        // the fee is that volume at the pool's own rate. `fee` is in hundredths of a bip.
+        const q = barPool.tokenIsC1 ? (a.amount0 as bigint) : (a.amount1 as bigint);
+        const vol = q < 0n ? -q : q;
+        const rate = Number(a.fee as number | bigint);
+        bars.push({
+          bucket: Math.floor(blk / BAR_BLOCKS),
+          sqrt, blk,
+          vol: Number(vol),
+          fee: (Number(vol) * rate) / 1e6,
+          liq: (a.liquidity as bigint).toString(),
+        });
+      }
       if (!cur) {
         agg.set(id, { lo: sqrt, hi: sqrt, loB: blk, hiB: blk, last: sqrt, lastB: blk, n: 1 });
         continue;
@@ -254,6 +288,22 @@ export async function indexPoolSwaps(
         for (const [id, v] of agg) {
           upsert.run(id, v.lo.toString(), v.hi.toString(), v.loB, v.hiB, v.last.toString(), v.lastB, v.n, to);
         }
+        // One row per bucket per chunk, so a chunk spanning two buckets writes both and a bucket
+        // spanning two chunks is merged by the upsert rather than replaced.
+        if (barPool && bars.length) {
+          const byBucket = new Map<number, typeof bars>();
+          for (const b of bars) {
+            const list = byBucket.get(b.bucket);
+            if (list) list.push(b); else byBucket.set(b.bucket, [b]);
+          }
+          for (const [bucket, list] of byBucket) {
+            let hi = list[0].sqrt, lo = list[0].sqrt, vol = 0, fee = 0;
+            for (const b of list) { if (b.sqrt > hi) hi = b.sqrt; if (b.sqrt < lo) lo = b.sqrt; vol += b.vol; fee += b.fee; }
+            const last = list[list.length - 1];
+            bar.run(barPool.poolId, bucket, list[0].sqrt.toString(), hi.toString(), lo.toString(),
+              last.sqrt.toString(), list.length, String(vol), String(fee), last.liq, last.blk);
+          }
+        }
         db.exec("COMMIT");
       } catch (e) {
         db.exec("ROLLBACK");
@@ -268,6 +318,108 @@ export async function indexPoolSwaps(
     if (spacingMs > 0) await sleep(spacingMs);
   }
   return { swaps, matched, chunks };
+}
+
+/**
+ * Reads one pool's whole swap history into bars.
+ *
+ * The chain-wide pass is the right shape for four thousand pools and the wrong shape for one: it
+ * has to walk every block in narrow chunks because the singleton carries every pool's traffic. Asked
+ * about a single pool, the endpoint will filter by the id in the topic, and then a chunk can be
+ * enormous. Measured against this endpoint, one id over 200,000 blocks came back in about a second.
+ *
+ * That is what makes a real chart affordable for the coin page: half a million blocks of history in
+ * a couple of dozen reads instead of five hundred.
+ */
+export async function indexCoinBars(
+  db: DB,
+  pool: { poolId: string; tokenIsC1: boolean },
+  fromBlock: number,
+  toBlock: number,
+  chunk = 150_000,
+  onChunk?: (upTo: number, swaps: number) => void,
+): Promise<{ swaps: number; chunks: number; bars: number }> {
+  const bar = db.prepare(`
+    INSERT INTO coin_bars (pool_id, bucket, open_sqrt, hi_sqrt, lo_sqrt, close_sqrt, swaps, vol_quote, fee_quote, liquidity, last_block)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(pool_id, bucket) DO UPDATE SET
+      hi_sqrt    = CASE WHEN CAST(excluded.hi_sqrt AS REAL) > CAST(coin_bars.hi_sqrt AS REAL) THEN excluded.hi_sqrt ELSE coin_bars.hi_sqrt END,
+      lo_sqrt    = CASE WHEN CAST(excluded.lo_sqrt AS REAL) < CAST(coin_bars.lo_sqrt AS REAL) THEN excluded.lo_sqrt ELSE coin_bars.lo_sqrt END,
+      close_sqrt = excluded.close_sqrt,
+      swaps      = coin_bars.swaps + excluded.swaps,
+      vol_quote  = CAST(CAST(coin_bars.vol_quote AS REAL) + CAST(excluded.vol_quote AS REAL) AS TEXT),
+      fee_quote  = CAST(CAST(coin_bars.fee_quote AS REAL) + CAST(excluded.fee_quote AS REAL) AS TEXT),
+      liquidity  = excluded.liquidity,
+      last_block = excluded.last_block`);
+
+  let swaps = 0, chunks = 0, written = 0;
+  let from = fromBlock;
+  let width = chunk;
+
+  while (from <= toBlock) {
+    const to = Math.min(toBlock, from + width - 1);
+    let logs: RawLog[];
+    try {
+      logs = (await withRetry(() => logsClient.request({
+        method: "eth_getLogs",
+        params: [{
+          address: ADDR.v4PoolManager,
+          fromBlock: `0x${from.toString(16)}`,
+          toBlock: `0x${to.toString(16)}`,
+          topics: [TOPIC_POOL_SWAP, [pool.poolId]],
+        }],
+      } as never))) as RawLog[];
+    } catch (e) {
+      if (width > 2000) { width = Math.floor(width / 2); continue; }
+      throw e;
+    }
+    chunks++;
+    swaps += logs.length;
+
+    const byBucket = new Map<number, { open: bigint; hi: bigint; lo: bigint; close: bigint; n: number; vol: number; fee: number; liq: string; blk: number }>();
+    for (const l of logs) {
+      let a: Record<string, unknown>;
+      try {
+        a = decodeEventLog({ abi: swapAbi, topics: l.topics, data: l.data }).args as Record<string, unknown>;
+      } catch {
+        continue;
+      }
+      const sqrt = a.sqrtPriceX96 as bigint;
+      if (sqrt <= 0n) continue;
+      const blk = Number(l.blockNumber);
+      const bucket = Math.floor(blk / BAR_BLOCKS);
+      // Volume is read off the quote side, which every swap reports whichever way it went, and the
+      // fee is that volume at the pool's own rate. `fee` is in hundredths of a bip.
+      const qraw = pool.tokenIsC1 ? (a.amount0 as bigint) : (a.amount1 as bigint);
+      const vol = Number(qraw < 0n ? -qraw : qraw);
+      const fee = (vol * Number(a.fee as number | bigint)) / 1e6;
+      const liq = (a.liquidity as bigint).toString();
+
+      const cur = byBucket.get(bucket);
+      if (!cur) { byBucket.set(bucket, { open: sqrt, hi: sqrt, lo: sqrt, close: sqrt, n: 1, vol, fee, liq, blk }); continue; }
+      if (sqrt > cur.hi) cur.hi = sqrt;
+      if (sqrt < cur.lo) cur.lo = sqrt;
+      cur.close = sqrt; cur.n++; cur.vol += vol; cur.fee += fee; cur.liq = liq; cur.blk = blk;
+    }
+
+    if (byBucket.size) {
+      db.exec("BEGIN");
+      try {
+        for (const [bucket, v] of byBucket) {
+          bar.run(pool.poolId, bucket, v.open.toString(), v.hi.toString(), v.lo.toString(),
+            v.close.toString(), v.n, String(v.vol), String(v.fee), v.liq, v.blk);
+          written++;
+        }
+        db.exec("COMMIT");
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
+    }
+    from = to + 1;
+    onChunk?.(to, swaps);
+  }
+  return { swaps, chunks, bars: written };
 }
 
 export type PoolCaps = {

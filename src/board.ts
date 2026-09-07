@@ -8,7 +8,7 @@ import { getMeta, openDb } from "./db.ts";
 import { contributions } from "./model/gbdt.ts";
 import { grade, modelId, pending, score as scoreLog, settled } from "./track.ts";
 import { formatUnits, quoteFromCache } from "./quote.ts";
-import { formatUsd, marketCapUsd } from "./prices.ts";
+import { formatUsd, marketCapUsd, usdOf } from "./prices.ts";
 import { BLOCKS_PER_DAY } from "./config.ts";
 import { CFG } from "./config.ts";
 import { indexCurve } from "./curve.ts";
@@ -447,33 +447,67 @@ const server = createServer(async (req, res) => {
       /**
        * The price path along the curve, in dollars of market cap.
        *
-       * This is the one real series available: every curve trade carries what was paid and what came
-       * back, so a price falls straight out of each log. It stops at graduation, because after that
-       * the token trades in the pool and the pool stream is folded to a high, low and last the moment
-       * it is read. So the chart covers the opening act honestly rather than covering everything
-       * badly, and the page labels it as such.
+       * Every curve trade records what was paid and what came back, so a price falls out of each log
+       * exactly. This covers the opening act, up to the moment the token left the curve.
        */
       curve: (() => {
         const rows = db.prepare(
-          "SELECT quote_wei, token_amt, ts, block FROM curve_trades WHERE token = ? ORDER BY block, log_index",
-        ).all(tok) as Array<{ quote_wei: string; token_amt: string; ts: number; block: number }>;
+          "SELECT quote_wei, token_amt, block FROM curve_trades WHERE token = ? ORDER BY block, log_index",
+        ).all(tok) as Array<{ quote_wei: string; token_amt: string; block: number }>;
         const pts: Array<{ b: number; usd: number }> = [];
         for (const r of rows) {
           const tokens = Number(r.token_amt);
           if (!(tokens > 0)) continue;
-          const px = (Number(r.quote_wei) / tokens) * (1e18 / 10 ** dec);
-          const cap = marketCapUsd(px, q.symbol);
+          const cap = marketCapUsd((Number(r.quote_wei) / tokens) * (1e18 / 10 ** dec), q.symbol);
           if (cap !== null && Number.isFinite(cap) && cap > 0) pts.push({ b: r.block, usd: cap });
         }
-        // Thinned to something a chart can draw: a few hundred points is plenty for a line, and
-        // sending thousands would spend bandwidth on pixels nobody can tell apart.
-        const cap = 240;
-        if (pts.length <= cap) return pts;
-        const step = pts.length / cap;
-        const out: typeof pts = [];
-        for (let i = 0; i < cap; i++) out.push(pts[Math.floor(i * step)]);
-        out.push(pts[pts.length - 1]);
-        return out;
+        return pts.length > 240 ? pts.filter((_, i) => i % Math.ceil(pts.length / 240) === 0) : pts;
+      })(),
+
+      /**
+       * The same thing after graduation, from the pool.
+       *
+       * These come from `coin_bars`, which exists only for this one coin: folding the whole swap
+       * stream to a high and a low is the only affordable shape for four thousand pools, and the
+       * wrong one for the single pool a page is about. Volume and fees ride along because the Swap
+       * event carries both amounts and the pool's fee rate, which the chain-wide pass discards.
+       */
+      pool2: (() => {
+        const pr = db.prepare("SELECT pool_id, token_is_c1, dec0, dec1 FROM pools WHERE token = ?").get(tok) as
+          | { pool_id: string; token_is_c1: number; dec0: number; dec1: number } | undefined;
+        if (!pr) return null;
+        const bars = db.prepare(
+          "SELECT bucket, close_sqrt, hi_sqrt, lo_sqrt, swaps, vol_quote, fee_quote, last_block FROM coin_bars WHERE pool_id = ? ORDER BY bucket",
+        ).all(pr.pool_id) as Array<{
+          bucket: number; close_sqrt: string; hi_sqrt: string; lo_sqrt: string;
+          swaps: number; vol_quote: string; fee_quote: string; last_block: number;
+        }>;
+        if (!bars.length) return null;
+
+        const scale = 1 / 10 ** dec;
+        const usdPer = usdOf(q.symbol);
+        const series = bars.map((b) => ({
+          b: b.last_block,
+          usd: marketCapUsd(quotePerToken(b.close_sqrt, pr), q.symbol),
+        })).filter((p) => p.usd !== null && Number.isFinite(p.usd as number));
+
+        // A day of chain, in blocks, so "last 24h" is measured rather than assumed from row count.
+        const dayFrom = bars[bars.length - 1].last_block - BLOCKS_PER_DAY;
+        const recent = bars.filter((b) => b.last_block >= dayFrom);
+        const sum = (rows: typeof bars, f: (b: typeof bars[number]) => number) => rows.reduce((a, b) => a + f(b), 0);
+        const toUsd = (raw: number) => (usdPer === null ? null : raw * scale * usdPer);
+
+        return {
+          bars: series,
+          swapsAll: sum(bars, (b) => b.swaps),
+          swaps24h: sum(recent, (b) => b.swaps),
+          vol24hUsd: toUsd(sum(recent, (b) => Number(b.vol_quote))),
+          volAllUsd: toUsd(sum(bars, (b) => Number(b.vol_quote))),
+          fees24hUsd: toUsd(sum(recent, (b) => Number(b.fee_quote))),
+          feesAllUsd: toUsd(sum(bars, (b) => Number(b.fee_quote))),
+          feesAllQuote: sum(bars, (b) => Number(b.fee_quote)) * scale,
+          coveredTo: bars[bars.length - 1].last_block,
+        };
       })(),
     });
     return;

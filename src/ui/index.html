@@ -181,7 +181,7 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .f.mono{font:500 11px var(--mono)}
 .shown{font:11px var(--mono);color:var(--t4);margin-left:8px}
 /* pages that are read rather than operated: a measured column, not a dashboard */
-.doc{max-width:1180px;margin:0 auto;padding:56px 24px 96px}
+.doc{max-width:1180px;margin:0 auto;padding:44px 24px 88px}
 .doc h1{margin:0;font:700 44px/1 Geist,sans-serif;letter-spacing:-.035em}
 .doc .sub{margin-top:10px;font-size:14px;color:var(--t55)}
 .doc .cols2{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:48px;margin-top:44px;align-items:start}
@@ -200,20 +200,19 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .rmbar b{font:600 13px Geist,sans-serif;color:var(--ink);letter-spacing:-.01em}
 .rmbar .sp{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--lime)}
 .rmbar .sp .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite}
-.rmwrap{border:1px solid var(--l08);border-radius:0 0 10px 10px;background:var(--bg2);padding:34px 24px 10px}
+.rmwrap{border:1px solid var(--l08);border-radius:0 0 10px 10px;background:var(--bg2);padding:24px 24px 22px}
 /* Absolute positions on a 190px stage, the geometry the design uses: one line, marks sitting on it,
    captions alternating above and below so five of them fit without colliding. */
-.tl{position:relative;height:230px}
-.tl .line{position:absolute;left:0;right:0;top:114px;height:2px;background:var(--l15)}
-.tl .fill{position:absolute;left:0;top:114px;height:2px;background:var(--lime)}
-/* The mark sits on the rule on its own, so a caption can grow away from the line instead of into
-   it. Anchoring the upper captions by their bottom edge is the whole fix: a two-line description
-   used to push the block down onto the rule and print itself over it. */
-.tl .mk{position:absolute;width:14px;height:14px;border-radius:3px;top:108px;border:2px solid var(--bg2);box-shadow:0 0 0 2px currentColor;background:currentColor}
-.tl .st{position:absolute;width:2px;background:currentColor}
+.tl{position:relative}
+.tl .line,.tl .fill{position:absolute;left:0;height:2px}
+.tl .line{right:0;background:var(--l15)}
+.tl .fill{background:var(--lime)}
+/* The mark is drawn on the stage rather than inside a caption, so the upper captions can hang from
+   the rule and grow upward away from it. The stage's height and the rule's position are measured
+   from the captions once they exist: fixing them in CSS left a dead band above the short ones and
+   would have clipped a long one. */
+.tl .mk{position:absolute;width:14px;height:14px;border-radius:3px;border:2px solid var(--bg2);box-shadow:0 0 0 2px currentColor;background:currentColor}
 .tl .m{position:absolute;width:min(190px,17%)}
-.tl .up{bottom:132px}
-.tl .dn{top:140px}
 .tl .tag{font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.08em}
 .tl .ti{font-weight:600;font-size:16px;margin-top:5px;letter-spacing:-.01em;color:var(--ink)}
 .tl .de{font-size:12px;line-height:1.5;color:var(--t55);margin-top:5px;text-wrap:pretty}
@@ -224,8 +223,8 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .tl .now.mk{animation:pulse 2s infinite}
 @media (max-width:1000px){
   .rmwrap{padding:18px}
-  .tl{height:auto;display:flex;flex-direction:column;gap:16px}
-  .tl .line,.tl .fill,.tl .mk,.tl .st{display:none}
+  .tl{height:auto!important;display:flex;flex-direction:column;gap:16px}
+  .tl .line,.tl .fill,.tl .mk{display:none}
   .tl .m{position:static!important;width:auto;padding-left:12px;border-left:2px solid currentColor}
 }
 .ship{display:flex;flex-direction:column}
@@ -272,18 +271,18 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .coinhd{display:flex;align-items:center;gap:10px;font:11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
 .coinhd .st{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--lime)}
 .coinhd .st .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite}
-.coinpx{margin-top:12px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.coinpx{margin-top:14px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
 .coinpx b{font:700 44px var(--mono);letter-spacing:-.02em;color:var(--ink)}
 .coinpx .ch{font:600 15px var(--mono)}
 .coinpx .ch.up{color:var(--lime)}.coinpx .ch.dn{color:var(--red)}
 .coinpx .w{font:12px var(--mono);color:var(--t45)}
-.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));border:1px solid var(--l08);border-radius:9px;margin-top:20px;overflow:hidden}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));border:1px solid var(--l08);border-radius:9px;margin-top:24px;overflow:hidden}
 .strip div{padding:11px 14px;border-left:1px solid var(--l08)}
 .strip div:first-child{border-left:0}
 .strip .k{font:500 9.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
 .strip .v{margin-top:5px;font:600 15px var(--mono);color:var(--ink)}
 .strip .v.dim{color:var(--t35);font-weight:500;font-size:12px}
-.chartbar{display:flex;align-items:center;gap:12px;margin-top:22px;font:11px var(--mono);color:var(--t45)}
+.chartbar{display:flex;align-items:center;gap:12px;margin-top:26px;font:11px var(--mono);color:var(--t45)}
 .chartbar .src{margin-left:auto}
 .chart{margin-top:10px;border:1px solid var(--l08);border-radius:9px;background:var(--bg2);padding:14px 14px 8px}
 .chart svg{display:block;width:100%;height:230px}
@@ -291,7 +290,7 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .rng{display:flex;align-items:center;gap:12px;margin-top:14px;font:11px var(--mono);color:var(--t45)}
 .rng .bar{position:relative;flex:1;height:2px;background:var(--l15);border-radius:2px}
 .rng .bar i{position:absolute;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--lime);transform:translateX(-5px)}
-.flow{position:relative;display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:0;margin-top:16px}
+.flow{position:relative;display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:0;margin-top:20px}
 .flow .s{position:relative;padding:0 16px 0 0}
 .flow .s .n{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid var(--l15);border-radius:7px;background:var(--bg2);font:600 12px var(--mono);color:var(--lime)}
 .flow .s::after{content:"";position:absolute;left:38px;right:0;top:19px;height:1px;background:var(--l15)}
@@ -826,8 +825,8 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
           </div>
           <div class="prose" style="margin:0">
             <h2 style="margin:0"><span class="n">&middot;</span>Not on this page</h2>
-            <p>No holder count, no liquidity, no 24-hour volume, and no fee ledger. None of them are indexed: the swap stream is folded to a running high, low and last per pool the moment it is read, because 3.4 million swaps a day pass through the singleton and keeping them all is what the disk cannot afford.</p>
-            <p>A page people check before buying is the last place to start estimating, so those say so rather than showing a number nobody measured.</p>
+            <p>No holder count, and no fee figure. Holders would need every transfer indexed. Fees are stranger: the pool's own fee is zero on every single swap, because the pons hook takes them rather than the pool, and without the hook's published interface there is no telling which of its events is a fee or whose it is.</p>
+            <p>Price, volume and swap counts are read from the pool itself and are exact. A page people check before buying is the last place to start estimating, so the two we cannot read say so rather than showing a number nobody measured.</p>
           </div>
         </div>
       </div>
@@ -1204,20 +1203,35 @@ function drawRoadmap() {
   // The fill stops at the last finished mark, so the rule shows progress rather than decoration.
   const fillTo = at(Math.max(0, shipped - 1));
 
+  const GAP = 18;
   stage.innerHTML =
-    '<div class="line"></div><div class="fill" style="width:' + fillTo + '%"></div>' +
+    '<div class="line"></div><div class="fill"></div>' +
     ROAD.map((m, i) => {
-      // The rule is at 114 on a 230 stage. Upper captions hang from 132 up, lower ones start at 140,
-      // so each has 18px of clearance whatever its description runs to.
       const up = i % 2 === 0;
-      const stem = up ? "top:96px;height:20px" : "top:122px;height:20px";
       return '<span class="mk ' + m.cls + '" style="left:' + at(i) + '%"></span>' +
-        '<span class="st ' + m.cls + '" style="left:calc(' + at(i) + '% + 6px);' + stem + '"></span>' +
-        '<div class="m ' + m.cls + " " + (up ? "up" : "dn") + '" style="left:' + at(i) + '%">' +
+        '<div class="m ' + m.cls + '" data-up="' + (up ? 1 : 0) + '" style="left:' + at(i) + '%">' +
         '<div class="tag">' + esc(m.tag) + '</div>' +
         '<div class="ti">' + esc(m.title) + '</div>' +
         '<div class="de">' + esc(m.d) + '</div></div>';
     }).join("");
+
+  // Measured rather than assumed: the tallest caption on each side decides where the rule sits and
+  // how tall the stage is, so a short row leaves no dead band above it and a long one is not cut off.
+  const caps = [...stage.querySelectorAll(".m")];
+  const tallest = (up) => Math.max(0, ...caps.filter((c) => (c.dataset.up === "1") === up).map((c) => c.offsetHeight));
+  const above = tallest(true), below = tallest(false);
+  const rule = above + GAP;
+
+  stage.style.height = rule + 2 + GAP + below + "px";
+  stage.querySelector(".line").style.top = rule + "px";
+  const fill = stage.querySelector(".fill");
+  fill.style.top = rule + "px";
+  fill.style.width = fillTo + "%";
+  stage.querySelectorAll(".mk").forEach((mk) => { mk.style.top = rule - 6 + "px"; });
+  caps.forEach((c) => {
+    if (c.dataset.up === "1") c.style.top = rule - GAP - c.offsetHeight + "px";
+    else c.style.top = rule + 2 + GAP + "px";
+  });
 
   $("rm-count").textContent = shipped + " of " + n + " shipped";
   $("rm-now").textContent = building ? building.title.toLowerCase() : "nothing in flight";
@@ -1587,13 +1601,16 @@ async function loadCoin() {
     ? "market cap " + usd(d.pool.lastUsd) + " \u00b7 " + d.supply.toLocaleString() + " supply" : "";
 
   const cell = (k, v, dim) => '<div><div class="k">' + k + '</div><div class="v' + (dim ? " dim" : "") + '">' + v + "</div></div>";
+  const p2 = d.pool2;
   $("coin-strip").innerHTML =
-    cell("Opened at", d.pool ? usd(d.pool.openUsd) : "\u2014") +
+    cell("24h volume", p2 && p2.vol24hUsd !== null ? usd(p2.vol24hUsd) : "\u2014") +
+    cell("24h swaps", p2 ? p2.swaps24h.toLocaleString() : "\u2014") +
     cell("Peak", d.pool ? usd(d.pool.peakUsd) : "\u2014") +
-    cell("Now", d.pool ? usd(d.pool.lastUsd) : "\u2014") +
-    cell("Pool swaps", d.pool ? d.pool.swaps.toLocaleString() : "\u2014") +
+    cell("Opened at", d.pool ? usd(d.pool.openUsd) : "\u2014") +
     cell("Pool", "Uniswap v4") +
-    cell("Holders", "not indexed", true);
+    // The pool's own fee is zero on every swap: the pons hook takes it, and without the hook's ABI
+    // there is no telling which of its events is a fee or whose. Saying so beats a plausible number.
+    cell("Fees", "hook, not readable", true);
 
   drawCoinChart(d);
 
@@ -1647,42 +1664,59 @@ async function loadCoin() {
  */
 function drawCoinChart(d) {
   const host = $("coin-chart"), ax = $("coin-ax"), rng = $("coin-rng"), lbl = $("coin-chart-lbl");
-  const pts = (d.curve || []).filter((p) => p && p.usd > 0);
+
+  // The whole life of the price, from two sources that meet at graduation: the curve's own trades,
+  // where a price falls out of every log, and the pool's bars afterwards. Both are read here, not
+  // fetched from anyone.
+  const curve = (d.curve || []).filter((p) => p && p.usd > 0).map((p) => ({ b: p.b, usd: p.usd, pool: false }));
+  const pool = (d.pool2 && d.pool2.bars || []).filter((p) => p && p.usd > 0).map((p) => ({ b: p.b, usd: p.usd, pool: true }));
+  const pts = curve.concat(pool);
+
   if (pts.length < 2) {
-    host.innerHTML = '<div style="height:230px;display:flex;align-items:center;justify-content:center;color:var(--t35);font:12px var(--mono)">no curve trades read for this token yet</div>';
-    ax.textContent = ""; rng.innerHTML = ""; lbl.textContent = "on the curve";
+    host.innerHTML = '<div style="height:230px;display:flex;align-items:center;justify-content:center;color:var(--t35);font:12px var(--mono)">nothing read for this token yet</div>';
+    ax.textContent = ""; rng.innerHTML = ""; lbl.textContent = "price";
     return;
   }
 
-  const W = 1000, H = 230, pad = { l: 8, r: 62, t: 12, b: 10 };
+  const W = 1000, H = 230, pad = { l: 8, r: 66, t: 12, b: 10 };
   const lo = Math.min(...pts.map((p) => p.usd)), hi = Math.max(...pts.map((p) => p.usd));
-  const span = hi - lo || hi || 1;
+  // Log scale, because this price runs from four thousand dollars to two and a half million and a
+  // linear axis would flatten the entire curve into the bottom pixel.
+  const L = (v) => Math.log10(Math.max(v, 1e-9));
+  const lo2 = L(lo), span = L(hi) - lo2 || 1;
   const x = (i) => pad.l + (i * (W - pad.l - pad.r)) / (pts.length - 1);
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (v - lo) / span);
+  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (L(v) - lo2) / span);
 
-  const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.usd).toFixed(1)).join(" ");
-  const area = line + " L" + x(pts.length - 1).toFixed(1) + " " + (H - pad.b) + " L" + pad.l + " " + (H - pad.b) + " Z";
+  const path = (arr, from) => arr.map((p, k) => (k ? "L" : "M") + x(from + k).toFixed(1) + " " + y(p.usd).toFixed(1)).join(" ");
+  const whole = path(pts, 0);
+  const area = whole + " L" + x(pts.length - 1).toFixed(1) + " " + (H - pad.b) + " L" + pad.l + " " + (H - pad.b) + " Z";
 
-  // Four labelled gridlines, each naming a value the chart actually reaches.
-  const ticks = [0, 1, 2, 3].map((k) => lo + (span * k) / 3);
+  const ticks = [0, 1, 2, 3].map((k) => 10 ** (lo2 + (span * k) / 3));
   const grid = ticks.map((v) => {
     const yy = y(v).toFixed(1);
     return '<line x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + yy + '" y2="' + yy + '" stroke="rgba(255,255,255,.07)" stroke-dasharray="2 4"/>' +
       '<text x="' + (W - pad.r + 8) + '" y="' + (Number(yy) + 3.5) + '" fill="rgba(255,255,255,.35)" font-family="ui-monospace,monospace" font-size="11">' + usd(v) + "</text>";
   }).join("");
 
+  // Where the curve ended and the pool began, marked rather than smoothed over.
+  const gx = curve.length && pool.length ? x(curve.length - 1).toFixed(1) : null;
+  const mark = gx === null ? "" :
+    '<line x1="' + gx + '" x2="' + gx + '" y1="' + pad.t + '" y2="' + (H - pad.b) +
+    '" stroke="rgba(255,255,255,.22)" stroke-dasharray="3 3"/>' +
+    '<text x="' + (Number(gx) + 6) + '" y="' + (pad.t + 12) + '" fill="rgba(255,255,255,.4)" font-family="ui-monospace,monospace" font-size="10">reached the pool</text>';
+
   host.innerHTML =
-    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="price along the curve">' +
+    '<svg viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="price from launch to now">' +
     '<defs><linearGradient id="cg" x1="0" x2="0" y1="0" y2="1">' +
-    '<stop offset="0%" stop-color="#ccff00" stop-opacity=".38"/><stop offset="100%" stop-color="#ccff00" stop-opacity="0"/>' +
+    '<stop offset="0%" stop-color="#ccff00" stop-opacity=".34"/><stop offset="100%" stop-color="#ccff00" stop-opacity="0"/>' +
     "</linearGradient></defs>" + grid +
     '<path d="' + area + '" fill="url(#cg)"/>' +
-    '<path d="' + line + '" fill="none" stroke="#ccff00" stroke-width="1.6" stroke-linejoin="round"/>' +
+    '<path d="' + whole + '" fill="none" stroke="#ccff00" stroke-width="1.6" stroke-linejoin="round"/>' + mark +
     "</svg>";
 
-  lbl.textContent = "on the curve \u00b7 " + pts.length + " trades, up to graduation";
-  ax.innerHTML = "<span>launch</span><span>" + usd(pts[0].usd) + " \u2192 " + usd(pts[pts.length - 1].usd) + "</span><span>graduation</span>";
-  const at = ((pts[pts.length - 1].usd - lo) / span) * 100;
+  lbl.textContent = curve.length + " curve trades \u00b7 " + pool.length + " pool bars \u00b7 log scale";
+  ax.innerHTML = "<span>launch</span><span>" + usd(pts[0].usd) + " \u2192 " + usd(pts[pts.length - 1].usd) + "</span><span>now</span>";
+  const at = ((L(pts[pts.length - 1].usd) - lo2) / span) * 100;
   rng.innerHTML = '<span>low ' + usd(lo) + '</span><span class="bar"><i style="left:' + at.toFixed(1) + '%"></i></span><span>high ' + usd(hi) + "</span>";
 }
 
