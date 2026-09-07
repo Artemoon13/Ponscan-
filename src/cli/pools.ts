@@ -1,20 +1,20 @@
 import { logsClient, withRetry } from "../chain.ts";
 import { getMeta, openDb, setMeta } from "../db.ts";
-import { indexPoolSwaps, resolvePool } from "../pool.ts";
+import { indexPoolSwaps, resolvePoolsSweep } from "../pool.ts";
 import { quoteFromCache } from "../quote.ts";
 
 /**
  * Follows graduated tokens into the pool.
  *
- * Two jobs, in order. First every graduated token that has no pool on record gets one, by finding
- * its `Initialize` and keeping only the pool carrying the pons hook. Then the swap stream is read
- * chain-wide from wherever it left off, which covers every known pool in the same pass.
+ * Two jobs, in order. First the `Initialize` stream is swept chain-wide, keeping only pools carrying
+ * the pons hook and matching each against a token we know. Then the swap stream is read the same
+ * way, which covers every known pool in one pass.
  *
  * The order matters: a pool discovered after the stream has already passed its blocks would have no
  * history, so resolution runs first and the stream starts no later than the oldest pool it must
  * cover.
  *
- * poolitzer pools [--limit N] [--chunk N] [--max-blocks N]
+ * poolitzer pools [--init-chunk N] [--chunk N] [--max-blocks N]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {
@@ -22,7 +22,7 @@ const arg = (name: string, dflt: number): number => {
   return i >= 0 ? Number(argv[i + 1]) : dflt;
 };
 
-const limit = arg("limit", 400);
+const initChunk = arg("init-chunk", 40_000);
 const chunk = arg("chunk", 2000);
 const maxBlocks = arg("max-blocks", 60_000);
 
@@ -31,32 +31,55 @@ const head = Number(await withRetry(() => logsClient.getBlockNumber()));
 
 /* ── 1. give every graduated token its pool ─────────────────────────────────── */
 
-const pending = db.prepare(`
-  SELECT l.token, l.block, l.pair_token, l.symbol
-  FROM graduations g JOIN launches l USING(token)
-  WHERE l.token NOT IN (SELECT token FROM pools)
-  ORDER BY l.block DESC LIMIT ?`).all(limit) as
-  Array<{ token: string; block: number; pair_token: string; symbol: string | null }>;
+/**
+ * One sweep of Initialize across the chain, not one search per token.
+ *
+ * The pons hook identifies our pools, and every pool on the chain is opened through the same
+ * singleton, so a chunk of that stream carries whatever graduated in those blocks. Chunks here are
+ * far wider than the swap pass uses: Initialize is rare where Swap is not, and 40,000 blocks
+ * measured 541 events against the endpoint's 10,000-log ceiling.
+ */
+const oldestGrad = db.prepare(
+  "SELECT min(l.block) b FROM graduations g JOIN launches l USING(token)",
+).get() as { b: number | null };
 
-console.log(`${(db.prepare("SELECT count(*) c FROM pools").get() as { c: number }).c} pools known; resolving up to ${pending.length} more\n`);
+if (oldestGrad.b === null) {
+  console.log("no graduations on record yet; nothing to resolve");
+} else {
+  const savedInit = Number(getMeta(db, "pool_init_to_block") ?? 0);
+  const initFrom = savedInit > 0 ? savedInit + 1 : oldestGrad.b;
+  const before = (db.prepare("SELECT count(*) c FROM pools").get() as { c: number }).c;
 
-let resolved = 0, missing = 0;
-for (const r of pending) {
-  const q = quoteFromCache(db, r.pair_token);
-  try {
-    // A pool is opened within a few minutes of graduating; the window is generous rather than tight
-    // so a slow sweep does not read as a missing pool.
-    const row = await resolvePool(db, r.token, r.block, Math.min(head, r.block + 40_000), q.decimals);
-    if (row) resolved++;
-    else missing++;
-  } catch {
-    missing++;
-  }
-  if ((resolved + missing) % 25 === 0) {
-    process.stdout.write(`\r  ${resolved} resolved, ${missing} without a pons pool  `);
+  if (initFrom > head) {
+    console.log(`${before} pools known; Initialize already swept to ${savedInit.toLocaleString()}`);
+  } else {
+    const span = head - initFrom + 1;
+    console.log(
+      `${before} pools known; sweeping Initialize over ${span.toLocaleString()} blocks ` +
+      `(${initFrom.toLocaleString()}..${head.toLocaleString()}) in ${initChunk.toLocaleString()}-block chunks`,
+    );
+    const t = Date.now();
+    const sweep = await resolvePoolsSweep(
+      db, initFrom, head, initChunk,
+      (pairToken) => quoteFromCache(db, pairToken).decimals,
+      (upTo, found) => {
+        const done = upTo - initFrom + 1;
+        const pct = (100 * done / span).toFixed(1);
+        process.stdout.write(`  ${pct}%  ${found} pools found  `);
+      },
+    );
+    setMeta(db, "pool_init_to_block", String(head));
+    console.log(`  ${sweep.found} pools found in ${sweep.chunks} reads, ${((Date.now() - t) / 1000).toFixed(1)}s${" ".repeat(20)}`);
+
+    const still = db.prepare(`
+      SELECT count(*) c FROM graduations g JOIN launches l USING(token)
+      WHERE l.token NOT IN (SELECT token FROM pools)`).get() as { c: number };
+    const grads = (db.prepare("SELECT count(*) c FROM graduations").get() as { c: number }).c;
+    if (still.c) {
+      console.log(`  ${still.c} of ${grads} graduated tokens still have no pons pool (${(100 * still.c / grads).toFixed(1)}%)`);
+    }
   }
 }
-console.log(`\r  ${resolved} resolved, ${missing} without a pons pool${" ".repeat(20)}`);
 
 /* ── 2. read the swap stream ────────────────────────────────────────────────── */
 

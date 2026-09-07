@@ -243,9 +243,16 @@ export function buildCard(db: DB, token: string): Card | null {
   const history = recent.map((r) => {
     const q = quoteFromCache(db, r.pair_token);
     const caps = capsFor(db, r.token, q.symbol, q.decimals);
+    // The same rule the creator's best launches use. For a token that graduated, the curve high is
+    // the bar it had to clear rather than how far it got, so the pool has to be allowed to answer;
+    // without this the two lists on one card disagree about the same launch.
+    const inPool = r.graduated ? poolCaps(db, r.token, q.symbol)?.peakUsd ?? null : null;
+    const peakUsd = caps.peakUsd === null ? inPool
+      : inPool === null ? caps.peakUsd : Math.max(caps.peakUsd, inPool);
+    const peakMultiple = peakUsd !== null && caps.launchUsd ? peakUsd / caps.launchUsd : caps.peakMultiple;
     return {
       token: r.token, symbol: r.symbol, ts: r.ts, graduated: Boolean(r.graduated),
-      peakMultiple: caps.peakMultiple, peakUsd: caps.peakUsd === null ? null : formatUsd(caps.peakUsd),
+      peakMultiple, peakUsd: peakUsd === null ? null : formatUsd(peakUsd),
       // Whether anyone has pulled this curve yet. Without it a blank peak is ambiguous: it reads the
       // same whether the curve is still being fetched or was fetched and found no trades at all.
       read: Boolean(wasRead.get(r.token)),

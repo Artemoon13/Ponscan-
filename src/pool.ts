@@ -68,34 +68,50 @@ export type PoolRow = {
   token_is_c1: number; dec0: number; dec1: number; init_block: number; init_sqrt: string;
 };
 
-/**
- * Finds the one pool that belongs to a graduated token, and rejects the ones that do not.
- *
- * A graduated token attracts impostors: sampled across six tokens, each had exactly one pool carrying
- * the pons hook and between four and seven others opened by strangers with `hooks` set to the zero
- * address and arbitrary fee tiers. Those pools trade, so they have prices, and a peak read out of one
- * would be a number somebody else chose. The hook is what makes the real pool identifiable, so it is
- * the filter rather than a detail.
- */
-export async function resolvePool(
-  db: DB, token: string, fromBlock: number, toBlock: number, quoteDecimals: number,
-): Promise<PoolRow | null> {
-  const padded = `0x${token.slice(2).padStart(64, "0")}` as `0x${string}`;
 
-  // The token sorts to either side of the pair depending on its address, so both are asked for.
-  for (const [isC1, topics] of [
-    [1, [TOPIC_POOL_INIT, null, null, padded]],
-    [0, [TOPIC_POOL_INIT, null, padded, null]],
-  ] as const) {
+/**
+ * Every pons pool opened in a block range, found in one sweep rather than one search per token.
+ *
+ * Resolution used to ask the PoolManager about a single token at a time across a wide window. That
+ * is the expensive way round, and measurably so: the per-token query costs 1,619 ms and comes back
+ * with nothing, while the same query with the token slot left open costs 1,385 ms and comes back
+ * with 541 pools. The singleton already carries every pool, so pinning one token buys no reduction
+ * in work, it only narrows what the same scan is allowed to return. Three thousand tokens at two
+ * calls each runs to two and a half hours; sweeping the same history once takes about four minutes.
+ *
+ * It also cannot miss, which the old way could. A per-token window that guessed wrong reported "no
+ * pons pool" for a token whose pool had simply opened outside it, and that is what put roughly 8% of
+ * graduated tokens in that bucket rather than anything real about them.
+ *
+ * `quoteDecimalsFor` is passed in rather than imported so this module keeps knowing only about
+ * pools; the caller already holds the quote-asset cache.
+ */
+export async function resolvePoolsSweep(
+  db: DB,
+  fromBlock: number,
+  toBlock: number,
+  chunk: number,
+  quoteDecimalsFor: (pairToken: string) => number,
+  onChunk?: (upTo: number, found: number) => void,
+): Promise<{ found: number; chunks: number }> {
+  const launch = db.prepare("SELECT token, pair_token FROM launches WHERE token = ?");
+  const ins = db.prepare(`
+    INSERT INTO pools (token, pool_id, currency0, currency1, token_is_c1, dec0, dec1, init_block, init_sqrt)
+    VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(token) DO NOTHING`);
+
+  let found = 0, chunks = 0;
+  for (let from = fromBlock; from <= toBlock; from += chunk) {
+    const to = Math.min(toBlock, from + chunk - 1);
     const logs = (await withRetry(() => logsClient.request({
       method: "eth_getLogs",
       params: [{
         address: ADDR.v4PoolManager,
-        fromBlock: `0x${fromBlock.toString(16)}`,
-        toBlock: `0x${toBlock.toString(16)}`,
-        topics,
+        fromBlock: `0x${from.toString(16)}`,
+        toBlock: `0x${to.toString(16)}`,
+        topics: [TOPIC_POOL_INIT],
       }],
     } as never))) as RawLog[];
+    chunks++;
 
     for (const l of logs) {
       let a: Record<string, unknown>;
@@ -106,27 +122,27 @@ export async function resolvePool(
       }
       if (String(a.hooks).toLowerCase() !== ADDR.hook.toLowerCase()) continue;
 
-      const row: PoolRow = {
-        token,
-        pool_id: String(a.id),
-        currency0: String(a.currency0).toLowerCase(),
-        currency1: String(a.currency1).toLowerCase(),
-        token_is_c1: isC1,
-        dec0: isC1 ? quoteDecimals : TOKEN_DECIMALS,
-        dec1: isC1 ? TOKEN_DECIMALS : quoteDecimals,
-        init_block: Number(l.blockNumber),
-        init_sqrt: (a.sqrtPriceX96 as bigint).toString(),
-      };
-      db.prepare(`
-        INSERT INTO pools (token, pool_id, currency0, currency1, token_is_c1, dec0, dec1, init_block, init_sqrt)
-        VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(token) DO NOTHING`).run(
-        row.token, row.pool_id, row.currency0, row.currency1, row.token_is_c1,
-        row.dec0, row.dec1, row.init_block, row.init_sqrt,
+      // One side of the pair is the launched token and the other is what it trades against; which is
+      // which follows from address order, so both are looked up rather than assumed.
+      const c0 = String(a.currency0).toLowerCase();
+      const c1 = String(a.currency1).toLowerCase();
+      const asC1 = launch.get(c1) as { token: string; pair_token: string } | undefined;
+      const asC0 = asC1 ? undefined : (launch.get(c0) as { token: string; pair_token: string } | undefined);
+      const row = asC1 ?? asC0;
+      if (!row) continue;
+
+      const isC1 = asC1 ? 1 : 0;
+      const qd = quoteDecimalsFor(row.pair_token);
+      ins.run(
+        row.token, String(a.id), c0, c1, isC1,
+        isC1 ? qd : TOKEN_DECIMALS, isC1 ? TOKEN_DECIMALS : qd,
+        Number(l.blockNumber), (a.sqrtPriceX96 as bigint).toString(),
       );
-      return row;
+      found++;
     }
+    onChunk?.(to, found);
   }
-  return null;
+  return { found, chunks };
 }
 
 /**
