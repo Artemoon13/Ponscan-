@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { buildDataset, FEATURES, type Row } from "./features.ts";
 import { deserialize, predict, type GbdtModel } from "./model/gbdt.ts";
 import { explain, type Reason } from "./model/reasons.ts";
+import { applyLive, liveFor } from "./calibration.ts";
+import { modelId } from "./track.ts";
 import type { DB } from "./db.ts";
 
 export type Scored = {
@@ -78,6 +80,26 @@ export function datasetWith(db: DB, token: string): Row[] {
   return rebuild(db, 0);
 }
 
+/**
+ * The correction fitted against the live prediction log, when one exists for the model in use.
+ *
+ * Read per call rather than cached: it is a tiny file, it changes at most a few times a day, and a
+ * board that kept serving a stale correction after a retrain would be printing numbers the log can
+ * no longer vouch for. `liveFor` already refuses a correction stamped with a different model.
+ */
+function live(): { a: number; b: number } | null {
+  try {
+    return liveFor(modelId());
+  } catch {
+    return null;
+  }
+}
+
+/** The probability as shown: the model's own, then the live correction if there is one. */
+export function shown(p: number, c: { a: number; b: number } | null): number {
+  return c ? applyLive(c, p) : p;
+}
+
 export function loadModel(path = "./data/model.json"): GbdtModel | null {
   if (!existsSync(path)) return null;
   return deserialize(readFileSync(path, "utf8"));
@@ -119,8 +141,9 @@ export function scoreRecent(
   const rows = dataset(db, cutoff).filter((r) => r.ts >= cutoff);
   if (!rows.length) return { items: [], matched: 0, total: 0 };
 
+  const c = live();
   const scored = rows
-    .map((r) => ({ token: r.token, ts: r.ts, x: r.x, p: predict(model, r.x) }))
+    .map((r) => ({ token: r.token, ts: r.ts, x: r.x, p: shown(predict(model, r.x), c) }))
     .sort((a, b) => b.p - a.p);
 
   const ranked = scored.map((s, i) => ({
@@ -157,8 +180,9 @@ export function scoreOne(db: DB, model: GbdtModel, token: string, windowHours = 
   const me = rows.find((r) => r.token === token.toLowerCase());
   if (!me) return null;
 
-  const peers = rows.filter((r) => r.ts >= cutoff).map((r) => predict(model, r.x));
-  const p = predict(model, me.x);
+  const c = live();
+  const peers = rows.filter((r) => r.ts >= cutoff).map((r) => shown(predict(model, r.x), c));
+  const p = shown(predict(model, me.x), c);
   const better = peers.filter((q) => q > p).length;
   return {
     token: me.token,

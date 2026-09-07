@@ -25,6 +25,8 @@
     "verify": "node --no-warnings src/cli/verify.ts",
     "stats": "node --no-warnings src/cli/stats.ts",
     "nightly": "node --no-warnings src/cli/nightly.ts",
+    "watchdog": "node --no-warnings src/cli/watchdog.ts",
+    "recalibrate": "node --no-warnings src/cli/recalibrate.ts",
     "test": "node --no-warnings --test",
     "pools": "node --no-warnings src/cli/pools.ts"
   },
