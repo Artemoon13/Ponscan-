@@ -3,7 +3,7 @@ import { loadModel, scoreRecent } from "../score.ts";
 import { alertText, HELP, statusText, tokenText, topText, type LaunchMeta } from "../tgtext.ts";
 
 /**
- * poolitzer telegram — the board's alerts, in a chat.
+ * gimlet telegram — the board's alerts, in a chat.
  *
  * This is the one part of the project that speaks to a third party, so it is worth being plain about
  * what that costs. Everything else here reads a public RPC and writes to a file on your disk; this
@@ -17,7 +17,7 @@ import { alertText, HELP, statusText, tokenText, topText, type LaunchMeta } from
  * never asks for a key or a seed, because there is no command that takes one. It holds nothing and
  * signs nothing: every reply is built from the same local database the board reads.
  *
- * poolitzer telegram [--min N] [--window-hours N] [--interval-sec N] [--once]
+ * gimlet telegram [--min N] [--window-hours N] [--interval-sec N] [--once]
  */
 
 const argv = process.argv.slice(2);
@@ -225,7 +225,7 @@ if (!me) {
   console.error("Telegram refused the token. Check TELEGRAM_BOT_TOKEN in .env.");
   process.exit(1);
 }
-console.log(`poolitzer telegram — @${me.username}`);
+console.log(`gimlet telegram — @${me.username}`);
 console.log(`  default threshold ${DEFAULT_MIN}%, window ${WINDOW_HOURS}h, checking every ${INTERVAL_SEC}s`);
 console.log(`  ${(db.prepare("SELECT count(*) c FROM tg_subs").get() as { c: number }).c} chat(s) subscribed`);
 console.log(`  send /start to @${me.username} to subscribe this machine's alerts to a chat\n`);

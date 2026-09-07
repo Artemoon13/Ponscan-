@@ -13,7 +13,7 @@ import { contentBox, crop, decode, encode, resize } from "../png.ts";
  * Safe to run twice. The trim is measured from the artwork each time, so a mark that is already
  * tight loses nothing.
  *
- * poolitzer icon
+ * gimlet icon
  */
 const UI = join(import.meta.dirname, "..", "ui");
 const SOURCE = join(UI, "logo.png");

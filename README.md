@@ -1,10 +1,10 @@
-# poolitzer
+# gimlet
 
 New tokens launch on [pons](https://www.ponsfamily.com) faster than anyone can read them. Almost all
 of them die. About **two in a hundred** make it off the bonding curve and into a real
 Uniswap pool.
 
-poolitzer watches every launch as it happens and puts the ones worth a look at the top. It runs on your
+gimlet watches every launch as it happens and puts the ones worth a look at the top. It runs on your
 own machine, needs no wallet and no key, and sends nothing anywhere.
 
 ## What you actually see
@@ -28,7 +28,7 @@ The point is not to be told what to buy. The point is to not read four hundred l
 
 Yes, a bit. Here is the honest version.
 
-poolitzer ranks every launch of the last six hours against the others — several thousand of them on a
+gimlet ranks every launch of the last six hours against the others — several thousand of them on a
 busy evening. Call the top tenth of that ranking the **shortlist**.
 
 **Out of a hundred launches picked at random, about two reach the pool. Out of a hundred
@@ -59,7 +59,7 @@ re-run that yourself in one command, and you should.
 
 You can check it, and you should not trust it.
 
-poolitzer writes down every score it gives, at the moment it gives it, **before the outcome exists**.
+gimlet writes down every score it gives, at the moment it gives it, **before the outcome exists**.
 Four hours later it looks up what actually happened and grades itself. `npm run scoreboard` shows you
 that record. `npm run verify` dumps the whole log to a file and recomputes the numbers from the file
 alone, so you can hand it to someone who does not trust the code at all.
@@ -71,7 +71,7 @@ Two rules keep that log honest:
 
 - **A launch older than five minutes is never recorded.** Half of graduations are decided by then, so
   scoring late would flatter the record with launches whose fate was already half-known.
-- **A score cannot be edited afterwards.** The first thing poolitzer says about a launch is the thing
+- **A score cannot be edited afterwards.** The first thing gimlet says about a launch is the thing
   it gets graded on.
 
 Live record so far: run `npm run scoreboard` — it reports whatever has settled on your own machine, which is the only record worth anything to you

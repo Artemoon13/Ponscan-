@@ -34,16 +34,16 @@ export const CFG = {
   /**
    * The token the coin page is about.
    *
-   * $POOLITZER does not exist yet, and a page that describes a coin is only worth reading if the
+   * $GIMLET does not exist yet, and a page that describes a coin is only worth reading if the
    * numbers on it are real. So this points at a launched token in the meantime and the page says
    * plainly that it is standing in; when the real one launches this is the only line that changes.
    *
    * Empty turns the coin page back into the "not launched" notice.
    */
   coinToken: str("COIN_TOKEN", "0xb19f5a6e22f9057980b08ff05b7f5a6878ab0c8a").toLowerCase(),
-  /** Set once $POOLITZER itself is the token above, so the page stops calling itself a stand-in. */
+  /** Set once $GIMLET itself is the token above, so the page stops calling itself a stand-in. */
   coinIsOurs: str("COIN_IS_OURS", "0") === "1",
-  dbPath: str("DB_PATH", "./data/poolitzer.db"),
+  dbPath: str("DB_PATH", "./data/gimlet.db"),
   boardPort: num("BOARD_PORT", 4663),
   /**
    * Interface the board listens on. Defaults to every interface, which is what a local run wants.

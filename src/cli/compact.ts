@@ -18,7 +18,7 @@ import { summariseCurve } from "../curve.ts";
  * interrupted run leaves summaries without their trades gone rather than trades gone without a
  * summary.
  *
- * poolitzer compact [--older-than-days N] [--limit N] [--dry-run] [--vacuum]
+ * gimlet compact [--older-than-days N] [--limit N] [--dry-run] [--vacuum]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {

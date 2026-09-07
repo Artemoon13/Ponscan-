@@ -14,7 +14,7 @@ import { quoteFromCache } from "../quote.ts";
  * history, so resolution runs first and the stream starts no later than the oldest pool it must
  * cover.
  *
- * poolitzer pools [--init-chunk N] [--chunk N] [--max-blocks N] [--spacing MS]
+ * gimlet pools [--init-chunk N] [--chunk N] [--max-blocks N] [--spacing MS]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {

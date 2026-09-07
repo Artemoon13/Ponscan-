@@ -23,7 +23,7 @@ export const ago = (sec: number): string =>
   sec < 90 ? `${Math.round(sec)}s` : sec < 5400 ? `${Math.round(sec / 60)}m` : `${(sec / 3600).toFixed(1)}h`;
 
 export const HELP = [
-  "<b>Poolitzer</b> — launch alerts from your own machine.",
+  "<b>Gimlet</b> — launch alerts from your own machine.",
   "",
   "/watch <i>n</i> — alert me at or above n% (e.g. <code>/watch 8</code>)",
   "/stop — stop alerts and delete my record",
@@ -37,30 +37,86 @@ export const HELP = [
 
 export type LaunchMeta = { symbol: string | null; name: string | null; deployer: string };
 
-/** One launch, as an alert. */
+/**
+ * One launch, as an alert.
+ *
+ * Built from the full card rather than the score alone. An alert that says only "31.1%" makes the
+ * reader open something else to decide anything, which defeats the point of pushing it: the numbers
+ * that answer "is this worth a look" are the forecast peak, what the creator has done before, and
+ * whether they put their own money in. Those are all a card read, and a card is a local query.
+ *
+ * Laid out in blocks with blank lines between, because these arrive in a stream. A wall of labelled
+ * values is unreadable at the third one; four short stanzas can be skimmed.
+ */
 export function alertText(db: DB, s: Scored, m: LaunchMeta, now = Math.floor(Date.now() / 1000)): string {
   const pct = (s.probability * 100).toFixed(1);
+  const card = buildCard(db, s.token);
+
+  const head = [
+    `<b>${esc(m.symbol ?? short(s.token))}</b>  <b>${pct}%</b> to reach the pool`,
+    `rank #${s.rank} of ${s.of.toLocaleString()} · ${ago(now - s.ts)} old${card ? ` · ${esc(card.launch.quoteSymbol)}` : ""}`,
+  ];
+
+  const blocks: string[][] = [head];
+
+  // The forecast, which is the reason to look at a launch at all. Shown as the band it was validated
+  // as: the point estimate only beats a constant by a quarter, so leading with it would overstate it.
+  // Only while the answer is still open. Once a launch has graduated and its pool peak is known,
+  // printing a forecast beside the fact reads as the tool contradicting itself.
+  if (card?.ath.available && card.ath.loUsd && card.ath.hiUsd && !card.outcome.graduated) {
+    const a = card.ath;
+    const peak = [`<b>peak</b> ${esc(a.loUsd)} – ${esc(a.hiUsd)}${a.pointUsd ? ` · around ${esc(a.pointUsd)}` : ""}`];
+    // The measured hit rate, not the rate the band was built for. It is currently well under it, and
+    // a range quoted without that reads as a promise the model does not keep.
+    if (a.coverage !== null) peak.push(`<i>ranges like this have held ${(100 * a.coverage).toFixed(0)}% of the time</i>`);
+    if (a.tailChance !== null) {
+      const base = a.tailBase !== null && a.tailBase > 0 ? ` vs ${(100 * a.tailBase).toFixed(0)}% typical` : "";
+      peak.push(`<b>×10 or more</b> ${(100 * a.tailChance).toFixed(0)}%${base}`);
+    }
+    blocks.push(peak);
+  }
+
+  if (card) {
+    const H = card.creatorHistory;
+    const L = card.launch;
+    const who = [
+      `<b>creator</b> ${H.priorLaunches} earlier launch${H.priorLaunches === 1 ? "" : "es"}, ${H.priorGraduations} graduated`,
+    ];
+    if (H.bestPeak) {
+      who.push(`their best ever: ${H.bestPeak.usd ?? `×${H.bestPeak.multiple.toFixed(1)}`}${H.bestPeak.symbol ? ` (${esc(H.bestPeak.symbol)})` : ""}`);
+    }
+    blocks.push(who);
+
+    const facts: string[] = [];
+    if (L.selfBuy) facts.push(`self-buy ${esc(L.selfBuy)} ${esc(L.quoteSymbol)}`);
+    if (L.creatorTaxBps !== null) facts.push(`tax ${(L.creatorTaxBps / 100).toFixed(2)}%`);
+    if (card.exemptions.length) facts.push(`${card.exemptions.length} tax-exempt`);
+    const line: string[] = [];
+    if (facts.length) line.push(facts.join(" · "));
+    if (card.trading.indexed && card.trading.buyersFirstMinute) {
+      line.push(`${card.trading.buyersFirstMinute} buyer${card.trading.buyersFirstMinute === 1 ? "" : "s"} in the first minute`);
+    }
+    // A ticker dozens of launches share is the single loudest signal on a fresh launch, so it is
+    // spelled out rather than left to the reason chips.
+    if (card.cluster.total > 1) {
+      line.push(`ticker shared by ${card.cluster.total} launches, ${card.cluster.graduated} graduated`);
+    }
+    if (line.length) blocks.push(line);
+  }
+
   // Reasons carry a short label for exactly this: a chat line has less room than a card.
-  const why = s.reasons.slice(0, 3)
-    .map((r) => `${r.direction === "up" ? "+" : "−"} ${esc(r.short)}`).join("\n")
-    // A launch can score on nothing in particular; the alert should still read as a sentence.
-    || "no reason stood out";
+  blocks.push([
+    s.reasons.slice(0, 3).map((r) => `${r.direction === "up" ? "+" : "−"} ${esc(r.short)}`).join("\n")
+      // A launch can score on nothing in particular; the alert should still read as a sentence.
+      || "no reason stood out",
+  ]);
 
-  const dev = db.prepare("SELECT count(*) c FROM launches WHERE deployer = ?").get(m.deployer) as { c: number };
-  const devGrad = db.prepare(
-    "SELECT count(*) c FROM launches x JOIN graduations g USING(token) WHERE x.deployer = ?",
-  ).get(m.deployer) as { c: number };
-
-  return [
-    `<b>${esc(m.symbol ?? short(s.token))}</b>  <b>${pct}%</b>`,
-    `rank #${s.rank} of ${s.of.toLocaleString()} · ${ago(now - s.ts)} old`,
-    "",
-    why,
-    "",
-    `creator: ${dev.c} launch${dev.c === 1 ? "" : "es"}, ${devGrad.c} graduated`,
+  blocks.push([
     `<code>${s.token}</code>`,
     `<a href="${EXPLORER.token(s.token)}">explorer</a>`,
-  ].join("\n");
+  ]);
+
+  return blocks.map((b) => b.join("\n")).join("\n\n");
 }
 
 export function statusText(db: DB, now = Math.floor(Date.now() / 1000)): string {
@@ -102,25 +158,57 @@ export function tokenText(db: DB, raw: string): string {
   const s = model ? scoreOne(db, model, t) : null;
   const H = card.creatorHistory;
 
-  const lines = [
+  const L = card.launch;
+  const blocks: string[][] = [[
     `<b>${esc(card.symbol ?? short(t))}</b>${card.name && card.name !== card.symbol ? ` · ${esc(card.name)}` : ""}`,
     s ? `<b>${(s.probability * 100).toFixed(1)}%</b> to reach the pool · rank #${s.rank} of ${s.of.toLocaleString()}`
-      : "not scored — outside the model's window",
-    "",
-    `peak on the curve: ${card.trading.peakUsd ?? "—"}`,
-  ];
-  // The pool figure only exists for a launch that graduated, and only once its swaps are read.
+      : "not scored, it is outside the model's window",
+    `${ago(Math.floor(Date.now() / 1000) - L.ts)} old · ${esc(L.quoteSymbol)} · ${card.outcome.graduated ? "reached the pool" : ["on the curve", "swept", "in the pool", "rescued"][card.outcome.phase] ?? "?"}`,
+  ]];
+
+  // What it has actually done, in two acts. The curve stops at the graduation bar by construction,
+  // so for a graduated token the pool line is the one carrying information.
+  const done = [`<b>peak on the curve</b> ${card.trading.peakUsd ?? "—"}`];
   if (card.pool) {
     const p = card.pool;
-    lines.push(`peak in the pool: ${p.tracked ? (p.peakUsd ?? "—") : "still reading"}${p.lastUsd ? ` · ${p.lastUsd} now` : ""}`);
+    done.push(`<b>peak in the pool</b> ${p.tracked ? (p.peakUsd ?? "—") : "still reading"}${p.lastUsd ? ` · ${p.lastUsd} now` : ""}`);
   }
-  lines.push(
-    "",
-    `creator: ${H.priorLaunches} earlier launch${H.priorLaunches === 1 ? "" : "es"}, ${H.priorGraduations} graduated`,
-  );
+  blocks.push(done);
+
+  if (card.ath.available && card.ath.loUsd && card.ath.hiUsd && !card.outcome.graduated) {
+    const a = card.ath;
+    const f = [`<b>predicted peak</b> ${esc(a.loUsd)} – ${esc(a.hiUsd)}${a.pointUsd ? ` · around ${esc(a.pointUsd)}` : ""}`];
+    if (a.tailChance !== null) {
+      const base = a.tailBase !== null && a.tailBase > 0 ? ` vs ${(100 * a.tailBase).toFixed(0)}% typical` : "";
+      f.push(`<b>×10 or more</b> ${(100 * a.tailChance).toFixed(0)}%${base}`);
+    }
+    if (a.coverage !== null) f.push(`<i>ranges like this held for ${(100 * a.coverage).toFixed(0)}% of launches the model never saw</i>`);
+    blocks.push(f);
+  }
+
+  const facts: string[] = [];
+  if (L.selfBuy) facts.push(`self-buy ${esc(L.selfBuy)} ${esc(L.quoteSymbol)}`);
+  if (L.creatorTaxBps !== null) facts.push(`tax ${(L.creatorTaxBps / 100).toFixed(2)}%`);
+  if (card.exemptions.length) facts.push(`${card.exemptions.length} tax-exempt`);
+  const detail: string[] = [];
+  if (facts.length) detail.push(facts.join(" · "));
+  if (card.trading.indexed) {
+    detail.push(`${card.trading.buyersTotal} buyer${card.trading.buyersTotal === 1 ? "" : "s"} total, ${card.trading.buyersFirstMinute} in the first minute`);
+  }
+  if (card.cluster.total > 1) {
+    detail.push(`ticker shared by ${card.cluster.total} launches, ${card.cluster.graduated} graduated`);
+  }
+  if (detail.length) blocks.push(detail);
+
+  const who = [`<b>creator</b> ${H.priorLaunches} earlier launch${H.priorLaunches === 1 ? "" : "es"}, ${H.priorGraduations} graduated`];
   if (H.bestPeak) {
-    lines.push(`their best: ${H.bestPeak.usd ?? `×${H.bestPeak.multiple.toFixed(1)}`}${H.bestPeak.symbol ? ` · ${esc(H.bestPeak.symbol)}` : ""}`);
+    who.push(`their best ever: ${H.bestPeak.usd ?? `×${H.bestPeak.multiple.toFixed(1)}`}${H.bestPeak.symbol ? ` (${esc(H.bestPeak.symbol)})` : ""}`);
   }
-  lines.push("", `<a href="${EXPLORER.token(t)}">explorer</a>`);
-  return lines.join("\n");
+  for (const p of (H.topPeaks ?? []).slice(1, 3)) {
+    who.push(`then ${p.usd ?? `×${p.multiple.toFixed(1)}`}${p.symbol ? ` (${esc(p.symbol)})` : ""}`);
+  }
+  blocks.push(who);
+
+  blocks.push([`<code>${t}</code>`, `<a href="${EXPLORER.token(t)}">explorer</a>`]);
+  return blocks.map((b) => b.join("\n")).join("\n\n");
 }

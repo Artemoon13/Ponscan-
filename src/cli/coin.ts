@@ -13,7 +13,7 @@ import { CFG } from "../config.ts";
  *
  * Resumable: the covered range is checkpointed, and a run with nothing new to read stops at once.
  *
- * poolitzer coin [--chunk N] [--from-launch]
+ * gimlet coin [--chunk N] [--from-launch]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {

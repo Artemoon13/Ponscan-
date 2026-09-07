@@ -16,7 +16,7 @@ import { assess, SEC_PER_BLOCK } from "../watchdog.ts";
  * was already reading. The state lives in the database rather than in memory because this runs from
  * a timer as a fresh process every time.
  *
- * poolitzer watchdog [--behind-sec N] [--silent-sec N] [--restart] [--unit NAME]
+ * gimlet watchdog [--behind-sec N] [--silent-sec N] [--restart] [--unit NAME]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {

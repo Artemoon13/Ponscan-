@@ -12,7 +12,7 @@ const check = (pass: boolean, msg: string): void => {
   console.log(pass ? ok(msg) : bad(msg));
 };
 
-console.log("poolitzer doctor\n");
+console.log("gimlet doctor\n");
 
 console.log("endpoints");
 const logsBlock = Number(await logsClient.getBlockNumber());

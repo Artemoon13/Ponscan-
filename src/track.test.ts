@@ -11,7 +11,7 @@ import { join } from "node:path";
  * scoreboard would still print, and the numbers would simply be too good.
  */
 
-const dir = mkdtempSync(join(tmpdir(), "poolitzer-track-"));
+const dir = mkdtempSync(join(tmpdir(), "gimlet-track-"));
 process.env.DB_PATH = join(dir, "test.db");
 
 const { openDb } = await import("./db.ts");

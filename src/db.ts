@@ -317,17 +317,26 @@ const MIGRATIONS: Array<{ table: string; column: string; ddl: string }> = [
 ];
 
 /**
- * The project was renamed from ponscan to Poolitzer after databases already existed on disk. A
- * database is days of collected history, so the default path must not silently start over: if the
- * new file is absent and the old one is present, the old one is moved into place — together with
- * its WAL and shared-memory sidecars, which carry unflushed writes and must travel with it.
+ * The project has been renamed twice — ponscan, then Poolitzer, now Gimlet — and each time there
+ * were databases already on disk. A database is days of collected history that cannot be re-fetched
+ * cheaply, so the default path must never silently start over: if the current file is absent and an
+ * older one is present, the older one is moved into place, together with its WAL and shared-memory
+ * sidecars, which carry unflushed writes and must travel with it.
+ *
+ * A list rather than a single hop, newest first, so a machine left at any past name catches up in
+ * one step instead of needing the renames replayed in order.
  */
+const LEGACY_DB_NAMES = ["poolitzer.db", "ponscan.db"] as const;
+
 function adoptLegacyDatabase(path: string): void {
-  if (basename(path) !== "poolitzer.db" || existsSync(path)) return;
-  const legacy = join(dirname(path), "ponscan.db");
-  if (!existsSync(legacy)) return;
-  for (const suffix of ["", "-wal", "-shm"]) {
-    if (existsSync(legacy + suffix)) renameSync(legacy + suffix, path + suffix);
+  if (basename(path) !== "gimlet.db" || existsSync(path)) return;
+  for (const name of LEGACY_DB_NAMES) {
+    const legacy = join(dirname(path), name);
+    if (!existsSync(legacy)) continue;
+    for (const suffix of ["", "-wal", "-shm"]) {
+      if (existsSync(legacy + suffix)) renameSync(legacy + suffix, path + suffix);
+    }
+    return;
   }
 }
 

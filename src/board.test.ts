@@ -20,7 +20,7 @@ import { openDb } from "./db.ts";
  * their own tests for that. Something as blunt as "does the page load" is exactly what was missing.
  */
 
-const dir = mkdtempSync(join(tmpdir(), "poolitzer-board-"));
+const dir = mkdtempSync(join(tmpdir(), "gimlet-board-"));
 /** A port unlikely to collide with a board someone is running while the tests are. */
 const PORT = 4771;
 const BASE = `http://127.0.0.1:${PORT}`;

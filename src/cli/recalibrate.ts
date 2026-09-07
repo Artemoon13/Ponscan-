@@ -5,7 +5,7 @@ import { fitLive, applyLive, liveFor, saveLive, MIN_CLAIMS } from "../calibratio
 /**
  * Refits the printed probability against what the log says actually happened.
  *
- * poolitzer recalibrate [--write]
+ * gimlet recalibrate [--write]
  *
  * Reports by default. Nothing about the ranking changes either way — the correction is monotone in
  * log-odds — so this only ever moves the number a card prints, never its place in the list.

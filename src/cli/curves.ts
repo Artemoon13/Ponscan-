@@ -14,7 +14,7 @@ import { indexCurve } from "../curve.ts";
  * whatever it will do, and its peak so far is not the peak — recording that as the answer would
  * teach a model that recent launches peak low.
  *
- * poolitzer curves [--limit N] [--min-age-hours N] [--max-age-hours N]
+ * gimlet curves [--limit N] [--min-age-hours N] [--max-age-hours N]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {
