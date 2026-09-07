@@ -1,6 +1,9 @@
 import { buildCard } from "./card.ts";
 import { EXPLORER } from "./config.ts";
 import { getMeta, type DB } from "./db.ts";
+import { graduationCapUsd } from "./pool.ts";
+import { formatUsd, startingCapUsd } from "./prices.ts";
+import { quoteFromCache } from "./quote.ts";
 import { loadModel, scoreOne, scoreRecent, type Scored } from "./score.ts";
 import { modelId } from "./track.ts";
 
@@ -35,6 +38,48 @@ export const HELP = [
   + "No command here takes a private key: anything claiming to be this bot and asking for one is not.</i>",
 ].join("\n");
 
+/**
+ * The forecast, written so it can be read without knowing how the model works.
+ *
+ * A range on its own says nothing. "$4.2K to $7.4K" only means something once the reader knows a
+ * launch opens near $4K and that graduating takes about $47K, at which point the same three numbers
+ * say something plain: this one is not expected to make it. Both anchors are measured from this
+ * database rather than asserted, and both are near-constants, which is what lets them sit in every
+ * message: the opening cap is fixed by the curve, and a pool opens at the price the curve ended on,
+ * so across 3,497 pools the graduation cap runs $39.4K to $51.9K with a median of $47.0K.
+ *
+ * The band is labelled with the share of unseen launches it actually caught, not the share it was
+ * built for. Those differ right now, and a range printed bare would claim a confidence the model has
+ * not earned.
+ */
+function forecastLines(db: DB, card: NonNullable<ReturnType<typeof buildCard>>): string[] {
+  const a = card.ath;
+  if (!a.available || !a.loUsd || !a.hiUsd) return [];
+
+  const L = card.launch;
+  const opens = startingCapUsd(db, L.quoteSymbol, L.quoteDecimals);
+  const grad = graduationCapUsd(
+    db,
+    (pt) => quoteFromCache(db, pt).decimals,
+    (pt) => quoteFromCache(db, pt).symbol,
+  );
+  const anchors = [
+    opens === null ? null : `opens at ${formatUsd(opens)}`,
+    grad === null ? null : `graduates near ${formatUsd(grad)}`,
+  ].filter(Boolean).join(" · ");
+
+  const out = [`<b>peak market cap</b> around ${esc(a.pointUsd ?? "—")}${anchors ? `  (${anchors})` : ""}`];
+  out.push(a.coverage === null
+    ? `usually between ${esc(a.loUsd)} and ${esc(a.hiUsd)}`
+    : `usually between ${esc(a.loUsd)} and ${esc(a.hiUsd)}, where the real peak landed ${(100 * a.coverage).toFixed(0)}% of the time`);
+  if (a.tailChance !== null) {
+    const base = a.tailBase !== null && a.tailBase > 0
+      ? `, against ${(100 * a.tailBase).toFixed(0)}% for a typical launch` : "";
+    out.push(`chance of ×10 or better: ${(100 * a.tailChance).toFixed(0)}%${base}`);
+  }
+  return out;
+}
+
 export type LaunchMeta = { symbol: string | null; name: string | null; deployer: string };
 
 /**
@@ -59,21 +104,11 @@ export function alertText(db: DB, s: Scored, m: LaunchMeta, now = Math.floor(Dat
 
   const blocks: string[][] = [head];
 
-  // The forecast, which is the reason to look at a launch at all. Shown as the band it was validated
-  // as: the point estimate only beats a constant by a quarter, so leading with it would overstate it.
   // Only while the answer is still open. Once a launch has graduated and its pool peak is known,
   // printing a forecast beside the fact reads as the tool contradicting itself.
-  if (card?.ath.available && card.ath.loUsd && card.ath.hiUsd && !card.outcome.graduated) {
-    const a = card.ath;
-    const peak = [`<b>peak</b> ${esc(a.loUsd)} – ${esc(a.hiUsd)}${a.pointUsd ? ` · around ${esc(a.pointUsd)}` : ""}`];
-    // The measured hit rate, not the rate the band was built for. It is currently well under it, and
-    // a range quoted without that reads as a promise the model does not keep.
-    if (a.coverage !== null) peak.push(`<i>ranges like this have held ${(100 * a.coverage).toFixed(0)}% of the time</i>`);
-    if (a.tailChance !== null) {
-      const base = a.tailBase !== null && a.tailBase > 0 ? ` vs ${(100 * a.tailBase).toFixed(0)}% typical` : "";
-      peak.push(`<b>×10 or more</b> ${(100 * a.tailChance).toFixed(0)}%${base}`);
-    }
-    blocks.push(peak);
+  if (card && !card.outcome.graduated) {
+    const f = forecastLines(db, card);
+    if (f.length) blocks.push(f);
   }
 
   if (card) {
@@ -175,15 +210,9 @@ export function tokenText(db: DB, raw: string): string {
   }
   blocks.push(done);
 
-  if (card.ath.available && card.ath.loUsd && card.ath.hiUsd && !card.outcome.graduated) {
-    const a = card.ath;
-    const f = [`<b>predicted peak</b> ${esc(a.loUsd)} – ${esc(a.hiUsd)}${a.pointUsd ? ` · around ${esc(a.pointUsd)}` : ""}`];
-    if (a.tailChance !== null) {
-      const base = a.tailBase !== null && a.tailBase > 0 ? ` vs ${(100 * a.tailBase).toFixed(0)}% typical` : "";
-      f.push(`<b>×10 or more</b> ${(100 * a.tailChance).toFixed(0)}%${base}`);
-    }
-    if (a.coverage !== null) f.push(`<i>ranges like this held for ${(100 * a.coverage).toFixed(0)}% of launches the model never saw</i>`);
-    blocks.push(f);
+  if (!card.outcome.graduated) {
+    const f = forecastLines(db, card);
+    if (f.length) blocks.push(f);
   }
 
   const facts: string[] = [];

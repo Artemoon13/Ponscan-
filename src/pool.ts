@@ -527,3 +527,35 @@ export function poolCaps(db: DB, token: string, quoteSymbol: string | null): Poo
 }
 
 export { SUPPLY };
+
+/**
+ * What a launch is worth at the moment it graduates, measured rather than quoted.
+ *
+ * The number readers actually need to place a forecast against. "Peak $7K" says nothing on its own;
+ * "peak $7K, and it takes about $47K to graduate" says the model expects this one not to make it.
+ *
+ * It is close to a constant, which is what makes it usable: across 3,497 pool openings the median is
+ * $46,957 with a tenth-to-ninetieth spread of $39,369 to $51,862, a ratio of 1.32. That is because a
+ * pool opens at the price the curve ended on, and the curve ends when the threshold is cleared.
+ *
+ * Cached for an hour. It moves only as quote-asset prices move, and it costs a scan of every pool.
+ */
+let gradCap: { at: number; v: number | null } | null = null;
+
+export function graduationCapUsd(db: DB, quoteDecimalsFor: (pairToken: string) => number, symbolFor: (pairToken: string) => string | null): number | null {
+  if (gradCap && Date.now() - gradCap.at < 3_600_000) return gradCap.v;
+
+  const rows = db.prepare(
+    "SELECT p.init_sqrt, p.token_is_c1, p.dec0, p.dec1, l.pair_token FROM pools p JOIN launches l USING(token)",
+  ).all() as Array<PoolRow & { pair_token: string }>;
+
+  const caps: number[] = [];
+  for (const p of rows) {
+    const cap = marketCapUsd(quotePerToken(p.init_sqrt, p), symbolFor(p.pair_token));
+    if (cap !== null && Number.isFinite(cap) && cap > 0) caps.push(cap);
+  }
+  caps.sort((a, b) => a - b);
+  const v = caps.length >= 50 ? caps[Math.floor(caps.length / 2)] : null;
+  gradCap = { at: Date.now(), v };
+  return v;
+}

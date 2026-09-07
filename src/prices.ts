@@ -75,7 +75,12 @@ export function formatUsd(v: number | null): string {
   if (v === null) return "—";
   if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
   if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  if (v >= 1e3) return `$${Math.round(v / 1e3)}K`;
+  // A decimal below $100K, because that is where these numbers live and rounding to whole thousands
+  // made distinct values print identically: a $6,600 estimate and a $7,400 upper bound both read
+  // "$7K", so a range appeared to have its own midpoint sitting on its edge.
+  if (v >= 1e5) return `$${Math.round(v / 1e3)}K`;
+  // A trailing ".0" is noise, so $47.0K prints as $47K while $6.8K keeps the digit that matters.
+  if (v >= 1e3) return `$${(v / 1e3).toFixed(1).replace(/\.0$/, "")}K`;
   return `$${Math.round(v)}`;
 }
 
