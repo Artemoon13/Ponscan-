@@ -528,15 +528,29 @@ const server = createServer(async (req, res) => {
         const sum = (rows: typeof bars, f: (b: typeof bars[number]) => number) => rows.reduce((a, b) => a + f(b), 0);
         const toUsd = (raw: number) => (usdPer === null ? null : raw * scale * usdPer);
 
+        // A six-hour window, which is only answerable because this coin keeps bars. Quoting a change
+        // "since the pool opened" was the honest thing to say when there was no series; there is one
+        // now, and six hours is what a reader of a price actually wants.
+        const last = series.length ? series[series.length - 1] : null;
+        const sixFrom = bars[bars.length - 1].last_block - Math.round(BLOCKS_PER_DAY / 4);
+        const older = series.find((s) => s.b >= sixFrom) ?? series[0];
+        const change6h = last && older && older.usd
+          ? { pct: ((last.usd as number) / (older.usd as number) - 1) * 100, from: older.usd as number }
+          : null;
+
+        // Uniswap's tick, from the price rather than from storage: the pool quotes 1.0001^tick, so
+        // the log recovers it without keeping another column.
+        const px = quotePerToken(bars[bars.length - 1].close_sqrt, pr);
+        const tick = px > 0 ? Math.round(Math.log(px) / Math.log(1.0001)) : null;
+
         return {
           bars: series,
           swapsAll: sum(bars, (b) => b.swaps),
           swaps24h: sum(recent, (b) => b.swaps),
           vol24hUsd: toUsd(sum(recent, (b) => Number(b.vol_quote))),
           volAllUsd: toUsd(sum(bars, (b) => Number(b.vol_quote))),
-          fees24hUsd: toUsd(sum(recent, (b) => Number(b.fee_quote))),
-          feesAllUsd: toUsd(sum(bars, (b) => Number(b.fee_quote))),
-          feesAllQuote: sum(bars, (b) => Number(b.fee_quote)) * scale,
+          change6h,
+          tick,
           coveredTo: bars[bars.length - 1].last_block,
         };
       })(),

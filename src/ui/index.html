@@ -298,6 +298,29 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .flow .s b{display:block;margin-top:12px;font-size:13.5px}
 .flow .s span{display:block;margin-top:3px;font-size:12px;color:var(--t55);line-height:1.45}
 .flow .s .val{display:block;margin-top:7px;font:600 12.5px var(--mono);color:var(--lime)}
+/* A heading with its aside beside it, the way the design sets them: no bullet, the qualifier in
+   mono on the same baseline rather than wrapped onto its own line. */
+.h2r{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:38px 0 0}
+.h2r h2{margin:0;font:700 20px Geist,sans-serif;letter-spacing:-.02em;color:var(--ink)}
+.h2r .q{font:11.5px var(--mono);color:var(--t45)}
+/* One rule running the width of the flow with the numbered boxes sitting on it. Drawing a segment
+   between each pair instead left four stubs that stopped short of the last step. */
+.flow2{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:18px}
+.flow2 .rule{position:absolute;left:22px;right:8px;top:22px;height:1px;background:var(--l15)}
+.flow2 .s{position:relative;padding-right:16px}
+.flow2 .s .n{position:relative;z-index:1;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--l15);border-radius:8px;background:var(--bg);font:600 12px var(--mono);color:var(--lime)}
+.flow2 .s b{display:block;margin-top:14px;font-size:13.5px;font-weight:600}
+.flow2 .s em{display:block;margin-top:4px;font-size:12px;color:var(--t55);line-height:1.45;font-style:normal}
+.flow2 .s .val{display:block;margin-top:8px;font:600 12.5px var(--mono);color:var(--lime)}
+@media (max-width:820px){.flow2{grid-template-columns:1fr 1fr;row-gap:22px}.flow2 .rule{display:none}}
+/* The ledger reads as a statement: when, what, how much. */
+.ldg{display:flex;flex-direction:column;margin-top:16px}
+.ldg .r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:baseline;padding:9px 0;border-top:1px solid var(--l06);font:11.5px var(--mono)}
+.ldg .r:first-child{border-top:0}
+.ldg .r .w{color:var(--t45);white-space:nowrap}
+.ldg .r .d{color:var(--t55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ldg .r .a{color:var(--ink);font-weight:600;text-align:right;white-space:nowrap}
+.ldg .note{margin-top:14px;font:11.5px var(--mono);color:var(--t35);line-height:1.55}
 .card2{border:1px solid var(--l08);border-radius:10px;background:var(--bg2);padding:16px 18px}
 .card2 .top{display:flex;align-items:center;gap:11px}
 .card2 .top .lg{width:38px;height:38px;border-radius:9px;background:var(--lime);color:#111;display:flex;align-items:center;justify-content:center;font:700 16px Geist,sans-serif;margin:0}
@@ -816,25 +839,22 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <div class="chart"><div id="coin-chart"></div><div class="ax" id="coin-ax"></div></div>
         <div class="rng" id="coin-rng"></div>
 
-        <div class="prose">
-          <h2><span class="n">&middot;</span>Where the fee goes</h2>
-          <p>Every trade in the pool pays a fee, the pons hook routes the creator's share on-chain, and it lands wherever the launch pointed it. That routing is fixed at launch and is public, so this is read from the launch itself rather than from anyone's word about it.</p>
-        </div>
-        <div class="flow" id="coin-fee"></div>
+        <div class="h2r"><h2>Where the fee goes</h2><span class="q">the only thing wired into this coin</span></div>
+        <div class="flow2" id="coin-fee"></div>
 
-        <div class="cols2" style="margin-top:34px;gap:32px;grid-template-columns:1fr 1fr">
-          <div class="prose" style="margin:0">
-            <h2 style="margin:0"><span class="n">&middot;</span>Why this coin exists</h2>
-            <p>The board runs on a node and a model that costs money to retrain every night. Rather than sell a subscription, the plan is a coin launched on the same factory the board watches, with its creator fee pointed at the cost of running it. Trading it is how the board stays free.</p>
-            <p>That is the whole arrangement. No roadmap for the token itself, no unlock, no share of anything, and nobody holding a reserved allocation.</p>
+        <div class="cols2" style="margin-top:38px;gap:36px;grid-template-columns:1fr 1fr">
+          <div>
+            <div class="h2r" style="margin-top:0"><h2>Why this coin exists</h2></div>
+            <div class="prose">
+              <p>The board runs on a node and a model that costs money to retrain every night. Rather than sell a subscription, the plan is a coin launched on the same factory the board watches, with its creator fee pointed at the cost of running it. Trading it is how the board stays free.</p>
+              <p>That is the whole arrangement. No roadmap for the token itself, no unlock, no share of anything, and nobody holding a reserved allocation.</p>
+              <p style="color:var(--t45);font-size:12.5px">Holders and pool liquidity are not on this page. Holders would need every transfer indexed; liquidity would need each position's range, and a guess at that here is the last thing worth shipping. Everything shown is read from the chain and exact.</p>
+            </div>
           </div>
-          <div class="prose" style="margin:0">
-            <h2 style="margin:0"><span class="n">&middot;</span>Fee ledger</h2>
-            <div class="ship" id="coin-ledger" style="margin-top:14px"></div>
-            <p id="coin-ledger-note" style="font-size:12.5px;color:var(--t45)"></p>
-            <h2><span class="n">&middot;</span>Not on this page</h2>
-            <p>No holder count and no liquidity figure. Holders would need every transfer indexed; liquidity would need each position's range, and a guess at that on the page people check before buying is the last thing worth shipping.</p>
-            <p>Everything else is read here and is exact: price and volume from the pool's own swaps, and creator fees from the hook's sweeps, which is where pons actually pays them. The two above say so rather than showing a number nobody measured.</p>
+          <div>
+            <div class="h2r" style="margin-top:0"><h2>Fee ledger</h2><span class="q" id="coin-ledger-since"></span></div>
+            <div class="ldg" id="coin-ledger"></div>
+            <div class="note" id="coin-ledger-note" style="font:11.5px var(--mono);color:var(--t35);line-height:1.55;margin-top:14px"></div>
           </div>
         </div>
       </div>
@@ -856,157 +876,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
   </div>
 </section>
 
-<section id="page-board" hidden>
-  <div class="board" id="board">
-    <div class="list">
-      <div class="lhead"><b>Fresh launches</b><span class="m" id="lh-m">—</span><span class="live" id="lh-live"><span class="dot"></span>LIVE</span></div>
-      <div class="stale" id="stale"></div>
-      <div class="filters">
-        <span class="f on" data-f="All">All</span>
-        <span class="f" data-f="Top decile">Top decile</span>
-        <span class="f" data-f="Repeat creators">Repeat creators</span>
-        <span class="f" data-f="ETH-quoted">ETH-quoted</span>
-        <span class="f mono" id="gear" title="score threshold and time window">⚙ settings</span>
-        <span class="shown" id="shown"></span>
-        <div class="spacer"></div>
-        <span class="f mono" id="m-score" title="ranked by score">by chance</span>
-        <span class="f mono" id="m-new" title="newest first, rank still by score">newest</span>
-        <span class="f mono" id="pause">⏸ pause</span>
-      </div>
-      <div class="settings" id="settings" hidden>
-        <label for="s-min">Show only at or above <input type="number" id="s-min" min="0" max="99" step="0.5"> % chance</label>
-        <label for="s-win">Window <select id="s-win"><option value="1">1 hour</option><option value="3">3 hours</option><option value="6">6 hours</option><option value="12">12 hours</option><option value="24">24 hours</option></select></label>
-        <span class="f mono" id="s-reset">Reset</span>
-        <span class="sfoot" id="s-foot"></span>
-      </div>
-      <div class="cols"><span>Time</span><span>Token</span><span class="r">Grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r" title="the highest any earlier launch by this creator ever reached">Dev ATH</span><span class="r">Age</span></div>
-      <div class="rows" id="rows"></div>
-      <div class="empty" id="empty" hidden></div>
-    </div>
-    <div class="divider" id="divider" title="Drag to resize"><i></i></div>
-    <div class="panel" id="panel"><div class="empty">Click a launch to open its card</div></div>
-  </div>
-</section>
 
-<!-- ───────────── MODEL ───────────── -->
-<section id="page-model" hidden>
-  <div class="page">
-    <div class="ph"><h2>Model</h2><span class="m" id="mo-h">—</span></div>
-    <div class="pipe" id="pipe"></div>
-    <div class="metrics" id="metrics"></div>
-    <div class="two2">
-      <div class="pane"><div class="k">Feature influence · mean |contribution| on the current board</div><div id="imp"></div></div>
-      <div class="pane"><div class="k">Live scoreboard · claims written before the outcome existed</div><div class="log" id="livelog"></div></div>
-    </div>
-    <p class="honest" id="honest"></p>
-  </div>
-</section>
-
-<!-- ───────────── TOKEN ───────────── -->
-<section id="page-token" hidden>
-  <div class="doc">
-    <div id="coin-standin"></div>
-    <div class="coinhd" id="coin-crumb">coin</div>
-    <div class="coinpx"><b id="coin-px">&mdash;</b><span class="w" id="coin-fdv"></span></div>
-
-    <div class="strip" id="coin-strip"></div>
-
-    <div class="cols2">
-      <div>
-        <div class="prose">
-          <h2><span class="n">&middot;</span>Where the fee goes</h2>
-          <p>Every trade in the pool pays a fee, the pons hook routes the creator's share on-chain, and it lands wherever the launch pointed it. That routing is set at launch and is public; this is read from the launch itself, not from anyone's word about it.</p>
-        </div>
-        <div class="feeflow" id="coin-fee"></div>
-
-        <div class="prose">
-          <h2><span class="n">&middot;</span>What this page does not show</h2>
-          <p>No holder count, no liquidity, no 24-hour volume, and no price chart. None of those are indexed: the swap stream is folded to a running high, low and last per pool the moment it is read, because 3.4 million swaps a day pass through the singleton and keeping them all is what the disk cannot afford. Everything above comes from the launch record and that fold. A page people check before buying is the last place to start estimating.</p>
-        </div>
-      </div>
-
-      <div style="display:flex;flex-direction:column;gap:16px">
-        <div class="verify">
-          <h3>Verify before you buy</h3>
-          <div style="font:12px Geist,sans-serif;color:var(--t55)">Match the address, not the name. Nothing on this site asks you to connect a wallet.</div>
-          <div id="coin-verify"></div>
-          <div class="note">Every other address carrying this name is not ours.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="page-board" hidden>
-  <div class="board" id="board">
-    <div class="list">
-      <div class="lhead"><b>Fresh launches</b><span class="m" id="lh-m">—</span><span class="live" id="lh-live"><span class="dot"></span>LIVE</span></div>
-      <div class="stale" id="stale"></div>
-      <div class="filters">
-        <span class="f on" data-f="All">All</span>
-        <span class="f" data-f="Top decile">Top decile</span>
-        <span class="f" data-f="Repeat creators">Repeat creators</span>
-        <span class="f" data-f="ETH-quoted">ETH-quoted</span>
-        <span class="f mono" id="gear" title="score threshold and time window">⚙ settings</span>
-        <span class="shown" id="shown"></span>
-        <div class="spacer"></div>
-        <span class="f mono" id="m-score" title="ranked by score">by chance</span>
-        <span class="f mono" id="m-new" title="newest first, rank still by score">newest</span>
-        <span class="f mono" id="pause">⏸ pause</span>
-      </div>
-      <div class="settings" id="settings" hidden>
-        <label for="s-min">Show only at or above <input type="number" id="s-min" min="0" max="99" step="0.5"> % chance</label>
-        <label for="s-win">Window <select id="s-win"><option value="1">1 hour</option><option value="3">3 hours</option><option value="6">6 hours</option><option value="12">12 hours</option><option value="24">24 hours</option></select></label>
-        <span class="f mono" id="s-reset">Reset</span>
-        <span class="sfoot" id="s-foot"></span>
-      </div>
-      <div class="cols"><span>Time</span><span>Token</span><span class="r">Grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r" title="the highest any earlier launch by this creator ever reached">Dev ATH</span><span class="r">Age</span></div>
-      <div class="rows" id="rows"></div>
-      <div class="empty" id="empty" hidden></div>
-    </div>
-    <div class="divider" id="divider" title="Drag to resize"><i></i></div>
-    <div class="panel" id="panel"><div class="empty">Click a launch to open its card</div></div>
-  </div>
-</section>
-
-<!-- ───────────── MODEL ───────────── -->
-<section id="page-model" hidden>
-  <div class="page">
-    <div class="ph"><h2>Model</h2><span class="m" id="mo-h">—</span></div>
-    <div class="pipe" id="pipe"></div>
-    <div class="metrics" id="metrics"></div>
-    <div class="two2">
-      <div class="pane"><div class="k">Feature influence · mean |contribution| on the current board</div><div id="imp"></div></div>
-      <div class="pane"><div class="k">Live scoreboard · claims written before the outcome existed</div><div class="log" id="livelog"></div></div>
-    </div>
-    <p class="honest" id="honest"></p>
-  </div>
-</section>
-
-<!-- ───────────── TOKEN ───────────── -->
-<section id="page-token" hidden>
-  <div class="page narrow">
-    <div class="tok-hd"><span class="coin">P</span><h2>$POOLITZER</h2><span class="pill">pons v2 · Robinhood Chain</span></div>
-    <div class="contract lg"><span class="k">contract</span><span class="addr" style="color:var(--t45)">not launched, so there is no address to show</span></div>
-    <div class="tiles4">
-      <div class="tile"><div class="k">Status</div><div class="v" style="color:var(--t45)">not launched</div><div class="s">this page fills in from the chain when it is</div></div>
-      <div class="tile"><div class="k">Score at launch</div><div class="v" style="color:var(--t45)">—</div><div class="s">will be logged before the outcome</div></div>
-      <div class="tile"><div class="k">Creator self-buy</div><div class="v" style="color:var(--t45)">—</div><div class="s">from the launch tx</div></div>
-      <div class="tile"><div class="k">Creator tax</div><div class="v" style="color:var(--t45)">—</div><div class="s">from the launch tx</div></div>
-    </div>
-    <div class="facts">
-      <div class="hd">Launch facts · same card as every other token</div>
-      <div class="fact"><span class="k">Launch tx</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
-      <div class="fact"><span class="k">Creator (tx.from)</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
-      <div class="fact"><span class="k">Called via</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
-      <div class="fact"><span class="k">Self-buy</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
-      <div class="fact"><span class="k">Exempt wallets</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
-      <div class="fact"><span class="k">Fee recipient</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
-      <div class="fact"><span class="k">Graduation tx</span><span class="v" style="color:var(--t45)">—</span><span></span></div>
-    </div>
-    <p class="honest">Only an address shown here, read from the factory's <code>TokenLaunched</code> log, will ever be ours. The tool is MIT and needs no token to run.</p>
-  </div>
-</section>
 
 </div>
 
@@ -1599,10 +1469,12 @@ async function loadCoin() {
   // Change is measured from the opening price, not from a rolling window: no price series survives
   // graduation, so "last 24h" is not something this can honestly claim.
   const ch = $("coin-ch");
-  if (d.pool && d.pool.openUsd && d.pool.lastUsd !== null) {
-    const r = d.pool.lastUsd / d.pool.openUsd;
-    ch.textContent = (r >= 1 ? "+" : "") + ((r - 1) * 100).toFixed(1) + "% since the pool opened";
-    ch.className = "ch " + (r >= 1 ? "up" : "dn");
+  const c6 = d.pool2 && d.pool2.change6h;
+  if (c6 && px !== null) {
+    const was = c6.from / d.supply;
+    ch.textContent = (c6.pct >= 0 ? "+" : "") + c6.pct.toFixed(1) + "%  \u00b7  " +
+      (px - was >= 0 ? "+" : "\u2212") + Math.abs(px - was).toPrecision(2) + "  last 6 hours";
+    ch.className = "ch " + (c6.pct >= 0 ? "up" : "dn");
   } else ch.textContent = "";
 
   $("coin-fdv").textContent = d.pool && d.pool.lastUsd !== null
@@ -1611,31 +1483,42 @@ async function loadCoin() {
   const cell = (k, v, dim) => '<div><div class="k">' + k + '</div><div class="v' + (dim ? " dim" : "") + '">' + v + "</div></div>";
   const p2 = d.pool2;
   $("coin-strip").innerHTML =
+    cell("Creator fees", d.fees && d.fees.usd !== null ? usd(d.fees.usd) : "\u2014") +
     cell("24h volume", p2 && p2.vol24hUsd !== null ? usd(p2.vol24hUsd) : "\u2014") +
     cell("24h swaps", p2 ? p2.swaps24h.toLocaleString() : "\u2014") +
     cell("Peak", d.pool ? usd(d.pool.peakUsd) : "\u2014") +
-    cell("Opened at", d.pool ? usd(d.pool.openUsd) : "\u2014") +
     cell("Pool", "Uniswap v4") +
-    cell("Creator fees", d.fees && d.fees.usd !== null ? usd(d.fees.usd) : "\u2014");
+    cell("Tick", p2 && p2.tick !== null ? String(p2.tick) : "\u2014");
 
   drawCoinChart(d);
 
   const tax = d.creatorTaxBps === null ? "unknown" : (d.creatorTaxBps / 100).toFixed(2) + "%";
-  const step = (n, b, sp, v) => '<div class="s"><span class="n">' + n + '</span><b>' + b + "</b><span>" + sp + '</span><span class="val">' + v + "</span></div>";
-  $("coin-fee").innerHTML =
-    step("01", "Swap", "every trade in the pool", esc(tax) + " creator fee") +
-    step("02", "pons hook", "routes the creator fee on-chain", esc(short(d.token))) +
-    step("03", "Recipient", "set at launch, public", d.feeRecipient ? esc(short(d.feeRecipient)) : "not declared") +
-    step("04", "Graduation", "the bar it had to clear", d.threshold ? esc(d.threshold) + " " + esc(d.quoteSymbol) : "\u2014");
+  const step = (n, b, sp, v) => '<div class="s"><span class="n">' + n + "</span><b>" + b + "</b><em>" + sp + '</em><span class="val">' + v + "</span></div>";
+  $("coin-fee").innerHTML = '<span class="rule"></span>' +
+    step("01", "swap", "every trade in the pool", esc(tax) + " creator fee") +
+    step("02", "pons hook", "accrues it off-pool, then sweeps", esc(short(d.token))) +
+    step("03", "recipient", "set at launch, public", d.feeRecipient ? esc(short(d.feeRecipient)) : "not declared") +
+    step("04", "swept so far", d.fees ? d.fees.sweeps.toLocaleString() + " sweeps to date" : "nothing read yet",
+      d.fees ? d.fees.quote.toFixed(3) + " " + esc(d.quoteSymbol) : "\u2014");
 
   const fees = d.fees;
+  // Each sweep is dated from its block: the chain runs at a known rate, so a block number converts
+  // to a time without another request, and a date reads better than a block does.
+  const SEC_PER_BLOCK = 86400 / 856582;
+  const headBlock = d.pool2 ? d.pool2.coveredTo : null;
+  const when = (b) => {
+    if (headBlock === null) return "block " + b.toLocaleString();
+    const dt = new Date(Date.now() - (headBlock - b) * SEC_PER_BLOCK * 1000);
+    return dt.toISOString().slice(5, 10).replace("-", "/") + " \u00b7 " + dt.toISOString().slice(11, 16);
+  };
   $("coin-ledger").innerHTML = fees && fees.recent.length
-    ? fees.recent.map((s) => '<div class="r"><i>\u2713</i><b>block ' + s.block.toLocaleString() +
-        "</b><span>" + s.quote.toFixed(4) + " " + esc(d.quoteSymbol) + "</span></div>").join("")
-    : '<div class="r no"><i>\u00b7</i><b>no sweeps read yet</b><span></span></div>';
+    ? fees.recent.map((s) => '<div class="r"><span class="w">' + when(s.block) +
+        '</span><span class="d">creator fee swept</span><span class="a">' +
+        s.quote.toFixed(4) + " " + esc(d.quoteSymbol) + "</span></div>").join("")
+    : '<div class="r"><span class="w">\u2014</span><span class="d">no sweeps read yet</span><span class="a"></span></div>';
+  $("coin-ledger-since").textContent = fees ? fees.sweeps.toLocaleString() + " sweeps to date" : "";
   $("coin-ledger-note").textContent = fees
-    ? fees.sweeps.toLocaleString() + " sweeps, " + fees.quote.toFixed(6) + " " + d.quoteSymbol +
-      " to the creator so far. Read from the hook rather than from the swaps: the pool's own fee is zero on every one."
+    ? fees.quote.toFixed(6) + " " + d.quoteSymbol + " to the creator so far. Read from the hook, not from the swaps: the pool's own fee is zero on every one of them."
     : "";
 
   $("coin-lg").textContent = sym.replace(/^\$/, "").slice(0, 1).toUpperCase();
