@@ -465,6 +465,37 @@ const server = createServer(async (req, res) => {
       })(),
 
       /**
+       * What the creator has actually earned, read from the hook's sweeps.
+       *
+       * Not from the swaps: the pool's own fee is zero on every one of them, because pons accrues in
+       * its hook and sweeps periodically. Checkable against the token's public pons page, which is
+       * how the event was identified in the first place.
+       */
+      fees: (() => {
+        const pr = db.prepare("SELECT pool_id FROM pools WHERE token = ?").get(tok) as { pool_id: string } | undefined;
+        if (!pr) return null;
+        const all = db.prepare(
+          "SELECT count(*) n, coalesce(sum(CAST(fee_quote AS REAL)), 0) s FROM coin_sweeps WHERE pool_id = ?",
+        ).get(pr.pool_id) as { n: number; s: number };
+        if (!all.n) return null;
+        const usdPer = usdOf(q.symbol);
+        const toQuote = (raw: number) => raw / 10 ** dec;
+        const recent = db.prepare(
+          "SELECT block, fee_quote FROM coin_sweeps WHERE pool_id = ? ORDER BY block DESC LIMIT 6",
+        ).all(pr.pool_id) as Array<{ block: number; fee_quote: string }>;
+        return {
+          sweeps: all.n,
+          quote: toQuote(all.s),
+          usd: usdPer === null ? null : toQuote(all.s) * usdPer,
+          recent: recent.map((r) => ({
+            block: r.block,
+            quote: toQuote(Number(r.fee_quote)),
+            usd: usdPer === null ? null : toQuote(Number(r.fee_quote)) * usdPer,
+          })),
+        };
+      })(),
+
+      /**
        * The same thing after graduation, from the pool.
        *
        * These come from `coin_bars`, which exists only for this one coin: folding the whole swap

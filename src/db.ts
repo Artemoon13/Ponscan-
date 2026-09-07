@@ -168,6 +168,48 @@ CREATE TABLE IF NOT EXISTS coin_bars (
   PRIMARY KEY (pool_id, bucket)
 ) STRICT;
 
+-- Creator fees, as they are actually paid: in sweeps, not per swap.
+--
+-- The pool's own fee field is zero on every swap, which is what made this look unreadable at first.
+-- pons does not charge at the pool; its hook accrues and then sweeps, emitting one event per sweep
+-- keyed by pool id. Summed over one token's history the third word of that event came to 73.713673
+-- ETH against the 74.164802 the pons page reports, the gap being twelve sweeps outside the range
+-- read. So this is the number, and it is checkable against a public page.
+--
+-- Rows rather than a running total, because a ledger of recent sweeps is worth showing.
+CREATE TABLE IF NOT EXISTS coin_sweeps (
+  pool_id   TEXT NOT NULL,
+  block     INTEGER NOT NULL,
+  log_index INTEGER NOT NULL,
+  fee_quote TEXT NOT NULL,
+  other     TEXT NOT NULL,
+  PRIMARY KEY (pool_id, block, log_index)
+) STRICT;
+
+-- Telegram subscribers, and what has already been sent to each.
+--
+-- The bot is the one part of this project that talks to a third party, so what it may do is narrow
+-- by construction. A chat exists in this table only because someone sent /start from it, which is
+-- what keeps the promise on the Telegram page that the bot never messages anyone first. Nothing
+-- here identifies a person: a chat id is what Telegram hands us and all we can act on.
+CREATE TABLE IF NOT EXISTS tg_subs (
+  chat_id    INTEGER PRIMARY KEY,
+  min_score  REAL NOT NULL,
+  quiet      INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  last_at    INTEGER NOT NULL DEFAULT 0
+) STRICT;
+
+-- One alert per launch per chat, ever. A launch stays above the threshold for as long as it is in
+-- the window, so without this the same token would be re-sent on every pass.
+CREATE TABLE IF NOT EXISTS tg_sent (
+  chat_id INTEGER NOT NULL,
+  token   TEXT NOT NULL,
+  sent_at INTEGER NOT NULL,
+  PRIMARY KEY (chat_id, token)
+) STRICT;
+CREATE INDEX IF NOT EXISTS tg_sent_at ON tg_sent(sent_at);
+
 CREATE TABLE IF NOT EXISTS pools (
   token       TEXT PRIMARY KEY,
   pool_id     TEXT NOT NULL,

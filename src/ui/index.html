@@ -184,7 +184,7 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .doc{max-width:1180px;margin:0 auto;padding:44px 24px 88px}
 .doc h1{margin:0;font:700 44px/1 Geist,sans-serif;letter-spacing:-.035em}
 .doc .sub{margin-top:10px;font-size:14px;color:var(--t55)}
-.doc .cols2{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:48px;margin-top:44px;align-items:start}
+.doc .cols2{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:44px;margin-top:34px;align-items:start}
 @media (max-width:900px){.doc .cols2{grid-template-columns:1fr}}
 .prose{font-size:14.5px;line-height:1.65;color:var(--t78)}
 .prose p{margin:14px 0 0;text-wrap:pretty}
@@ -271,13 +271,13 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .coinhd{display:flex;align-items:center;gap:10px;font:11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
 .coinhd .st{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--lime)}
 .coinhd .st .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite}
-.coinpx{margin-top:14px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.coinpx{margin-top:16px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
 .coinpx b{font:700 44px var(--mono);letter-spacing:-.02em;color:var(--ink)}
 .coinpx .ch{font:600 15px var(--mono)}
 .coinpx .ch.up{color:var(--lime)}.coinpx .ch.dn{color:var(--red)}
 .coinpx .w{font:12px var(--mono);color:var(--t45)}
 .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));border:1px solid var(--l08);border-radius:9px;margin-top:24px;overflow:hidden}
-.strip div{padding:11px 14px;border-left:1px solid var(--l08)}
+.strip div{padding:13px 15px;border-left:1px solid var(--l08)}
 .strip div:first-child{border-left:0}
 .strip .k{font:500 9.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
 .strip .v{margin-top:5px;font:600 15px var(--mono);color:var(--ink)}
@@ -315,7 +315,7 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .verify .r .k{color:var(--t45)}
 .verify .r .v{color:var(--ink);overflow-wrap:anywhere}
 .verify .note{margin-top:12px;font:12.5px Geist,sans-serif;color:var(--t55);line-height:1.5}
-.notyet{margin-top:22px;border:1px solid rgba(232,184,58,.35);background:rgba(232,184,58,.07);border-radius:9px;padding:14px 16px;font-size:13.5px;color:var(--ink);line-height:1.55}
+.notyet{margin-top:0;margin-bottom:26px;border:1px solid rgba(232,184,58,.35);background:rgba(232,184,58,.07);border-radius:9px;padding:14px 16px;font-size:13.5px;color:var(--ink);line-height:1.55}
 .notyet b{color:var(--amber)}
 .settings{display:flex;align-items:center;gap:16px;padding:0 24px;height:42px;border-bottom:1px solid var(--l08);flex:none;font-size:11.5px;color:var(--t45);white-space:nowrap;overflow-x:auto}
 .settings label{display:flex;align-items:center;gap:7px;flex:none}
@@ -824,9 +824,12 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
             <p>That is the whole arrangement. No roadmap for the token itself, no unlock, no share of anything, and nobody holding a reserved allocation.</p>
           </div>
           <div class="prose" style="margin:0">
-            <h2 style="margin:0"><span class="n">&middot;</span>Not on this page</h2>
-            <p>No holder count, and no fee figure. Holders would need every transfer indexed. Fees are stranger: the pool's own fee is zero on every single swap, because the pons hook takes them rather than the pool, and without the hook's published interface there is no telling which of its events is a fee or whose it is.</p>
-            <p>Price, volume and swap counts are read from the pool itself and are exact. A page people check before buying is the last place to start estimating, so the two we cannot read say so rather than showing a number nobody measured.</p>
+            <h2 style="margin:0"><span class="n">&middot;</span>Fee ledger</h2>
+            <div class="ship" id="coin-ledger" style="margin-top:14px"></div>
+            <p id="coin-ledger-note" style="font-size:12.5px;color:var(--t45)"></p>
+            <h2><span class="n">&middot;</span>Not on this page</h2>
+            <p>No holder count and no liquidity figure. Holders would need every transfer indexed; liquidity would need each position's range, and a guess at that on the page people check before buying is the last thing worth shipping.</p>
+            <p>Everything else is read here and is exact: price and volume from the pool's own swaps, and creator fees from the hook's sweeps, which is where pons actually pays them. The two above say so rather than showing a number nobody measured.</p>
           </div>
         </div>
       </div>
@@ -1608,9 +1611,7 @@ async function loadCoin() {
     cell("Peak", d.pool ? usd(d.pool.peakUsd) : "\u2014") +
     cell("Opened at", d.pool ? usd(d.pool.openUsd) : "\u2014") +
     cell("Pool", "Uniswap v4") +
-    // The pool's own fee is zero on every swap: the pons hook takes it, and without the hook's ABI
-    // there is no telling which of its events is a fee or whose. Saying so beats a plausible number.
-    cell("Fees", "hook, not readable", true);
+    cell("Creator fees", d.fees && d.fees.usd !== null ? usd(d.fees.usd) : "\u2014");
 
   drawCoinChart(d);
 
@@ -1621,6 +1622,16 @@ async function loadCoin() {
     step("02", "pons hook", "routes the creator fee on-chain", esc(short(d.token))) +
     step("03", "Recipient", "set at launch, public", d.feeRecipient ? esc(short(d.feeRecipient)) : "not declared") +
     step("04", "Graduation", "the bar it had to clear", d.threshold ? esc(d.threshold) + " " + esc(d.quoteSymbol) : "\u2014");
+
+  const fees = d.fees;
+  $("coin-ledger").innerHTML = fees && fees.recent.length
+    ? fees.recent.map((s) => '<div class="r"><i>\u2713</i><b>block ' + s.block.toLocaleString() +
+        "</b><span>" + s.quote.toFixed(4) + " " + esc(d.quoteSymbol) + "</span></div>").join("")
+    : '<div class="r no"><i>\u00b7</i><b>no sweeps read yet</b><span></span></div>';
+  $("coin-ledger-note").textContent = fees
+    ? fees.sweeps.toLocaleString() + " sweeps, " + fees.quote.toFixed(6) + " " + d.quoteSymbol +
+      " to the creator so far. Read from the hook rather than from the swaps: the pool's own fee is zero on every one."
+    : "";
 
   $("coin-lg").textContent = sym.replace(/^\$/, "").slice(0, 1).toUpperCase();
   $("coin-name").textContent = "$" + sym.replace(/^\$/, "");

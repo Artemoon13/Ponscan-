@@ -31,6 +31,17 @@ export const TOPIC_POOL_SWAP = toEventSelector(
   "Swap(bytes32,address,int128,int128,uint160,uint128,int24,uint24)",
 );
 
+/**
+ * The pons hook's fee sweep, identified by matching its totals against a public page.
+ *
+ * Its signature is not published anywhere we can read, so it is pinned by topic rather than derived
+ * from a name. What is known is checkable: the event is keyed by pool id, and the third word of its
+ * data summed to 73.713673 ETH over one token's 319 sweeps against the 74.164802 ETH that token's
+ * pons page reports across 331. The gap is the twelve sweeps outside the block range read.
+ */
+export const TOPIC_HOOK_SWEEP =
+  "0x2f3c43579b9064b6f28edcf41608f3815792d274a56afe024359703cb4ea9b30" as const;
+
 const initAbi = [{
   type: "event", name: "Initialize", inputs: [
     { name: "id", type: "bytes32", indexed: true },
@@ -352,6 +363,10 @@ export async function indexCoinBars(
       liquidity  = excluded.liquidity,
       last_block = excluded.last_block`);
 
+  const sweepIns = db.prepare(
+    "INSERT INTO coin_sweeps (pool_id, block, log_index, fee_quote, other) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",
+  );
+
   let swaps = 0, chunks = 0, written = 0;
   let from = fromBlock;
   let width = chunk;
@@ -416,6 +431,40 @@ export async function indexCoinBars(
         throw e;
       }
     }
+    // Fees are swept, not charged per swap, so they come from the hook rather than the pool and are
+    // read over the same range in the same pass.
+    try {
+      const sweeps = (await withRetry(() => logsClient.request({
+        method: "eth_getLogs",
+        params: [{
+          address: ADDR.hook,
+          fromBlock: `0x${from.toString(16)}`,
+          toBlock: `0x${to.toString(16)}`,
+          topics: [TOPIC_HOOK_SWEEP, pool.poolId],
+        }],
+      } as never))) as RawLog[];
+      if (sweeps.length) {
+        db.exec("BEGIN");
+        try {
+          for (const l of sweeps) {
+            const d = String(l.data).slice(2);
+            if (d.length < 192) continue;
+            sweepIns.run(
+              pool.poolId, Number(l.blockNumber), Number(l.logIndex),
+              BigInt("0x" + d.slice(128, 192)).toString(),
+              BigInt("0x" + d.slice(0, 64)).toString(),
+            );
+          }
+          db.exec("COMMIT");
+        } catch (e) {
+          db.exec("ROLLBACK");
+          throw e;
+        }
+      }
+    } catch {
+      // A sweep read that fails leaves the bars alone; the next run covers the same range again.
+    }
+
     from = to + 1;
     onChunk?.(to, swaps);
   }
@@ -449,13 +498,29 @@ export function poolCaps(db: DB, token: string, quoteSymbol: string | null): Poo
   const open = cap(p.init_sqrt);
   const peak = cap(peakSqrt);
 
+  // `pool_peaks` is written by the chain-wide pass, which is millions of blocks behind head. Where a
+  // coin has its own bars they are current, and a day-old price on the page that quotes a price is
+  // the one number nobody should have to discount. This showed $1.28M for a token trading at $128K.
+  const bar = db.prepare(
+    "SELECT close_sqrt, hi_sqrt, lo_sqrt FROM coin_bars WHERE pool_id = ? ORDER BY bucket DESC LIMIT 1",
+  ).get(p.pool_id) as { close_sqrt: string; hi_sqrt: string; lo_sqrt: string } | undefined;
+  const fresh = bar ? cap(bar.close_sqrt) : null;
+
+  // The peak has to see both stores too, since each covers a range the other may not.
+  const barPeak = db.prepare(
+    `SELECT ${p.token_is_c1 ? "min(lo_sqrt)" : "max(hi_sqrt)"} s FROM coin_bars WHERE pool_id = ?`,
+  ).get(p.pool_id) as { s: string | null } | undefined;
+  const barPeakUsd = barPeak?.s ? cap(barPeak.s) : null;
+
+  const best = [peak, open, barPeakUsd].filter((v): v is number => v !== null);
+
   return {
     poolId: p.pool_id,
     openUsd: open,
     // The pool opens at the price the curve ended on, so that opening is itself a candidate peak for
     // a token nobody bought afterwards.
-    peakUsd: peak === null ? open : open === null ? peak : Math.max(peak, open),
-    lastUsd: cap(k.last_sqrt),
+    peakUsd: best.length ? Math.max(...best) : null,
+    lastUsd: fresh ?? cap(k.last_sqrt),
     peakBlock,
     swaps: k.swaps,
   };
