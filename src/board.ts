@@ -339,22 +339,28 @@ const server = createServer(async (req, res) => {
    * Optional on purpose: the repository ships without a logo, and a missing file is a 404 the page
    * handles by falling back to the plain lime square rather than a broken image.
    */
-  if (url.pathname === "/logo.png") {
-    const file = join(here, "ui", "logo.png");
+  /**
+   * The mark and the favicons cut from it by `npm run icon`.
+   *
+   * All optional: the repository can ship without a mark, and a missing file is a 404 the page
+   * handles by falling back to the plain lime square rather than a broken image. The small ones are
+   * cached hard because they change only when somebody replaces the logo, and every visitor fetches
+   * one before the page has finished drawing.
+   */
+  const ASSETS: Record<string, string> = {
+    "/logo.png": "logo.png",
+    "/icon-128.png": "icon-128.png",
+    "/icon-64.png": "icon-64.png",
+  };
+  const asset = ASSETS[url.pathname];
+  if (asset) {
+    const file = join(here, "ui", asset);
     if (!existsSync(file)) { res.writeHead(404).end(); return; }
-    res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=300" });
+    res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=86400" });
     res.end(readFileSync(file));
     return;
   }
 
-  /**
-   * The picture a chat app shows beside the link.
-   *
-   * Prefers a purpose-made card and falls back to the mark. Social previews crop to about 1.91:1, so
-   * a square mark loses its top and bottom in a wide card and is better shown in a small square one;
-   * which of those we ask for is decided below by which file is actually here. Dropping an og.png in
-   * is therefore the whole change needed to upgrade the preview later.
-   */
   if (url.pathname === "/og.png") {
     const file = [join(here, "ui", "og.png"), join(here, "ui", "logo.png")].find((f) => existsSync(f));
     if (!file) { res.writeHead(404).end(); return; }
