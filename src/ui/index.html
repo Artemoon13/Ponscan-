@@ -734,14 +734,49 @@ $("divider").addEventListener("mousedown", (e) => {
 });
 
 /* ── card ── */
+/**
+ * Opening a card also starts work the card cannot wait for.
+ *
+ * The server reads this launch's own curve before answering, but a creator's earlier curves are
+ * fetched in the background afterwards, six at a time. The reply is therefore a snapshot taken
+ * before that finishes, and the card used to keep it forever: the curves were read seconds later
+ * and the panel went on saying they were not, for as long as the reader left it open.
+ *
+ * So a card with reading still outstanding asks again, a few times, backing off. It stops as soon
+ * as nothing is outstanding, when the reader moves to another launch, or after the last attempt,
+ * and it never blocks the first render.
+ */
+const REFETCH_DELAYS_MS = [3000, 6000, 12000];
+
+async function fetchCard(token) {
+  const r = await fetch("/api/token/" + token);
+  if (!r.ok) throw new Error("card " + r.status);
+  return r.json();
+}
+
+function outstanding(d) {
+  const h = d && d.card && d.card.creatorHistory;
+  return h ? h.unread > 0 : false;
+}
+
 async function openCard(token) {
   S.sel = token;
   document.querySelectorAll(".row").forEach((r) => r.classList.toggle("sel", r.dataset.token === token));
   $("panel").innerHTML = '<div class="empty">loading the card and indexing its curve…</div>';
   let d;
-  try { const r = await fetch("/api/token/" + token); if (!r.ok) throw 0; d = await r.json(); } catch { $("panel").innerHTML = '<div class="empty">not found</div>'; return; }
+  try { d = await fetchCard(token); } catch { $("panel").innerHTML = '<div class="empty">not found</div>'; return; }
   if (S.sel !== token) return;
   S.card = d; renderCard();
+
+  for (const wait of REFETCH_DELAYS_MS) {
+    if (!outstanding(S.card) || S.sel !== token) return;
+    await new Promise((r) => setTimeout(r, wait));
+    if (S.sel !== token) return;
+    let next;
+    try { next = await fetchCard(token); } catch { return; }
+    if (S.sel !== token) return;
+    S.card = next; renderCard();
+  }
 }
 
 function gradeOf(n, g) {
@@ -821,7 +856,7 @@ function renderCard() {
       <div class="soc"><span class="k">Socials</span><span class="b">${hasX ? `<a href="${esc(soc.twitter)}" target="_blank" rel="noopener"><b>𝕏</b>Twitter ↗</a>` : ""}${hasWeb ? `<a href="${esc(soc.website)}" target="_blank" rel="noopener"><b>⌂</b>Website ↗</a>` : ""}${!hasX && !hasWeb ? '<span class="none">none declared</span>' : ""}</span></div>
       <div class="sec"><span class="k">Creator</span><span class="v">${L.creator ? L.creator : "—"}</span>${L.creator ? `<a href="${A(L.creator)}" target="_blank" rel="noopener">↗</a>` : ""}</div>
       <div class="stat3"><div><b>${H.priorLaunches}</b><span>launches before</span></div><div class="lime"><b>${H.priorGraduations}</b><span>graduated · ${rate}</span></div>
-        <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? (H.bestPeak.usd ? esc(H.bestPeak.usd) : "×" + H.bestPeak.multiple.toFixed(1)) : "—"}</b><span>${H.bestPeak ? "best peak · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread + " curves not read"}</span></div></div>
+        <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? (H.bestPeak.usd ? esc(H.bestPeak.usd) : "×" + H.bestPeak.multiple.toFixed(1)) : "—"}</b><span>${H.bestPeak ? "best peak · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread + (H.unread === 1 ? " curve not read" : " curves not read")}</span></div></div>
       ${bestList}
       ${past}
       <div class="sec"><span class="k">Trading on the curve</span></div>
