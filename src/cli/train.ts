@@ -44,7 +44,7 @@ const { buildAthDataset, fitAthModel } = await import("../model/ath.ts");
 const { writeFileSync: writeAth } = await import("node:fs");
 const athRows = buildAthDataset(db);
 console.log(`
-how high it climbs — a second model, on ${athRows.length} settled launches with a readable curve`);
+how high it climbs. A second model, on ${athRows.length} settled launches with a readable curve`);
 if (athRows.length < 300) {
   console.log(`  not enough yet. Curve trades are read per token; run: npm run curves`);
 } else {

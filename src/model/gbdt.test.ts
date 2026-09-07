@@ -157,7 +157,7 @@ test("a different seed produces a different model but a comparable one", () => {
   const auc = rocAuc(TEST.X.map((x) => predict(other, x)), TEST.y);
   assert.ok(
     auc > BAYES_AUC - 0.05,
-    `seed 7 held-out ROC-AUC ${auc.toFixed(3)} against a ceiling of ${BAYES_AUC.toFixed(3)} — the fit leans on the seed`,
+    `seed 7 held-out ROC-AUC ${auc.toFixed(3)} against a ceiling of ${BAYES_AUC.toFixed(3)}; the fit leans on the seed`,
   );
 });
 

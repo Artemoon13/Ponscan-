@@ -297,7 +297,11 @@ const server = createServer(async (req, res) => {
     model = loadModel();
     const hours = Number(url.searchParams.get("hours") ?? 6);
     const order: FeedOrder = url.searchParams.get("sort") === "new" ? "new" : "score";
-    const rows = model ? scoreRecent(db, model, hours, 150, order) : [];
+    // The reader's floor, as a probability. Clamped rather than trusted: a threshold at or above 1
+    // would empty the board and read as the feed being broken.
+    const minP = Math.min(0.99, Math.max(0, Number(url.searchParams.get("min") ?? 0) || 0));
+    const page = model ? scoreRecent(db, model, hours, 150, order, minP) : null;
+    const rows = page?.items ?? [];
     const now = Math.floor(Date.now() / 1000);
     const since = now - hours * 3600;
 
@@ -358,7 +362,9 @@ const server = createServer(async (req, res) => {
       // The feed is capped, and a list that silently hides two thousand launches reads as if it
       // were the whole window. The UI says so out loud, so this has to come back with it.
       shown: rows.length,
-      inWindow: rows.length ? rows[0].of : 0,
+      inWindow: page?.total ?? 0,
+      matched: page?.matched ?? 0,
+      minScore: minP,
       counts,
       items: rows.map((r) => ({ ...r, meta: byToken.get(r.token) ?? null })),
     });
@@ -408,5 +414,5 @@ const server = createServer(async (req, res) => {
 
 server.listen(CFG.boardPort, CFG.boardHost, () => {
   console.log(`poolitzer board on http://${CFG.boardHost}:${CFG.boardPort}`);
-  if (!model) console.log("no model yet — run: npm run train");
+  if (!model) console.log("no model yet. Run: npm run train");
 });

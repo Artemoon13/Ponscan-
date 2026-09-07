@@ -23,7 +23,7 @@ grade(db);
 const rows = settled(db);
 
 if (!rows.length) {
-  console.log("nothing settled yet — run the watcher for a few hours first: npm run watch");
+  console.log("nothing settled yet. Run the watcher for a few hours first: npm run watch");
   db.close();
   process.exit(0);
 }

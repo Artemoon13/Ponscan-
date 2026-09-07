@@ -21,7 +21,7 @@ console.log(`  fee redirects       ${c.feechg.toLocaleString()}`);
 console.log(`  span                ${new Date(span.a * 1000).toISOString()} .. ${new Date(span.b * 1000).toISOString()}`);
 
 const w = fullyEnrichedWindow(db);
-console.log(`\ntrainable window     ${w ? `${new Date(w.from * 1000).toISOString()} .. ${new Date(w.to * 1000).toISOString()}` : "none — run enrich-window"}`);
+console.log(`\ntrainable window     ${w ? `${new Date(w.from * 1000).toISOString()} .. ${new Date(w.to * 1000).toISOString()}` : "none. Run enrich-window"}`);
 
 console.log("\ntime from launch to graduation");
 const d = (db.prepare("SELECT g.ts - l.ts s FROM graduations g JOIN launches l USING(token) WHERE g.ts >= l.ts ORDER BY s").all() as Array<{ s: number }>).map((r) => r.s);

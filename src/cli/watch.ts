@@ -108,8 +108,8 @@ const dim = (s: string): string => `\x1b[2m${s}\x1b[0m`;
 const bold = (s: string): string => `\x1b[1m${s}\x1b[0m`;
 
 if (PLAIN) {
-  if (!model) console.log("no model at ./data/model.json — showing launches without a score (run: npm run train)\n");
-  else console.log(dim(`model ${MODEL_ID} — every score shown is logged before its outcome exists (npm run scoreboard)\n`));
+  if (!model) console.log("no model at ./data/model.json, so launches show without a score (run: npm run train)\n");
+  else console.log(dim(`model ${MODEL_ID}: every score shown is logged before its outcome exists (npm run scoreboard)\n`));
   const colour = (p: number): string => (p >= 0.06 ? "\x1b[32m" : p >= 0.03 ? "\x1b[33m" : "\x1b[2m");
   onItem = (it) => {
     console.log(`${colour(it.probability)}${(100 * it.probability).toFixed(1).padStart(5)}%\x1b[0m  #${String(it.rank).padStart(4)}/${it.of}  ${bold(it.sym.padEnd(10))} ${it.name.slice(0, 28).padEnd(28)} ${dim(EXPLORER.token(it.token))}`);
@@ -279,7 +279,7 @@ function openUrl(url: string): void {
 function seed(): void {
   if (!model) return;
   // The screen should not open empty: start from the newest launches already scored on the board.
-  for (const s of scoreRecent(db, model, 6, 24, "new")) { const it = itemFrom(s); it.born = 0; items.push(it); }
+  for (const s of scoreRecent(db, model, 6, 24, "new").items) { const it = itemFrom(s); it.born = 0; items.push(it); }
 }
 
 if (!PLAIN) {
@@ -289,7 +289,7 @@ if (!PLAIN) {
     process.stdout.write(frame().map((segs) => segs.map((s) => s.t).join("")).join("\n") + "\n");
     process.exit(0);
   }
-  if (!model) { console.log("no model at ./data/model.json — run: npm run train"); process.exit(1); }
+  if (!model) { console.log("no model at ./data/model.json. Run: npm run train"); process.exit(1); }
 
   onItem = (it) => {
     items.unshift(it);

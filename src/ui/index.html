@@ -150,6 +150,12 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .f.on{background:var(--lime);color:#111;border-color:var(--lime);font-weight:600}
 .f.mono{font:500 11px var(--mono)}
 .shown{font:11px var(--mono);color:var(--t4);margin-left:8px}
+.settings{display:flex;align-items:center;gap:16px;padding:0 24px;height:42px;border-bottom:1px solid var(--l08);flex:none;font-size:11.5px;color:var(--t45);white-space:nowrap;overflow-x:auto}
+.settings label{display:flex;align-items:center;gap:7px;flex:none}
+.settings input,.settings select{background:#0d0d0d;border:1px solid var(--l15);color:var(--ink);border-radius:4px;padding:4px 7px;font:500 11px var(--mono)}
+.settings input{width:58px}
+.settings input:focus,.settings select:focus{outline:2px solid var(--lime);outline-offset:1px;border-color:var(--lime)}
+.settings .sfoot{font:11px var(--mono);color:var(--t4);flex:none}
 .cols,.row{display:grid;grid-template-columns:52px 150px 88px 44px minmax(0,1fr) 84px 56px;gap:0 12px;padding:0 24px;align-items:center}
 .cols{height:32px;font:500 10px var(--mono);color:var(--t45);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--l08);flex:none}
 .cols .r,.row .r{text-align:right}
@@ -336,7 +342,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
     <a class="tokencard" href="#/token">
       <div style="min-width:0">
         <div class="hd"><span class="coin">P</span><b style="font-size:20px;letter-spacing:-.02em">$POOLITZER</b><span class="pill">pons v2 · Robinhood Chain</span><span style="font:500 11px var(--mono);color:var(--t55)">not launched yet</span></div>
-        <div class="contract"><span class="k">contract</span><span class="addr" style="color:var(--t45)">no address published — anything claiming to be $POOLITZER before one appears here is not ours</span></div>
+        <div class="contract"><span class="k">contract</span><span class="addr" style="color:var(--t45)">no address published. Anything claiming to be $POOLITZER before one appears here is not ours</span></div>
         <div style="margin-top:12px;font-size:12.5px;color:var(--t6);line-height:1.5">When it launches it will go through the same factory as every other token here, and this card will read the same on-chain facts as any other card. Until then there is nothing to buy.</div>
       </div>
       <div class="tiles">
@@ -395,11 +401,18 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <span class="f" data-f="Top decile">Top decile</span>
         <span class="f" data-f="Repeat creators">Repeat creators</span>
         <span class="f" data-f="ETH-quoted">ETH-quoted</span>
+        <span class="f mono" id="gear" title="score threshold and time window">⚙ settings</span>
         <span class="shown" id="shown"></span>
         <div class="spacer"></div>
         <span class="f mono" id="m-score" title="ranked by score">by chance</span>
         <span class="f mono" id="m-new" title="newest first, rank still by score">newest</span>
         <span class="f mono" id="pause">⏸ pause</span>
+      </div>
+      <div class="settings" id="settings" hidden>
+        <label for="s-min">Show only at or above <input type="number" id="s-min" min="0" max="99" step="0.5"> % chance</label>
+        <label for="s-win">Window <select id="s-win"><option value="1">1 hour</option><option value="3">3 hours</option><option value="6">6 hours</option><option value="12">12 hours</option><option value="24">24 hours</option></select></label>
+        <span class="f mono" id="s-reset">Reset</span>
+        <span class="sfoot" id="s-foot"></span>
       </div>
       <div class="cols"><span>Time</span><span>Token</span><span class="r">Grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r">Age</span></div>
       <div class="rows" id="rows"></div>
@@ -428,7 +441,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
 <section id="page-token" hidden>
   <div class="page narrow">
     <div class="tok-hd"><span class="coin">P</span><h2>$POOLITZER</h2><span class="pill">pons v2 · Robinhood Chain</span></div>
-    <div class="contract lg"><span class="k">contract</span><span class="addr" style="color:var(--t45)">not launched — no address to show</span></div>
+    <div class="contract lg"><span class="k">contract</span><span class="addr" style="color:var(--t45)">not launched, so there is no address to show</span></div>
     <div class="tiles4">
       <div class="tile"><div class="k">Status</div><div class="v" style="color:var(--t45)">not launched</div><div class="s">this page fills in from the chain when it is</div></div>
       <div class="tile"><div class="k">Score at launch</div><div class="v" style="color:var(--t45)">—</div><div class="s">will be logged before the outcome</div></div>
@@ -504,6 +517,10 @@ const S = {
   filter: "All", paused: false,
   order: localStorage.getItem("poolitzer.order") === "new" ? "new" : "score",
   known: new Set(), copiedSel: 0, panelW: Number(localStorage.getItem("poolitzer.panelW")) || 400,
+  // Kept as a percentage because that is the unit on screen; the API takes a probability.
+  minScore: Math.min(99, Math.max(0, Number(localStorage.getItem("poolitzer.minScore")) || 0)),
+  hours: [1, 3, 6, 12, 24].includes(Number(localStorage.getItem("poolitzer.hours"))) ? Number(localStorage.getItem("poolitzer.hours")) : 6,
+  settingsOpen: localStorage.getItem("poolitzer.settingsOpen") === "1",
 };
 
 /* ── routing ── */
@@ -529,7 +546,7 @@ function showHealth(h, d) {
   let cls = "", msg = "";
   if (!h || h.watcherSeenSecAgo === null || h.watcherSeenSecAgo > 120) {
     cls = "bad"; msg = !h || h.watcherSeenSecAgo === null
-      ? "The watcher has never reported in. Nothing here is live — start it with: npm run watch"
+      ? "The watcher has never reported in. Nothing here is live. Start it with: npm run watch"
       : `The watcher has not reported for ${mins(h.watcherSeenSecAgo)}. This list has stopped updating.`;
   } else if (h.behindSec !== null && h.behindSec > 120) { cls = "bad"; msg = `Running ${mins(h.behindSec)} behind the chain. Launches from the last ${mins(h.behindSec)} are missing.`; }
   else if (h.behindSec !== null && h.behindSec > 30) { cls = "warn"; msg = `Running ${mins(h.behindSec)} behind the chain, catching up.`; }
@@ -551,7 +568,7 @@ async function loadFeed() {
   if (S.paused && S.page === "board") return;
   feedInFlight = true;
   let d;
-  try { d = await (await fetch("/api/feed?hours=6&sort=" + S.order)).json(); }
+  try { d = await (await fetch(`/api/feed?hours=${S.hours}&sort=${S.order}&min=${S.minScore / 100}`)).json(); }
   catch { return; }
   finally { feedInFlight = false; }
   S.feed = d;
@@ -585,11 +602,17 @@ function renderBoard() {
   $("m-new").classList.toggle("on", S.order === "new");
   document.querySelectorAll(".f[data-f]").forEach((f) => f.classList.toggle("on", f.dataset.f === S.filter));
   $("pause").textContent = S.paused ? "▶ resume" : "⏸ pause";
-  $("shown").textContent = d.inWindow ? `showing ${d.shown} of ${d.inWindow.toLocaleString()} in the last 6h` : "";
+  const win = S.hours === 1 ? "hour" : S.hours + "h";
+  // Three numbers, because with a threshold set they are three different things: what is on screen,
+  // what cleared the threshold, and what actually launched.
+  $("shown").textContent = !d.inWindow ? ""
+    : S.minScore > 0
+      ? `showing ${d.shown} of ${d.matched.toLocaleString()} at or above ${S.minScore}% · ${d.inWindow.toLocaleString()} launched in the last ${win}`
+      : `showing ${d.shown} of ${d.inWindow.toLocaleString()} in the last ${win}`;
 
-  if (!d.hasModel) { $("rows").innerHTML = ""; $("empty").hidden = false; $("empty").textContent = "no model yet — run: npm run train"; return; }
+  if (!d.hasModel) { $("rows").innerHTML = ""; $("empty").hidden = false; $("empty").textContent = "no model yet. Run: npm run train"; return; }
   const items = d.items.filter(passes);
-  if (!items.length) { $("rows").innerHTML = ""; $("empty").hidden = false; $("empty").textContent = "nothing matches this filter in the last 6 hours"; return; }
+  if (!items.length) { $("rows").innerHTML = ""; $("empty").hidden = false; $("empty").textContent = S.minScore > 0 ? `nothing scored ${S.minScore}% or better in the last ${win}` : `nothing matches this filter in the last ${win}`; return; }
   $("empty").hidden = true;
 
   const first = S.known.size === 0;
@@ -615,6 +638,54 @@ function renderBoard() {
 
 $("rows").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) location.hash = "#/board/" + r.dataset.token; });
 document.querySelectorAll(".f[data-f]").forEach((f) => f.onclick = () => { S.filter = f.dataset.f; renderBoard(); });
+
+/* ── settings ── */
+/**
+ * Thresholds the reader sets, kept on their machine.
+ *
+ * The score floor and the window go to the server rather than being applied here, because the feed
+ * is capped at 150 rows: filtering a capped list only thins what already fit, so a floor applied in
+ * the browser would silently miss everything past the cap. The chips above stay client-side, since
+ * they narrow rather than reach.
+ */
+function syncSettings() {
+  $("settings").hidden = !S.settingsOpen;
+  $("gear").classList.toggle("on", S.settingsOpen);
+  if (document.activeElement !== $("s-min")) $("s-min").value = S.minScore;
+  $("s-win").value = String(S.hours);
+  const off = S.minScore === 0 && S.hours === 6;
+  $("s-foot").textContent = off ? "showing every launch" : "kept on this machine, nothing is sent anywhere";
+}
+
+let minTimer = 0;
+$("gear").onclick = () => {
+  S.settingsOpen = !S.settingsOpen;
+  localStorage.setItem("poolitzer.settingsOpen", S.settingsOpen ? "1" : "0");
+  syncSettings();
+};
+$("s-min").oninput = () => {
+  S.minScore = Math.min(99, Math.max(0, Number($("s-min").value) || 0));
+  localStorage.setItem("poolitzer.minScore", String(S.minScore));
+  syncSettings();
+  // Debounced: this fires on every keystroke, and each reload is a scored pass over the window.
+  clearTimeout(minTimer);
+  minTimer = setTimeout(loadFeed, 350);
+};
+$("s-win").onchange = () => {
+  S.hours = Number($("s-win").value);
+  localStorage.setItem("poolitzer.hours", String(S.hours));
+  syncSettings();
+  loadFeed();
+};
+$("s-reset").onclick = () => {
+  S.minScore = 0;
+  S.hours = 6;
+  localStorage.removeItem("poolitzer.minScore");
+  localStorage.removeItem("poolitzer.hours");
+  syncSettings();
+  loadFeed();
+};
+syncSettings();
 $("m-score").onclick = () => setOrder("score");
 $("m-new").onclick = () => setOrder("new");
 $("pause").onclick = () => { S.paused = !S.paused; renderBoard(); if (!S.paused) loadFeed(); };
@@ -657,7 +728,7 @@ function renderCard() {
   const g = gradeOf(H.priorLaunches, H.priorGraduations);
   const calledVia = L.selfBuy !== null ? "pons router · calldata decoded"
     : L.viaContract ? `${short(L.calledBy)} · calldata not decoded` : "not through the router · calldata not decoded";
-  const clusterTxt = C.total <= 1 ? "unique — no other launch used this ticker"
+  const clusterTxt = C.total <= 1 ? "unique, no other launch used this ticker"
     : `${C.kind === "swarm" ? "swarm" : "one wallet repeating"} · ${C.total} launches, ${C.graduated} reached the pool`;
   const feesTxt = k.fees.recipient ? `${short(k.fees.recipient)}${k.fees.redirected ? " · routed away from the launcher" : " (creator)"}` : "unknown";
   const soc = k.socials || {};
@@ -668,19 +739,19 @@ function renderCard() {
   // Their highest climbers across every curve of theirs that has been read, not just the recent ten.
   const bestList = (H.topPeaks && H.topPeaks.length)
     ? `<div class="thead"><span>Their best launches</span><span class="w">${(H.priorLaunches - H.unread) + "/" + H.priorLaunches + " read"}</span><span style="text-align:right">Peak reached</span><span></span></div>` +
-      H.topPeaks.map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.multiple >= 3 ? "g" : ""}">${(p.usd ? esc(p.usd) + " " : "") + "×" + p.multiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
+      H.topPeaks.map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.multiple >= 3 ? "g" : ""}">${p.usd ? esc(p.usd) : "×" + p.multiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
     : "";
   const past = H.recent.length
     ? `<div class="thead"><span>Earlier</span><span></span><span style="text-align:right">Peak reached</span><span></span></div>` +
-      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? (p.read ? "no trades" : "reading…") : (p.peakUsd ? esc(p.peakUsd) + " " : "") + "×" + p.peakMultiple.toFixed(2)}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
+      H.recent.slice(0, 5).map((p) => `<div class="trow"><b>${esc(p.symbol || short(p.token))}</b><span class="w">${ago(p.ts)} ago · ${p.graduated ? "reached the pool" : "did not"}</span><span class="o ${p.peakMultiple === null ? "n" : p.peakMultiple >= 3 ? "g" : ""}">${p.peakMultiple === null ? (p.read ? "no trades" : "reading…") : (p.peakUsd ? esc(p.peakUsd) : "×" + p.peakMultiple.toFixed(2))}</span><a href="${EXP}/token/${p.token}" target="_blank" rel="noopener">↗</a></div>`).join("")
     : `<div class="note">${H.priorLaunches === 0 ? "First launch from this wallet." : "No earlier launches on record."}</div>`;
 
   /* sections the design does not have, kept because the tool does */
-  const trading = !T.indexed ? `<div class="note">Trading on the curve not indexed yet — reopen the card in a moment.</div>` : `
+  const trading = !T.indexed ? `<div class="note">Trading on the curve not indexed yet. Reopen the card in a moment.</div>` : `
     ${fact("Trades", `${T.buys} buys · ${T.sells} sells`)}
     ${fact("Buyers", `${T.buyersTotal} total · <b>${T.buyersFirstMinute}</b> in the first minute`)}
     ${fact("Opening tax paid", T.snipers.length ? `${esc(T.snipeTaxTotal)} ${esc(L.quoteSymbol)} by ${new Set(T.snipers.map((x) => x.address)).size} wallet(s)` : "nobody raced the window")}
-    ${fact("Peak reached", T.peakMultiple === null ? "nothing has traded on the curve yet" : `${T.peakUsd ? esc(T.peakUsd) + " · " : ""}×${T.peakMultiple.toFixed(2)} above its first trade`)}
+    ${fact("Peak reached", T.peakMultiple === null ? "nothing has traded on the curve yet" : (T.peakUsd ? esc(T.peakUsd) : `×${T.peakMultiple.toFixed(2)} above its first trade`))}
     ${T.coBuyers.length ? `<div class="sec"><span class="k">Bought inside the launch tx</span></div><div class="list2">${T.coBuyers.map((b) => `<div class="li"><span><a href="${A(b.address)}" target="_blank" rel="noopener">${short(b.address)}</a></span><span class="m">${esc(b.amount)} ${esc(L.quoteSymbol)}</span></div>`).join("")}</div>` : ""}
     ${T.snipers.length ? `<div class="sec"><span class="k">Raced the 3-second window</span></div><div class="list2">${T.snipers.slice(0, 8).map((x) => `<div class="li"><span><a href="${A(x.address)}" target="_blank" rel="noopener">${short(x.address)}</a>${x.onExemptList ? '<span class="x r">on exempt list</span>' : ""}</span><span class="m">+${x.blocksAfterLaunch} blk · paid ${esc(x.tax)}</span></div>`).join("")}</div>` : ""}
     ${T.topWallets.length ? `<div class="sec"><span class="k">Biggest wallets, by money in</span></div><div class="list2">${T.topWallets.slice(0, 8).map((p) => `<div class="li"><span><a href="${A(p.address)}" target="_blank" rel="noopener">${short(p.address)}</a>${p.multiple !== null ? `<span class="x ${p.multiple >= 1 ? "l" : "r"}">×${p.multiple.toFixed(2)}</span>` : ""}</span><span class="m">in ${esc(p.inAmount)} · out ${esc(p.outAmount)}</span></div>`).join("")}</div>` : ""}`;
@@ -694,13 +765,13 @@ function renderCard() {
     <div class="ptop">
       <div class="bigs">
         <div class="big lime"><div class="k">Graduate</div><div class="v">${s ? pct(s.probability) : "—"}</div></div>
-        <div class="big line" title="${A_ && A_.available ? `Range, not a figure: the point estimate barely beats a constant. This 80% band covered ${(100 * A_.coverage).toFixed(0)}% of unseen launches; the model's rank correlation with the real peak is ${A_.spearman.toFixed(2)}.` : "Needs the peak model — run npm run curves then npm run train"}">
+        <div class="big line" title="${A_ && A_.available ? `Range, not a figure: the point estimate barely beats a constant. This 80% band covered ${(100 * A_.coverage).toFixed(0)}% of unseen launches; the model's rank correlation with the real peak is ${A_.spearman.toFixed(2)}.` : "Needs the peak model. Run npm run curves, then npm run train"}">
           <div class="k">Peak, likely range</div>
           <div class="v">${A_ && A_.available && A_.loUsd ? `${esc(A_.loUsd)}–${esc(A_.hiUsd)}` : A_ && A_.available ? `×${A_.loMultiple.toFixed(1)}–${A_.hiMultiple.toFixed(1)}` : "—"}</div>
         </div>
       </div>
       <div class="reasons">${reasons}</div>
-      <div class="subline">rank <b>#${s ? s.rank : "—"}</b> of ${s ? s.of.toLocaleString() : "—"} in the last 6h${A_ && A_.available ? ` · peak model expects <b>×${A_.multiple.toFixed(1)}</b>, 80% band` : ""}</div>
+      <div class="subline">rank <b>#${s ? s.rank : "—"}</b> of ${s ? s.of.toLocaleString() : "—"} in the last 6h${A_ && A_.available ? ` · peak model expects <b>${esc(A_.pointUsd || "×" + A_.multiple.toFixed(1))}</b>, 80% band` : ""}</div>
     </div>
     <div class="pbody">
       ${fact("Creator (tx.from)", L.creator ? short(L.creator) : "unknown", "", L.creator ? A(L.creator) : "")}
@@ -716,7 +787,7 @@ function renderCard() {
       <div class="soc"><span class="k">Socials</span><span class="b">${hasX ? `<a href="${esc(soc.twitter)}" target="_blank" rel="noopener"><b>𝕏</b>Twitter ↗</a>` : ""}${hasWeb ? `<a href="${esc(soc.website)}" target="_blank" rel="noopener"><b>⌂</b>Website ↗</a>` : ""}${!hasX && !hasWeb ? '<span class="none">none declared</span>' : ""}</span></div>
       <div class="sec"><span class="k">Creator</span><span class="v">${L.creator ? L.creator : "—"}</span>${L.creator ? `<a href="${A(L.creator)}" target="_blank" rel="noopener">↗</a>` : ""}</div>
       <div class="stat3"><div><b>${H.priorLaunches}</b><span>launches before</span></div><div class="lime"><b>${H.priorGraduations}</b><span>graduated · ${rate}</span></div>
-        <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? (H.bestPeak.usd ? esc(H.bestPeak.usd) : "×" + H.bestPeak.multiple.toFixed(1)) : "—"}</b><span>${H.bestPeak ? "best peak · ×" + H.bestPeak.multiple.toFixed(1) + " · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread ? "reading " + H.unread + " curves…" : "no peaks yet"}</span></div></div>
+        <div${H.bestPeak ? ' class="lime"' : ""}><b>${H.bestPeak ? (H.bestPeak.usd ? esc(H.bestPeak.usd) : "×" + H.bestPeak.multiple.toFixed(1)) : "—"}</b><span>${H.bestPeak ? "best peak · " + esc(H.bestPeak.symbol || short(H.bestPeak.token)) : H.unread ? "reading " + H.unread + " curves…" : "no peaks yet"}</span></div></div>
       ${bestList}
       ${past}
       <div class="sec"><span class="k">Trading on the curve</span></div>
@@ -764,12 +835,12 @@ async function loadModel() {
   const sc = live.thisModel.score, all = live.allModels.score;
   $("livelog").innerHTML = [
     row("this model", `${live.thisModel.n} claims settled`),
-    sc ? row("top decile", `${sc.topDecileHits} of ${sc.topDecileN} graduated · ${sc.topDecileLift.toFixed(2)}× base`, sc.topDecileLift >= 2 ? "lime" : sc.topDecileLift >= 1 ? "amb" : "red") : row("top decile", "fewer than 20 settled claims — nothing to report yet", "amb"),
+    sc ? row("top decile", `${sc.topDecileHits} of ${sc.topDecileN} graduated · ${sc.topDecileLift.toFixed(2)}× base`, sc.topDecileLift >= 2 ? "lime" : sc.topDecileLift >= 1 ? "amb" : "red") : row("top decile", "fewer than 20 settled claims, so nothing to report yet", "amb"),
     sc ? row("ROC-AUC", sc.rocAuc.toFixed(3), sc.rocAuc >= 0.6 ? "lime" : sc.rocAuc >= 0.55 ? "amb" : "red") : "",
     sc ? row("base rate", (100 * sc.baseRate).toFixed(2) + "%") : "",
     row("all models", `${live.allModels.n} settled${all ? " · " + all.topDecileLift.toFixed(2) + "× top decile" : ""}`),
     row("pending", `${live.pending} claims inside the 4-hour horizon`),
-    row("check it", `npm run verify — exports the log and recomputes these from the file`, "lime"),
+    row("check it", `npm run verify, which exports the log and recomputes these from the file`, "lime"),
   ].join("");
   $("honest").textContent = v
     ? `Honest note: across ${v.folds.length} rolling-origin folds the top decile graduated at ${v.decile.mean.toFixed(2)}× the base rate on average, ` +

@@ -22,7 +22,7 @@ const justGraded = grade(db);
 const rows = settled(db, pick("model"));
 const outstanding = pending(db);
 
-console.log("\npoolitzer scoreboard — scores recorded before the outcome was known\n");
+console.log("\npoolitzer scoreboard: scores recorded before the outcome was known\n");
 
 if (!rows.length) {
   console.log(`  nothing settled yet: ${outstanding} claims still inside the ${HORIZON_SEC / 3600}h horizon.`);
@@ -48,7 +48,7 @@ for (const era of eras) {
   console.log(`model ${era}   ${from} .. ${to} UTC`);
 
   if (!s) {
-    console.log(`  ${mine.length} settled claims — too few to score, needs 20\n`);
+    console.log(`  ${mine.length} settled claims, too few to score; needs 20\n`);
     continue;
   }
 

@@ -25,7 +25,7 @@ const steps: Array<[string, string[], string]> = [
 ];
 
 for (const [script, args, why] of steps) {
-  console.log(`\n=== ${script} — ${why} ===`);
+  console.log(`\n=== ${script}: ${why} ===`);
   const r = spawnSync("npm", ["run", "--silent", script, "--", ...args], { stdio: "inherit", shell: true });
   if (r.status !== 0) {
     console.error(`\n${script} failed. Fix that before continuing; the next step would build on it.`);

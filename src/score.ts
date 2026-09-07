@@ -103,12 +103,21 @@ export type FeedOrder = "score" | "new";
  * "#1" that meant "most recent" would be worthless — the point of showing a fresh launch is to see
  * where it lands against everything else, not to be told it is new.
  */
+/**
+ * One page of the feed, with the counts needed to describe it honestly.
+ *
+ * `total` is every launch in the window and `matched` is how many cleared the reader's threshold,
+ * so a capped list can say "showing 150 of 300 that scored 5% or better, out of 4,665" instead of
+ * implying the window holds only what fits on screen.
+ */
+export type FeedPage = { items: Scored[]; matched: number; total: number };
+
 export function scoreRecent(
-  db: DB, model: GbdtModel, windowHours = 6, limit = 200, order: FeedOrder = "score",
-): Scored[] {
+  db: DB, model: GbdtModel, windowHours = 6, limit = 200, order: FeedOrder = "score", minP = 0,
+): FeedPage {
   const cutoff = Math.floor(Date.now() / 1000) - windowHours * 3600;
   const rows = dataset(db, cutoff).filter((r) => r.ts >= cutoff);
-  if (!rows.length) return [];
+  if (!rows.length) return { items: [], matched: 0, total: 0 };
 
   const scored = rows
     .map((r) => ({ token: r.token, ts: r.ts, x: r.x, p: predict(model, r.x) }))
@@ -124,11 +133,21 @@ export function scoreRecent(
     percentile: 100 * (1 - i / Math.max(1, scored.length - 1)),
   }));
 
-  const shown = order === "new"
-    ? [...ranked].sort((a, b) => b.ts - a.ts || a.rank - b.rank).slice(0, limit)
-    : ranked.slice(0, limit);
+  // Filtered after ranking, so a rank means the same thing whatever the reader has hidden: #264 of
+  // 4,537 is its place among every launch in the window, not among the survivors of a threshold.
+  // Filtered before the cap, though, so a threshold reaches the whole window rather than merely
+  // thinning the first hundred and fifty rows.
+  const kept = minP > 0 ? ranked.filter((r) => r.probability >= minP) : ranked;
 
-  return shown.map(({ x, ...rest }) => ({ ...rest, reasons: explain(model, x, 3) }));
+  const shown = order === "new"
+    ? [...kept].sort((a, b) => b.ts - a.ts || a.rank - b.rank).slice(0, limit)
+    : kept.slice(0, limit);
+
+  return {
+    items: shown.map(({ x, ...rest }) => ({ ...rest, reasons: explain(model, x, 3) })),
+    matched: kept.length,
+    total: scored.length,
+  };
 }
 
 /** Scores one launch and places it against the same recent window. */
