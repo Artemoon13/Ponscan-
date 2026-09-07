@@ -200,9 +200,11 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .rmbar b{font:600 13px Geist,sans-serif;color:var(--ink);letter-spacing:-.01em}
 .rmbar .sp{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--lime)}
 .rmbar .sp .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite}
-.rmwrap{border:1px solid var(--l08);border-radius:0 0 10px 10px;background:var(--bg2);padding:24px 24px 22px}
+.rmwrap{border:1px solid var(--l08);border-radius:0 0 10px 10px;background:var(--bg2);padding:30px 28px 26px}
 /* Absolute positions on a 190px stage, the geometry the design uses: one line, marks sitting on it,
    captions alternating above and below so five of them fit without colliding. */
+.rmwrap h1{margin:0}
+.rmwrap .sub{margin:10px 0 36px}
 .tl{position:relative}
 .tl .line,.tl .fill{position:absolute;left:0;height:2px}
 .tl .line{right:0;background:var(--l15)}
@@ -590,15 +592,16 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
 <!-- ───────────── BOARD ───────────── -->
 <section id="page-roadmap" hidden>
   <div class="doc">
-    <h1>What gets built next</h1>
-    <div class="sub">The local board is live. The hosted one is not built yet, and neither is anything that needs the token.</div>
-
     <div class="rmbar">
       <b>Roadmap</b><span>in order &middot; no dates</span>
       <span id="rm-count">&mdash;</span>
       <span class="sp"><span class="dot"></span><span id="rm-now">&mdash;</span></span>
     </div>
-    <div class="rmwrap"><div class="tl" id="rm-tl"></div></div>
+    <div class="rmwrap">
+      <h1>What gets built next</h1>
+      <div class="sub">The local board is live. The hosted one is not built yet, and neither is anything that needs the token.</div>
+      <div class="tl" id="rm-tl"></div>
+    </div>
 
     <div class="cols2">
       <div class="prose">
@@ -1454,11 +1457,7 @@ async function loadCoin() {
   }
 
   const sym = d.symbol || short(d.token);
-  box.innerHTML = d.standIn
-    ? '<div class="notyet"><b>Standing in.</b> $POOLITZER has not launched, so this page is showing <b>' +
-      esc(sym) + '</b> &mdash; a token that did, read the same way every other launch on this board is read. ' +
-      'When ours launches, this page points at it and nothing else here changes.</div>'
-    : "";
+  box.innerHTML = "";
 
   $("coin-crumb").textContent = "coin / " + sym + " / robinhood chain 4663";
   $("coin-state").hidden = !d.graduated;
