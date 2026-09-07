@@ -576,8 +576,13 @@ function showHealth(h, d) {
   const pill = $("livepill"), txt = $("livetxt"), st = $("stale"), lh = $("lh-live");
   const mins = (s) => s < 90 ? `${s}s` : `${Math.round(s / 60)}m`;
   let cls = "", msg = "";
-  if (!h || h.watcherSeenSecAgo === null || h.watcherSeenSecAgo > 120) {
-    cls = "bad"; msg = !h || h.watcherSeenSecAgo === null
+  if (!h) {
+    // Nothing to report on, which is not the same as something to report.
+    showUnreachable();
+    return;
+  }
+  if (h.watcherSeenSecAgo === null || h.watcherSeenSecAgo > 120) {
+    cls = "bad"; msg = h.watcherSeenSecAgo === null
       ? "The watcher has never reported in. Nothing here is live. Start it with: npm run watch"
       : `The watcher has not reported for ${mins(h.watcherSeenSecAgo)}. This list has stopped updating.`;
   } else if (h.behindSec !== null && h.behindSec > 120) { cls = "bad"; msg = `Running ${mins(h.behindSec)} behind the chain. Launches from the last ${mins(h.behindSec)} are missing.`; }
@@ -599,14 +604,46 @@ async function loadFeed() {
   if (feedInFlight) return;
   if (S.paused && S.page === "board") return;
   feedInFlight = true;
-  let d;
-  try { d = await (await fetch(`/api/feed?hours=${S.hours}&sort=${S.order}&min=${S.minScore / 100}`)).json(); }
-  catch { return; }
-  finally { feedInFlight = false; }
+  let d = null;
+  try {
+    const r = await fetch(`/api/feed?hours=${S.hours}&sort=${S.order}&min=${S.minScore / 100}`);
+    // A refusal is not data. The board answers a rate limit with 200-shaped JSON carrying an error
+    // and nothing else, so fetch resolves, JSON parses, and the old code handed that object on as a
+    // feed: no items for the list, no health for the banner. The banner then read the missing health
+    // as "the watcher has never reported in", which is a claim about the watcher made from having
+    // heard nothing at all.
+    if (r.ok) {
+      const body = await r.json();
+      if (body && !body.error) d = body;
+    }
+  } catch {
+    // Unreachable board; handled the same as a refusal.
+  } finally {
+    feedInFlight = false;
+  }
+
+  if (!d) { showUnreachable(); return; }
+
   S.feed = d;
   showHealth(d.health, d);
   renderHero();
   if (S.page === "board") renderBoard();
+}
+
+/**
+ * What to say when the board itself did not answer.
+ *
+ * Deliberately separate from the staleness banner: that one reports on the watcher, and this one
+ * reports that we have no idea how the watcher is doing. Whatever the list is already showing stays
+ * on screen, because stale rows with a warning above them beat an empty page.
+ */
+function showUnreachable() {
+  const st = $("stale"), pill = $("livepill"), lh = $("lh-live"), txt = $("livetxt");
+  st.className = "stale warn";
+  st.textContent = "No answer from the board just now, so this list may be behind. It will catch up on its own.";
+  pill.className = "live warn";
+  lh.className = "live warn";
+  txt.textContent = "no answer";
 }
 
 function passes(it) {
@@ -751,7 +788,7 @@ $("divider").addEventListener("mousedown", (e) => {
  * as nothing is outstanding, when the reader moves to another launch, or after the last attempt,
  * and it never blocks the first render.
  */
-const REFETCH_DELAYS_MS = [3000, 6000, 12000];
+const REFETCH_DELAYS_MS = [4000, 10000];
 
 async function fetchCard(token) {
   const r = await fetch("/api/token/" + token);

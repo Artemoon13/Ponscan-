@@ -49,12 +49,19 @@ function health(): Record<string, unknown> {
 }
 
 /**
- * Sixty requests a minute per address, counted in fixed windows.
+ * Requests a minute per address, counted in fixed windows.
  *
  * Crude on purpose: the feed is a public read of data anyone could gather themselves, so this exists
  * to stop one script making the board useless for everyone, not to guard a secret.
+ *
+ * Sixty was too tight to be that, and caught readers rather than scripts. One open page polls the
+ * feed twelve times a minute on its own, and opening a launch costs the card plus up to two follow
+ * ups while its curves are still being read, so someone clicking through a dozen launches crossed
+ * the line in under a minute of ordinary use. What they got for it was worse than a refusal: the
+ * page read the rejection as an answer and reported the watcher as dead. Four a second still bounds
+ * a scraper and leaves a person alone.
  */
-const RATE_LIMIT = 60;
+const RATE_LIMIT = Number(process.env.RATE_LIMIT ?? 240);
 const RATE_WINDOW_MS = 60_000;
 const hits = new Map<string, { n: number; until: number }>();
 /** Only believe a forwarded address when this instance is knowingly behind a proxy. */
