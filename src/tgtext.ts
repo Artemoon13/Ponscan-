@@ -1,7 +1,7 @@
 import { buildCard } from "./card.ts";
 import { EXPLORER } from "./config.ts";
 import { getMeta, type DB } from "./db.ts";
-import { graduationCapUsd } from "./pool.ts";
+import { graduationCapUsd, graduationMultiple } from "./pool.ts";
 import { formatUsd, startingCapUsd } from "./prices.ts";
 import { quoteFromCache } from "./quote.ts";
 import { loadModel, scoreOne, scoreRecent, type Scored } from "./score.ts";
@@ -48,34 +48,60 @@ export const HELP = [
  * message: the opening cap is fixed by the curve, and a pool opens at the price the curve ended on,
  * so across 3,497 pools the graduation cap runs $39.4K to $51.9K with a median of $47.0K.
  *
+ * Where the quote asset has no dollar price the same forecast is given as a multiple, with a
+ * price-free anchor: graduation sits at a median of x10.9 of the opening price across 174 graduated
+ * tokens, tenth to ninetieth x7.7 to x11.8. That is a protocol constant, not a market one.
+ *
  * The band is labelled with the share of unseen launches it actually caught, not the share it was
  * built for. Those differ right now, and a range printed bare would claim a confidence the model has
  * not earned.
  */
 function forecastLines(db: DB, card: NonNullable<ReturnType<typeof buildCard>>): string[] {
   const a = card.ath;
-  if (!a.available || !a.loUsd || !a.hiUsd) return [];
+  if (!a.available || a.multiple === null) return [];
 
   const L = card.launch;
-  const opens = startingCapUsd(db, L.quoteSymbol, L.quoteDecimals);
-  const grad = graduationCapUsd(
-    db,
-    (pt) => quoteFromCache(db, pt).decimals,
-    (pt) => quoteFromCache(db, pt).symbol,
-  );
-  const anchors = [
-    opens === null ? null : `opens at ${formatUsd(opens)}`,
-    grad === null ? null : `graduates near ${formatUsd(grad)}`,
-  ].filter(Boolean).join(" · ");
+  const dollars = a.pointUsd !== null && a.loUsd !== null && a.hiUsd !== null;
 
-  const out = [`<b>peak market cap</b> around ${esc(a.pointUsd ?? "—")}${anchors ? `  (${anchors})` : ""}`];
+  // Dollars need a price for the quote asset, and the price book does not cover every asset a launch
+  // can be quoted against: 9.7% of a week's launches are quoted in something it has no price for.
+  // Those used to lose the forecast entirely, which was the worst of the options, since the multiple
+  // is what the model predicts and the dollar figure is only that multiple times a price we happen
+  // to know. So the same forecast is given in whichever unit is available.
+  const times = (v: number | null): string => (v === null ? "—" : `×${v < 10 ? v.toFixed(1) : Math.round(v)}`);
+
+  const anchors: string[] = [];
+  if (dollars) {
+    const opens = startingCapUsd(db, L.quoteSymbol, L.quoteDecimals);
+    const grad = graduationCapUsd(
+      db,
+      (pt) => quoteFromCache(db, pt).decimals,
+      (pt) => quoteFromCache(db, pt).symbol,
+    );
+    if (opens !== null) anchors.push(`opens at ${formatUsd(opens)}`);
+    if (grad !== null) anchors.push(`graduates near ${formatUsd(grad)}`);
+  } else {
+    // The price-free anchor. A protocol constant rather than a market one, so it holds for any asset.
+    const gm = graduationMultiple(db);
+    if (gm !== null) anchors.push(`graduating takes about ${times(gm)}`);
+  }
+  const tail = anchors.length ? `  (${anchors.join(" · ")})` : "";
+
+  const point = dollars ? esc(a.pointUsd as string) : `${times(a.multiple)} of its opening price`;
+  const lo = dollars ? esc(a.loUsd as string) : times(a.loMultiple);
+  const hi = dollars ? esc(a.hiUsd as string) : times(a.hiMultiple);
+
+  const out = [`<b>peak market cap</b> around ${point}${tail}`];
   out.push(a.coverage === null
-    ? `usually between ${esc(a.loUsd)} and ${esc(a.hiUsd)}`
-    : `usually between ${esc(a.loUsd)} and ${esc(a.hiUsd)}, where the real peak landed ${(100 * a.coverage).toFixed(0)}% of the time`);
+    ? `usually between ${lo} and ${hi}`
+    : `usually between ${lo} and ${hi}, where the real peak landed ${(100 * a.coverage).toFixed(0)}% of the time`);
   if (a.tailChance !== null) {
     const base = a.tailBase !== null && a.tailBase > 0
       ? `, against ${(100 * a.tailBase).toFixed(0)}% for a typical launch` : "";
     out.push(`chance of ×10 or better: ${(100 * a.tailChance).toFixed(0)}%${base}`);
+  }
+  if (!dollars) {
+    out.push(`<i>no dollar price on record for ${esc(L.quoteSymbol)}, so this is a multiple rather than a cap</i>`);
   }
   return out;
 }

@@ -559,3 +559,40 @@ export function graduationCapUsd(db: DB, quoteDecimalsFor: (pairToken: string) =
   gradCap = { at: Date.now(), v };
   return v;
 }
+
+/**
+ * Graduation expressed as a multiple of the opening price, needing no dollar price at all.
+ *
+ * The dollar anchor only works for quote assets the price book covers, and it does not cover them
+ * all: 9.7% of a week's launches are quoted in something with no price, and for those the forecast
+ * was being dropped rather than shown in the unit the model actually predicts. This is the same
+ * anchor in that unit, and it is a protocol constant rather than a market one, so it holds across
+ * every asset: measured on 174 graduated tokens the median is x10.9, with a tenth-to-ninetieth range
+ * of x7.7 to x11.8.
+ */
+let gradMult: { at: number; v: number | null } | null = null;
+
+export function graduationMultiple(db: DB): number | null {
+  if (gradMult && Date.now() - gradMult.at < 3_600_000) return gradMult.v;
+
+  const rows = db.prepare(`
+    WITH firsts AS (
+      SELECT token, CAST(quote_wei AS REAL) / CAST(token_amt AS REAL) px,
+             row_number() OVER (PARTITION BY token ORDER BY block, log_index) rn
+      FROM curve_trades WHERE CAST(token_amt AS REAL) > 0 AND CAST(quote_wei AS REAL) > 0
+    )
+    SELECT p.token_is_c1, p.dec0, p.dec1, p.init_sqrt, f.px first_px
+    FROM pools p JOIN firsts f ON f.token = p.token AND f.rn = 1`).all() as
+    Array<PoolRow & { first_px: number }>;
+
+  const ratios: number[] = [];
+  for (const r of rows) {
+    const open = r.first_px * (1e18 / 10 ** (r.token_is_c1 ? r.dec0 : r.dec1));
+    const grad = quotePerToken(r.init_sqrt, r);
+    if (open > 0 && grad > 0 && Number.isFinite(grad / open)) ratios.push(grad / open);
+  }
+  ratios.sort((a, b) => a - b);
+  const v = ratios.length >= 30 ? ratios[Math.floor(ratios.length / 2)] : null;
+  gradMult = { at: Date.now(), v };
+  return v;
+}
