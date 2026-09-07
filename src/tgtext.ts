@@ -45,8 +45,12 @@ export const HELP = [
  * launch opens near $4K and that graduating takes about $47K, at which point the same three numbers
  * say something plain: this one is not expected to make it. Both anchors are measured from this
  * database rather than asserted, and both are near-constants, which is what lets them sit in every
- * message: the opening cap is fixed by the curve, and a pool opens at the price the curve ended on,
- * so across 3,497 pools the graduation cap runs $39.4K to $51.9K with a median of $47.0K.
+ * message: the opening cap is fixed by the curve, and a pool opens at the price the curve ended on.
+ *
+ * Both anchors are taken per quote asset, not globally. The global median graduation cap is $41K,
+ * but an ETH-quoted launch graduates at $51.9K and a TTWO-quoted one at $28.0K, so quoting the
+ * average to an ETH launch understates its bar by a fifth. Being roughly right about the anchor is
+ * what makes a reader stop trusting the exact numbers standing next to it.
  *
  * Where the quote asset has no dollar price the same forecast is given as a multiple, with a
  * price-free anchor: graduation sits at a median of x10.9 of the opening price across 174 graduated
@@ -77,6 +81,7 @@ function forecastLines(db: DB, card: NonNullable<ReturnType<typeof buildCard>>):
       db,
       (pt) => quoteFromCache(db, pt).decimals,
       (pt) => quoteFromCache(db, pt).symbol,
+      L.quoteSymbol,
     );
     if (opens !== null) anchors.push(`opens at ${formatUsd(opens)}`);
     if (grad !== null) anchors.push(`graduates near ${formatUsd(grad)}`);
