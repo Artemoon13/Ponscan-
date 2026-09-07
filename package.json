@@ -9,22 +9,23 @@
     "node": ">=22.6"
   },
   "scripts": {
-    "test": "node --no-warnings --test",
-    "setup": "node --no-warnings src/cli/setup.ts",
     "doctor": "node --no-warnings src/cli/doctor.ts",
+    "setup": "node --no-warnings src/cli/setup.ts",
     "backfill": "node --no-warnings src/cli/backfill.ts",
     "enrich-window": "node --no-warnings src/cli/enrich-window.ts",
     "enrich": "node --no-warnings src/cli/enrich.ts",
+    "names": "node --no-warnings src/cli/names.ts",
     "quotes": "node --no-warnings src/cli/quotes.ts",
+    "curves": "node --no-warnings src/cli/curves.ts",
     "train": "node --no-warnings src/cli/train.ts",
     "validate": "node --no-warnings src/cli/validate.ts",
     "board": "node --no-warnings src/board.ts",
     "watch": "node --no-warnings src/cli/watch.ts",
+    "scoreboard": "node --no-warnings src/cli/scoreboard.ts",
+    "verify": "node --no-warnings src/cli/verify.ts",
     "stats": "node --no-warnings src/cli/stats.ts",
     "nightly": "node --no-warnings src/cli/nightly.ts",
-    "names": "node --no-warnings src/cli/names.ts",
-    "scoreboard": "node --no-warnings src/cli/scoreboard.ts",
-    "verify": "node --no-warnings src/cli/verify.ts"
+    "test": "node --no-warnings --test"
   },
   "dependencies": {
     "viem": "^2.56.3"

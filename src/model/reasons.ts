@@ -54,7 +54,13 @@ const PHRASE: Record<FeatureName, Phrase> = {
     : null,
   via_contract: (v) => (v === 1 ? ["launched through a batching contract, not directly", "via contract"] : null),
   is_eth_quoted: (v) => (v === 1 ? ["quoted in ETH", "ETH-quoted"] : ["quoted in a token, not ETH", "token-quoted"]),
-  log_threshold: (v) => [`graduation needs ${Math.expm1(v).toFixed(2)} of the quote asset`, `needs ${Math.expm1(v).toFixed(2)}`],
+  /**
+   * Not shown, though the model still uses it. The graduation threshold is a property of the quote
+   * asset, not of the launch: every ETH-quoted launch needs the same 4.20, so the chip read "needs
+   * 4.20" on row after row and pushed out a reason that actually distinguished one launch from the
+   * next. It separates quote assets, which `is_eth_quoted` already says in words.
+   */
+  log_threshold: () => null,
   desc_len: (v) => (v === 0 ? ["no description", "no description"] : null),
   symbol_len: () => null,
   dev_prior_launches: (v) => v > 0

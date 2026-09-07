@@ -51,7 +51,7 @@ button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer
 .btn:active{background:#b8e600;border-color:#b8e600}
 .btn:focus-visible{outline:2px solid var(--lime2);outline-offset:2px}
 .btn.ghost{background:transparent;border-color:rgba(255,255,255,.2);color:var(--ink);font-weight:500;font-family:var(--mono)}
-.btn.ghost:hover{background:var(--l07);border-color:var(--l18);color:var(--ink)}
+.btn.ghost:hover{background:var(--l07);border-color:rgba(204,255,0,.4);color:var(--ink)}
 /**
  * Named `btn-lg`, not `btn big`. `.big` is the card's stat tile, which sets a fixed 76px height and
  * a column layout; a button carrying both classes inherited the tile's height and stood twice as
@@ -314,7 +314,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <h1>Every pons launch, scored the second it lands.</h1>
         <div class="ctas">
           <a class="btn btn-lg" href="#/board">Open the live board</a>
-          <button class="btn btn-lg ghost" id="copy-quick" title="Copy the whole sequence">git clone · npm run setup · npm run board</button>
+          <a class="btn btn-lg ghost" href="https://github.com/Artemoon13/Ponscan-" target="_blank" rel="noopener" title="Open the repository">git clone · npm run setup · npm run board</a>
         </div>
         <div class="kpis">
           <div><b id="k-base">—</b>base graduation rate</div>
@@ -325,7 +325,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
       </div>
       <a class="shot" href="#/board">
         <div class="shot-bar"><i></i><i></i><i></i><span style="margin-left:8px">localhost:4663 · live</span></div>
-        <div class="shot-head"><span>P grad</span><span>Launch</span><span style="text-align:right">Rank</span><span style="text-align:right">Age</span></div>
+        <div class="shot-head"><span>Grad</span><span>Launch</span><span style="text-align:right">Rank</span><span style="text-align:right">Age</span></div>
         <div id="hero-rows"></div>
       </a>
     </div>
@@ -398,7 +398,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <span class="f mono" id="m-new" title="newest first, rank still by score">newest</span>
         <span class="f mono" id="pause">⏸ pause</span>
       </div>
-      <div class="cols"><span>Time</span><span>Token</span><span class="r">P grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r">Age</span></div>
+      <div class="cols"><span>Time</span><span>Token</span><span class="r">Grad</span><span class="r">Rank</span><span>Reasons</span><span class="r">Self-buy</span><span class="r">Age</span></div>
       <div class="rows" id="rows"></div>
       <div class="empty" id="empty" hidden></div>
     </div>
@@ -685,7 +685,7 @@ function renderCard() {
       <span class="grade" title="Creator record from past launches" style="--gc:${g.c};--gb:${g.b};--gbg:${g.bg}"><i>${g.L}</i><span>${g.txt}</span></span></div>
     <div class="ptop">
       <div class="bigs">
-        <div class="big lime"><div class="k">P graduate</div><div class="v">${s ? pct(s.probability) : "—"}</div></div>
+        <div class="big lime"><div class="k">Graduate</div><div class="v">${s ? pct(s.probability) : "—"}</div></div>
         <div class="big line"><div class="k">Rank · of ${s ? s.of.toLocaleString() : "—"} in 6h</div><div class="v">${s ? "#" + s.rank : "—"}</div></div>
       </div>
       <div class="reasons">${reasons}</div>
@@ -771,11 +771,6 @@ document.querySelectorAll("#term .cmd .cp").forEach((btn) => {
   btn.onclick = () => copyWithFeedback(btn, btn.closest(".cmd").dataset.cmd);
 });
 $("copy-all").onclick = () => copyWithFeedback($("copy-all"), allCommands(), "Copy all", "Copied ✓");
-// The hero button shows an abbreviated sequence; it copies the real commands, not the summary.
-$("copy-quick").onclick = function () {
-  const label = "git clone · npm run setup · npm run board";
-  copyWithFeedback(this, allCommands(), label, "Commands copied ✓");
-};
 
 /* ── ages tick without a refetch ── */
 setInterval(() => document.querySelectorAll("[data-ts]").forEach((el) => { const t = Number(el.dataset.ts); if (t) el.textContent = ago(t); }), 1000);

@@ -180,7 +180,7 @@ function frame(): Seg[][] {
   /* left: the table */
   const nameW = Math.max(12, LW - 2 - 10 - 8 - 7 - 8 - 7 - 4 - 10);
   const left: Seg[][] = [];
-  left.push([seg(fit(`  TIME      P GRAD  RANK   SYM     ${"NAME".padEnd(nameW)}SELF   EX  CLUSTER`, LW), DIM)]);
+  left.push([seg(fit(`  TIME        GRAD  RANK   SYM     ${"NAME".padEnd(nameW)}SELF   EX  CLUSTER`, LW), DIM)]);
   left.push([seg("-".repeat(LW), FAINT)]);
   const rowsAvail = body - 2;
   const start = Math.max(0, Math.min(state.selIdx - Math.floor(rowsAvail / 2), list.length - rowsAvail));
@@ -218,7 +218,7 @@ function frame(): Seg[][] {
     right.push(blank());
     const pc = sel.graduated ? GREEN : sel.percentile >= 90 ? LIME : sel.probability >= 0.03 ? AMBER : WHITE;
     const lift = c ? "" : "";
-    right.push(box([seg(fit("P GRADUATE", 12), DIM), seg(fit(sel.graduated ? `GRADUATED . ${sel.gradSecs ?? "?"} s` : (100 * sel.probability).toFixed(1) + "%", sel.graduated ? 18 : 8), pc + BOLD), seg(fit(sel.graduated ? "" : `#${sel.rank}/${sel.of} last 6h${lift}`, RW - 4 - 20 - (sel.graduated ? 10 : 0)), DIM)]));
+    right.push(box([seg(fit("GRADUATE", 12), DIM), seg(fit(sel.graduated ? `GRADUATED . ${sel.gradSecs ?? "?"} s` : (100 * sel.probability).toFixed(1) + "%", sel.graduated ? 18 : 8), pc + BOLD), seg(fit(sel.graduated ? "" : `#${sel.rank}/${sel.of} last 6h${lift}`, RW - 4 - 20 - (sel.graduated ? 10 : 0)), DIM)]));
     right.push(box([seg(fit("TICKER", 12), DIM), seg(fit(sel.cluster.total > 1 ? `${sel.cluster.total} launches` : "unique", 14), sel.cluster.total > 1 ? LIME : WHITE), seg(fit(sel.cluster.total > 1 ? `${sel.cluster.grad} reached pool` : "", RW - 4 - 26), DIM)]));
     right.push(blank());
     for (const r of sel.reasons.slice(0, 3)) right.push(box([seg((r.direction === "up" ? "+" : "-") + " ", (r.direction === "up" ? LIME : RED) + BOLD), seg(fit(r.text, RW - 6), WHITE)]));
