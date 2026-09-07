@@ -296,13 +296,42 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  /**
+   * The picture a chat app shows beside the link.
+   *
+   * Prefers a purpose-made card and falls back to the mark. Social previews crop to about 1.91:1, so
+   * a square mark loses its top and bottom in a wide card and is better shown in a small square one;
+   * which of those we ask for is decided below by which file is actually here. Dropping an og.png in
+   * is therefore the whole change needed to upgrade the preview later.
+   */
+  if (url.pathname === "/og.png") {
+    const file = [join(here, "ui", "og.png"), join(here, "ui", "logo.png")].find((f) => existsSync(f));
+    if (!file) { res.writeHead(404).end(); return; }
+    res.writeHead(200, { "content-type": "image/png", "cache-control": "max-age=3600" });
+    res.end(readFileSync(file));
+    return;
+  }
+
   if (url.pathname === "/") {
     const html = readFileSync(join(here, "ui", "index.html"));
     // Re-read per request so an edit shows up on reload — which only works if the browser is told
     // not to keep its own copy. With no cache header at all it caches heuristically and serves a
     // stale page against a live API, which reads as the data being wrong rather than the page.
+    // Absolute URLs, because a preview is fetched by someone else's server and a relative path
+    // means nothing to it. Taken from the request rather than configured, so the same build gives
+    // the right links behind the proxy, on a tunnel, and on localhost without being told where it is.
+    const proto = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0].trim()
+      || (TRUST_PROXY ? "https" : "http");
+    const base = `${proto}://${req.headers.host ?? `localhost:${CFG.boardPort}`}`;
+    // A square mark centre-crops badly in a wide card, so ask for the small one until a purpose-made
+    // image exists.
+    const wide = existsSync(join(here, "ui", "og.png"));
+    const page = String(html)
+      .replaceAll("__BASE__", base)
+      .replaceAll("__TWITTER_CARD__", wide ? "summary_large_image" : "summary");
+
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-    res.end(html);
+    res.end(page);
     return;
   }
 
