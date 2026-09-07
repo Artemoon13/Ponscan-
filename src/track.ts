@@ -85,6 +85,33 @@ export function grade(db: DB, now = Math.floor(Date.now() / 1000)): number {
         WHERE g.token = predictions.token AND g.ts - predictions.launch_ts <= ?
       ) THEN 1 ELSE 0 END
     WHERE graded_at IS NULL AND launch_ts + ? <= ?`).run(now, HORIZON_SEC, HORIZON_SEC, now);
+  return Number(res.changes) + regrade(db, now);
+}
+
+/**
+ * Corrects claims that were settled against evidence which had not arrived yet.
+ *
+ * Grading asks whether a graduation is on record, and reads a missing row as "it did not happen".
+ * Those are not the same thing. The watcher can be behind, or restart, or miss a window that a
+ * later pass fills in, and then a launch that reached the pool four minutes in is settled as a
+ * failure four hours later, with `graded_at` set so nothing ever looks again.
+ *
+ * It happened to 14 claims, every one of them a token that reached the pool between one and
+ * twenty-four minutes after launch. That is 9.7% of all the positives on record, and it does not
+ * merely understate the score: the live correction is fitted against these labels, so missing
+ * positives push every published probability down by about a tenth.
+ *
+ * The asymmetry is the point. A graduation row is proof that it happened; the absence of one is
+ * not proof that it did not. So a 0 may become a 1 when the evidence turns up, and a 1 is never
+ * revisited.
+ */
+export function regrade(db: DB, now = Math.floor(Date.now() / 1000)): number {
+  const res = db.prepare(`
+    UPDATE predictions SET label = 1, graded_at = ?
+    WHERE label = 0 AND EXISTS (
+      SELECT 1 FROM graduations g
+      WHERE g.token = predictions.token AND g.ts - predictions.launch_ts <= ?
+    )`).run(now, HORIZON_SEC);
   return Number(res.changes);
 }
 

@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyLive, fitLive, MIN_CLAIMS, SLOPE_RANGE } from "./calibration.ts";
+import { applyLive, fitLive, liveFor, MIN_CLAIMS, saveLive, SLOPE_RANGE } from "./calibration.ts";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 /**
  * The correction has one job and one prohibition: move the printed probability toward what happened,
@@ -110,4 +113,22 @@ test("a fit taken from already-corrected scores throws the correction away", () 
     `a fit from shown scores should be far worse when applied to raw ones: ` +
     `truth ${was.toFixed(4)}, from raw ${withGood.toFixed(4)}, from shown ${withWrong.toFixed(4)}`,
   );
+});
+
+test("a correction fitted on one model is not handed to another", () => {
+  // This was relaxed once, on the reasoning that a model always retires before it can be corrected.
+  // It does not: a model gathers about a thousand claims an hour and they settle after four, so it
+  // has some twenty hours in which its own claims can correct it. Meanwhile the relaxed version
+  // handed a twofold correction to a successor that needed none, and would have printed 0.35% where
+  // 1.40% happened.
+  const dir = mkdtempSync(join(tmpdir(), "gimlet-cal-"));
+  const path = join(dir, "calibration.json");
+  try {
+    saveLive({ modelId: "aaaaaaaaaaaa", a: 1.17, b: -0.69, n: 2217,
+      fittedAt: Math.floor(Date.now() / 1000), saidBefore: 0.026, wasBefore: 0.008 }, path);
+    assert.ok(liveFor("aaaaaaaaaaaa", path), "the model it was fitted on must get it");
+    assert.equal(liveFor("bbbbbbbbbbbb", path), null, "and no other model may, however fresh the fit");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

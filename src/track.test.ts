@@ -97,6 +97,33 @@ test("grading is idempotent", () => {
   assert.equal(grade(db, T0 + HORIZON_SEC + 999), 0, "already-settled claims must not be regraded");
 });
 
+test("a graduation that arrives after grading corrects its claim", () => {
+  // The watcher can be behind, restart, or miss a window a later pass fills in. Grading reads a
+  // missing row as "it did not happen", which is a different statement from the truth.
+  addLaunch("0xlatelog", T0);
+  assert.equal(record(db, scored("0xlatelog", 0.4), T0, "m1", T0 + 10), true);
+  grade(db, T0 + HORIZON_SEC + 1);
+  assert.equal(new Map(settled(db).map((r) => [r.token, r.label])).get("0xlatelog"), 0,
+    "with no graduation on record it settles negative, which is all grading can say");
+
+  // The evidence turns up: it reached the pool five minutes in, hours before it was graded.
+  addGraduation("0xlatelog", T0 + 300);
+  assert.equal(grade(db, T0 + HORIZON_SEC + 2), 1, "the late graduation must correct exactly one claim");
+  assert.equal(new Map(settled(db).map((r) => [r.token, r.label])).get("0xlatelog"), 1);
+
+  assert.equal(grade(db, T0 + HORIZON_SEC + 3), 0, "and correcting it once is enough");
+});
+
+test("a claim that really did fail is never talked into a hit", () => {
+  addLaunch("0xstayszero", T0);
+  assert.equal(record(db, scored("0xstayszero", 0.4), T0, "m1", T0 + 10), true);
+  addGraduation("0xstayszero", T0 + HORIZON_SEC + 60);
+  grade(db, T0 + HORIZON_SEC + 1);
+  grade(db, T0 + HORIZON_SEC + 120);
+  assert.equal(new Map(settled(db).map((r) => [r.token, r.label])).get("0xstayszero"), 0,
+    "a graduation outside the horizon is not evidence for a claim measured inside it");
+});
+
 test("scoring the log matches hand arithmetic", () => {
   // 100 claims, 10 positives, and the model ranked 4 of them into its top decile.
   const rows: Array<{ probability: number; label: 0 | 1 }> = [];
