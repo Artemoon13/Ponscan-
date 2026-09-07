@@ -172,6 +172,7 @@ export function quotePerToken(sqrt: string | bigint, p: Pick<PoolRow, "token_is_
  */
 export async function indexPoolSwaps(
   db: DB, fromBlock: number, toBlock: number, chunk = 2000,
+  onChunk?: (upTo: number, swaps: number) => void,
 ): Promise<{ swaps: number; matched: number; chunks: number }> {
   const known = new Set<string>(
     (db.prepare("SELECT pool_id FROM pools").all() as Array<{ pool_id: string }>).map((r) => r.pool_id),
@@ -214,6 +215,10 @@ export async function indexPoolSwaps(
       if (width > 125) { width = Math.floor(width / 2); continue; }
       throw e;
     }
+    // And widen again once the burst is past. Without this one busy stretch narrowed the window for
+    // the whole remaining run, so a single spike early in a six-million-block sweep taxed every
+    // block after it.
+    if (logs.length < 4000 && width < chunk) width = Math.min(chunk, width * 2);
     chunks++;
     swaps += logs.length;
 
@@ -255,6 +260,7 @@ export async function indexPoolSwaps(
       }
     }
     from = to + 1;
+    onChunk?.(to, swaps);
   }
   return { swaps, matched, chunks };
 }

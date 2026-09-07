@@ -65,11 +65,13 @@ if (oldestGrad.b === null) {
       (upTo, found) => {
         const done = upTo - initFrom + 1;
         const pct = (100 * done / span).toFixed(1);
-        process.stdout.write(`  ${pct}%  ${found} pools found  `);
+        process.stdout.write(`
+  ${pct}%  ${found} pools found  `);
       },
     );
     setMeta(db, "pool_init_to_block", String(head));
-    console.log(`  ${sweep.found} pools found in ${sweep.chunks} reads, ${((Date.now() - t) / 1000).toFixed(1)}s${" ".repeat(20)}`);
+    console.log(`
+  ${sweep.found} pools found in ${sweep.chunks} reads, ${((Date.now() - t) / 1000).toFixed(1)}s${" ".repeat(20)}`);
 
     const still = db.prepare(`
       SELECT count(*) c FROM graduations g JOIN launches l USING(token)
@@ -94,7 +96,14 @@ const to = Math.min(head, from + maxBlocks - 1);
 
 console.log(`\nreading pool swaps, blocks ${from.toLocaleString()}..${to.toLocaleString()} (head ${head.toLocaleString()}, ${(head - to).toLocaleString()} behind)`);
 const t0 = Date.now();
-const r = await indexPoolSwaps(db, from, to, chunk);
+// Checkpointed per chunk rather than at the end. This pass covers millions of blocks and takes over
+// an hour; recording progress only on success meant an interruption at minute eighty threw away
+// eighty minutes of reading, and the peaks written along the way had no record saying so.
+const r = await indexPoolSwaps(db, from, to, chunk, (upTo, swaps) => {
+  setMeta(db, "pool_swaps_to_block", String(upTo));
+  const done = upTo - from + 1, span = to - from + 1;
+  process.stdout.write(`  ${(100 * done / span).toFixed(1)}%  ${swaps.toLocaleString()} swaps  `);
+});
 const secs = (Date.now() - t0) / 1000;
 
 setMeta(db, "pool_swaps_to_block", String(to));
