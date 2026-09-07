@@ -69,7 +69,7 @@ button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer
 .mark.img{width:40px;height:40px;background:none;border-radius:0;object-fit:contain}
 .brand b{font-size:19px;letter-spacing:-.02em}
 .links{display:flex;gap:26px;font-size:16px;align-self:stretch;align-items:stretch}
-.links a{display:flex;align-items:center;cursor:pointer;padding-top:2px;color:var(--t65);border-bottom:2px solid transparent}
+.links a{display:flex;align-items:center;cursor:pointer;padding-top:2px;color:var(--t65);border-bottom:2px solid transparent;white-space:nowrap}
 .links a.on{color:var(--ink);border-bottom-color:var(--lime)}
 .spacer{flex:1}
 .live{display:flex;align-items:center;gap:8px;font:500 11px var(--mono);color:var(--t55);white-space:nowrap}
@@ -180,6 +180,57 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .f.on{background:var(--lime);color:#111;border-color:var(--lime);font-weight:600}
 .f.mono{font:500 11px var(--mono)}
 .shown{font:11px var(--mono);color:var(--t4);margin-left:8px}
+/* pages that are read rather than operated: a measured column, not a dashboard */
+.doc{max-width:1180px;margin:0 auto;padding:56px 24px 96px}
+.doc h1{margin:0;font:700 44px/1 Geist,sans-serif;letter-spacing:-.035em}
+.doc .sub{margin-top:10px;font-size:14px;color:var(--t55)}
+.doc .cols2{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:48px;margin-top:44px;align-items:start}
+@media (max-width:900px){.doc .cols2{grid-template-columns:1fr}}
+.prose{font-size:14.5px;line-height:1.65;color:var(--t78)}
+.prose p{margin:14px 0 0;text-wrap:pretty}
+.prose h2{margin:40px 0 0;font:700 22px Geist,sans-serif;letter-spacing:-.025em;color:var(--ink);display:flex;align-items:center;gap:12px}
+.prose h2 .n{font:500 12px var(--mono);color:var(--lime)}
+.prose h2 .n.red{color:var(--red)}
+.never{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.never div{display:grid;grid-template-columns:16px 1fr;gap:10px}
+.never i{font:600 14px var(--mono);color:var(--red);font-style:normal}
+/* milestones: status is the point, so it carries the colour */
+.miles{display:flex;flex-direction:column;gap:10px;margin-top:28px}
+.mile{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:14px 16px;border:1px solid var(--l08);border-radius:8px;background:var(--bg2)}
+.mile .tag{font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.08em;align-self:start;padding:4px 7px;border-radius:4px;text-align:center}
+.mile .tag.done{background:rgba(204,255,0,.14);color:var(--lime)}
+.mile .tag.now{background:rgba(232,184,58,.14);color:var(--amber)}
+.mile .tag.next{background:var(--l06);color:var(--t55)}
+.mile b{display:block;font-size:14px;letter-spacing:-.01em}
+.mile span{display:block;margin-top:4px;font-size:13px;color:var(--t55);line-height:1.5}
+.side{border:1px solid var(--l08);border-radius:10px;background:var(--bg2);padding:18px 20px}
+.side h3{margin:0 0 12px;font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
+.side .row2{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--l06);font-size:12.5px}
+.side .row2:first-of-type{border-top:0}
+.side .row2 b{font-weight:600}
+.side .row2 span{color:var(--t45);font:11.5px var(--mono);text-align:right}
+/* a step with a command under it */
+.steps{display:flex;flex-direction:column;gap:14px;margin-top:28px}
+.stp{border:1px solid var(--l08);border-radius:10px;background:var(--bg2);padding:16px 18px}
+.stp .hd{display:flex;align-items:baseline;gap:10px}
+.stp .hd .n{font:500 11px var(--mono);color:var(--lime)}
+.stp .hd b{font-size:14px}
+.stp .hd .t{margin-left:auto;font:11px var(--mono);color:var(--t35)}
+.stp .d{margin-top:6px;font-size:13px;color:var(--t55);line-height:1.5}
+.cmd{margin-top:10px;display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--l08);border-radius:7px;padding:9px 12px;font:500 12.5px var(--mono)}
+.cmd .p{color:var(--t35)}
+.cmd code{flex:1;color:var(--ink);overflow-x:auto;white-space:nowrap}
+.cmd button{border:1px solid var(--l15);background:transparent;color:var(--t55);border-radius:5px;padding:3px 8px;font:500 10.5px var(--mono);cursor:pointer;flex:none}
+.cmd button:hover{color:var(--lime);border-color:var(--lime)}
+.envt{width:100%;border-collapse:collapse;margin-top:14px;font:12px var(--mono)}
+.envt th{text-align:left;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--t45);padding:0 10px 8px 0;border-bottom:1px solid var(--l08)}
+.envt td{padding:8px 10px 8px 0;border-bottom:1px solid var(--l06);vertical-align:top}
+.envt td.k{color:var(--lime);white-space:nowrap}
+.envt td.v{color:var(--ink);white-space:nowrap}
+.envt td.d{color:var(--t55);font-family:Geist,sans-serif;font-size:12.5px;line-height:1.45}
+/* the honest banner for a page describing something that does not exist yet */
+.notyet{margin-top:22px;border:1px solid rgba(232,184,58,.35);background:rgba(232,184,58,.07);border-radius:9px;padding:14px 16px;font-size:13.5px;color:var(--ink);line-height:1.55}
+.notyet b{color:var(--amber)}
 .settings{display:flex;align-items:center;gap:16px;padding:0 24px;height:42px;border-bottom:1px solid var(--l08);flex:none;font-size:11.5px;color:var(--t45);white-space:nowrap;overflow-x:auto}
 .settings label{display:flex;align-items:center;gap:7px;flex:none}
 .settings input,.settings select{background:#0d0d0d;border:1px solid var(--l15);color:var(--ink);border-radius:4px;padding:4px 7px;font:500 11px var(--mono)}
@@ -341,6 +392,8 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
     <a href="#/board" data-nav="board">Board</a>
     <a href="#/model" data-nav="model">Model</a>
     <a href="#/token" data-nav="token">$POOLITZER</a>
+    <a href="#/roadmap" data-nav="roadmap">Roadmap</a>
+    <a href="#/run" data-nav="run">Run it</a>
     <a href="https://github.com/Artemoon13/Ponscan-#readme" target="_blank" rel="noopener">Docs</a>
     <a href="https://github.com/Artemoon13/Ponscan-" target="_blank" rel="noopener">GitHub</a>
   </div>
@@ -421,11 +474,194 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
       </div>
     </div>
 
-    <div class="foot"><span>Poolitzer · MIT · not a safety rating, not a price forecast, not advice</span><span><a href="https://github.com/Artemoon13/Ponscan-" target="_blank" rel="noopener">GitHub</a><a href="https://github.com/Artemoon13/Ponscan-#readme" target="_blank" rel="noopener">Docs</a><code>npm run validate</code></span></div>
+    <div class="foot"><span>Poolitzer · MIT · not a safety rating, not a price forecast, not advice</span><span><a href="#/roadmap">Roadmap</a><a href="#/run">Run it</a><a href="#/telegram">Telegram</a><a href="#/pro">Pro</a><a href="https://github.com/Artemoon13/Ponscan-" target="_blank" rel="noopener">GitHub</a><a href="https://github.com/Artemoon13/Ponscan-#readme" target="_blank" rel="noopener">Docs</a><code>npm run validate</code></span></div>
   </div>
 </section>
 
 <!-- ───────────── BOARD ───────────── -->
+<section id="page-roadmap" hidden>
+  <div class="doc">
+    <h1>What gets built next</h1>
+    <div class="sub">The local board is live. The hosted one is not built yet, and neither is anything that needs the token.</div>
+
+    <div class="miles">
+      <div class="mile"><span class="tag done">shipped</span><div><b>The board, on your machine</b><span>Every pons v2 launch on Robinhood Chain, scored the second it lands, with its rank and three reasons. Clone, run, done.</span></div></div>
+      <div class="mile"><span class="tag done">shipped</span><div><b>The card behind every launch</b><span>Who created it, what they self-bought, which wallets they exempted from the opening tax, who else bought in the launch transaction, where the fees go, and what that creator launched before. Every line links to its transaction.</span></div></div>
+      <div class="mile"><span class="tag done">shipped</span><div><b>What happens after graduation</b><span>A graduated token's curve high is the bar it had to clear, not how far it got. The pool is followed too, so a card can say a launch opened at $52K and reached $522K.</span></div></div>
+      <div class="mile"><span class="tag now">building</span><div><b>Pool history for every graduated token</b><span>The swap stream is being read back through the whole chain. Until it finishes, older graduations show only what has been read so far, and say so.</span></div></div>
+      <div class="mile"><span class="tag now">building</span><div><b>Tickers on older launches</b><span>Roughly four in five launches in the database have no symbol yet, because enrichment has only covered the recent window. Until it catches up, older launches show a shortened address.</span></div></div>
+      <div class="mile"><span class="tag next">planned</span><div><b>A hosted board</b><span>The same code with a node in front, so reading it does not require cloning a repository and running a runtime.</span></div></div>
+      <div class="mile"><span class="tag next">planned</span><div><b>Alerts</b><span>Say once what you care about and hear about it when it happens, instead of watching a list.</span></div></div>
+      <div class="mile"><span class="tag next">planned</span><div><b>Telegram, then Pro</b><span>Neither exists today. Both depend on $POOLITZER, which has not launched.</span></div></div>
+    </div>
+
+    <div class="cols2">
+      <div class="prose">
+        <p>poolitzer reads pons v2 launches on Robinhood Chain, scores them and ranks them. Today that happens on your own machine: you clone a repository and run a runtime, which rules out almost everybody. A hosted board is the next thing that matters, and it is not built.</p>
+        <p>Here is what gets built next, in order, with no dates. Anything marked <b>planned</b> above does not exist. If a page on this site ever describes something as working when it is not, that is a bug worth reporting.</p>
+
+        <h2><span class="n">01</span>Make the score worth trusting</h2>
+        <p>The graduation model is validated on time-ordered folds and reports what it actually did, including the folds where it did no better than chance. The peak model ranks well and sizes badly, so it is shown as an 80% band rather than as a number. Both improve with more settled history, which is what the backfills are for.</p>
+
+        <h2><span class="n">02</span>Cover the history</h2>
+        <p>Curves are read on demand, pools are swept wholesale, and enrichment has only covered the recent window. Every one of those gaps shows up as a dash somewhere on a card. The work is unglamorous and mostly spent waiting on rate limits.</p>
+
+        <h2><span class="n">03</span>Make it reachable</h2>
+        <p>A hosted board, then alerts. The local version stays free and stays the reference: the score you compute yourself is the score the site shows, which is the point of it being open.</p>
+
+        <h2><span class="n red">04</span>Never</h2>
+        <div class="never">
+          <div><i>x</i><span>Never asks for a private key, a seed phrase or an approval.</span></div>
+          <div><i>x</i><span>Never holds funds, never trades, never touches a wallet.</span></div>
+          <div><i>x</i><span>Never sends your data anywhere. The local board talks to a public RPC and nothing else.</span></div>
+          <div><i>x</i><span>Never presents a score as a safety rating, a price forecast, or advice.</span></div>
+          <div><i>x</i><span>Never quietly drops a validation result for being unflattering.</span></div>
+        </div>
+
+        <h2><span class="n">05</span>How to check</h2>
+        <p>Commits show what shipped and when. The model page shows what the model scored on data it had not seen, and the scoreboard grades claims that were recorded before their outcomes existed. If something here goes quiet for weeks, ask about it in public.</p>
+      </div>
+
+      <div class="side">
+        <h3>Measured from this database</h3>
+        <div class="row2"><b>Launches indexed</b><span id="rm-total">&mdash;</span></div>
+        <div class="row2"><b>Reached the pool</b><span id="rm-grad">&mdash;</span></div>
+        <div class="row2"><b>Base graduation rate</b><span id="rm-base">&mdash;</span></div>
+        <div class="row2"><b>Top-decile lift</b><span id="rm-lift">&mdash;</span></div>
+        <div class="row2"><b>Launches enriched</b><span id="rm-enr">&mdash;</span></div>
+        <h3 style="margin-top:20px">Source</h3>
+        <div class="row2"><b>Licence</b><span>MIT</span></div>
+        <div class="row2"><b>Runtime</b><span>Node &gt;= 22.6</span></div>
+        <div class="row2"><b>Wallet keys needed</b><span>0</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="page-run" hidden>
+  <div class="doc">
+    <h1>Run it</h1>
+    <div class="sub">Node &gt;= 22.6 &middot; no Python &middot; no build step &middot; no database to install</div>
+
+    <div class="cols2">
+      <div>
+        <div class="steps">
+          <div class="stp">
+            <div class="hd"><span class="n">01</span><b>Get the code</b><span class="t">seconds</span></div>
+            <div class="d">TypeScript runs directly on Node 22.6 and later, so there is nothing to compile.</div>
+            <div class="cmd"><span class="p">$</span><code>git clone https://github.com/Artemoon13/Ponscan-.git &amp;&amp; cd Ponscan-</code><button data-copy>copy</button></div>
+          </div>
+          <div class="stp">
+            <div class="hd"><span class="n">02</span><b>Install and create the database</b><span class="t">under a minute</span></div>
+            <div class="d">Writes ./data/poolitzer.db and checks it can reach both endpoints. The defaults in .env work as they are.</div>
+            <div class="cmd"><span class="p">$</span><code>npm install &amp;&amp; npm run setup</code><button data-copy>copy</button></div>
+          </div>
+          <div class="stp">
+            <div class="hd"><span class="n">03</span><b>Collect some history</b><span class="t">minutes to hours</span></div>
+            <div class="d">A model needs settled outcomes before it can be fitted. Backfill reads past launches; enrich fills in who created them and how much they self-bought.</div>
+            <div class="cmd"><span class="p">$</span><code>npm run backfill -- --hours 26</code><button data-copy>copy</button></div>
+            <div class="cmd"><span class="p">$</span><code>npm run enrich-window -- --hours 20</code><button data-copy>copy</button></div>
+          </div>
+          <div class="stp">
+            <div class="hd"><span class="n">04</span><b>Fit the model and check it</b><span class="t">a minute</span></div>
+            <div class="d">Trains on time-ordered folds and prints what it scored on data it had not seen. If that looks like chance, it says so.</div>
+            <div class="cmd"><span class="p">$</span><code>npm run train &amp;&amp; npm run validate</code><button data-copy>copy</button></div>
+          </div>
+          <div class="stp">
+            <div class="hd"><span class="n">05</span><b>Open the board and start the watcher</b><span class="t">now</span></div>
+            <div class="d">Two processes: the board serves this page, the watcher follows the chain and records every score before its outcome exists. Run them in separate terminals.</div>
+            <div class="cmd"><span class="p">$</span><code>npm run board</code><button data-copy>copy</button></div>
+            <div class="cmd"><span class="p">$</span><code>npm run watch</code><button data-copy>copy</button></div>
+          </div>
+          <div class="stp">
+            <div class="hd"><span class="n">06</span><b>Keep it current</b><span class="t">nightly</span></div>
+            <div class="d">Backfill, enrich, read curves, follow pools, retrain, then fold old curves into summaries and reclaim the disk. The board reloads the model on every request, so a retrain needs no restart.</div>
+            <div class="cmd"><span class="p">$</span><code>npm run nightly</code><button data-copy>copy</button></div>
+          </div>
+        </div>
+
+        <div class="prose">
+          <h2><span class="n">&middot;</span>Two endpoints, on purpose</h2>
+          <p>Only the official RPC serves <code>eth_getLogs</code>, and it has no websocket. publicnode has the socket and faster state reads but refuses logs. So detection rides the socket, log reads go to the official node, and enrichment reads transactions from publicnode, which keeps the log budget with the watcher.</p>
+          <p>Both are public and neither needs a key. Measured over a day the whole thing costs about 133,000 requests, roughly 1.5 a second, against endpoints that start refusing near ten. A long bulk read earns a 403 eventually anyway; that is a request to slow down, and the reader waits it out rather than failing.</p>
+        </div>
+      </div>
+
+      <div class="side">
+        <h3>.env defaults</h3>
+        <table class="envt">
+          <tr><th>Key</th><th>Default</th></tr>
+          <tr><td class="k">RPC_HTTP_URL</td><td class="v">rpc.mainnet.chain.robinhood.com</td></tr>
+          <tr><td class="k">RPC_STATE_URL</td><td class="v">robinhood-rpc.publicnode.com</td></tr>
+          <tr><td class="k">RPC_WS_URL</td><td class="v">wss://robinhood-rpc.publicnode.com</td></tr>
+          <tr><td class="k">POLL_MS</td><td class="v">300</td></tr>
+          <tr><td class="k">RPC_IN_FLIGHT</td><td class="v">3</td></tr>
+          <tr><td class="k">RPC_SPACING_MS</td><td class="v">60</td></tr>
+          <tr><td class="k">LOGS_CHUNK_BLOCKS</td><td class="v">60000</td></tr>
+          <tr><td class="k">DB_PATH</td><td class="v">./data/poolitzer.db</td></tr>
+          <tr><td class="k">BOARD_PORT</td><td class="v">4663</td></tr>
+          <tr><td class="k">BOARD_HOST</td><td class="v">0.0.0.0</td></tr>
+          <tr><td class="k">RATE_LIMIT</td><td class="v">240</td></tr>
+        </table>
+        <div style="margin-top:12px;font-size:12.5px;color:var(--t45);line-height:1.5">Behind a reverse proxy, bind to loopback and let the proxy be the front door: <code>BOARD_HOST=127.0.0.1</code> with <code>TRUST_PROXY=1</code>.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="page-telegram" hidden>
+  <div class="doc">
+    <h1>Telegram</h1>
+    <div class="sub">One room, one bot.</div>
+    <div class="notyet"><b>Not built yet.</b> There is no room and no bot today, and no $POOLITZER contract for either to be about. This page states what is planned, so the rules are on the record before anything exists. Anyone contacting you now claiming to be the poolitzer bot, the team, or support, is not.</div>
+    <div class="cols2">
+      <div class="prose">
+        <p>The plan is a single room that acts as the tape: every $POOLITZER buy lands in it the moment it clears the pool, with the wallet, the size and the price. The bot answers questions in the room, and in a direct message it opens Pro for anyone who can prove the holding.</p>
+        <h2><span class="n red">&middot;</span>What the bot will never do</h2>
+        <div class="never">
+          <div><i>x</i><span>Never asks for a key, a seed phrase or an approval.</span></div>
+          <div><i>x</i><span>Never messages anyone first.</span></div>
+          <div><i>x</i><span>Never holds funds, never trades, never touches a wallet.</span></div>
+        </div>
+        <p>The holder check is a signature over a plain sentence, the kind every wallet can produce without spending gas, and the sentence says in words that it moves nothing.</p>
+        <h2><span class="n">&middot;</span>House rules</h2>
+        <p>Nobody will ever message you first. Nobody will ever ask for your seed. No links to other tokens. There will be exactly one contract, published on the $POOLITZER page, and every other address carrying this name is not ours.</p>
+      </div>
+      <div class="side">
+        <h3>Status</h3>
+        <div class="row2"><b>Room</b><span>not created</span></div>
+        <div class="row2"><b>Bot</b><span>not written</span></div>
+        <div class="row2"><b>Contract</b><span>not launched</span></div>
+        <div class="row2"><b>Depends on</b><span>$POOLITZER</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="page-pro" hidden>
+  <div class="doc">
+    <h1>Pro</h1>
+    <div class="sub">The terminal on your machine is free and stays free. Pro is the hosted half.</div>
+    <div class="notyet"><b>Not built yet.</b> There is no hosted board, no holder check and no $POOLITZER contract. Nothing on this page can be bought, signed or unlocked today. It is here so the terms are visible before any of it exists.</div>
+    <div class="cols2">
+      <div class="prose">
+        <p>The plan is that holding $POOLITZER opens the hosted site up: more watches at once, more live feeds, the heavy reads without a challenge, and creator history over any window. Proving the holding is a signature over a plain sentence. A signature has no chain, so the wallet can sit anywhere, and the site never asks for a key, a seed or an approval.</p>
+        <h2><span class="n">&middot;</span>What stays free, always</h2>
+        <p>Everything you are looking at. The board, the card behind every launch, the model and its validation, the prediction log. You run it yourself, it talks to a public RPC and nothing else, and the score you compute is the score the hosted site shows. That is the point of it being open, and Pro does not change it.</p>
+      </div>
+      <div class="side">
+        <h3>Free vs Pro</h3>
+        <div class="row2"><b>Local board</b><span>free, always</span></div>
+        <div class="row2"><b>Full card and model</b><span>free, always</span></div>
+        <div class="row2"><b>Prediction log</b><span>free, always</span></div>
+        <div class="row2"><b>Hosted board</b><span>planned</span></div>
+        <div class="row2"><b>Alerts</b><span>planned</span></div>
+        <div class="row2"><b>Holder check</b><span>planned</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="page-board" hidden>
   <div class="board" id="board">
     <div class="list">
@@ -562,13 +798,13 @@ const S = {
 function route() {
   const h = location.hash.replace(/^#\/?/, "");
   const [page, arg] = h.split("/");
-  S.page = ["board", "model", "token"].includes(page) ? page : "home";
-  for (const p of ["home", "board", "model", "token"]) $("page-" + p).hidden = S.page !== p;
+  S.page = ["board", "model", "token", "roadmap", "run", "telegram", "pro"].includes(page) ? page : "home";
+  for (const p of ["home", "board", "model", "token", "roadmap", "run", "telegram", "pro"]) $("page-" + p).hidden = S.page !== p;
   document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("on", a.dataset.nav === S.page));
   document.body.style.overflow = S.page === "board" ? "hidden" : "";
   if (S.page === "board" && arg && arg.startsWith("0x")) openCard(arg.toLowerCase());
   if (S.page === "model") loadModel();
-  if (S.page === "home") loadStats();
+  if (S.page === "home" || S.page === "roadmap") loadStats();
   loadFeed();
   window.scrollTo(0, 0);
 }
@@ -657,6 +893,22 @@ function passes(it) {
   return true;
 }
 
+/**
+ * The roadmap's side panel, from the same figures the front page already asks for.
+ *
+ * A roadmap that quotes its own database is harder to let rot than one carrying typed-in numbers,
+ * and these come from the one request the page was making anyway.
+ */
+function renderRoadmap(s) {
+  if (!s) return;
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  set("rm-total", s.total ? s.total.toLocaleString() : "\u2014");
+  set("rm-grad", s.graduationsWeek ? s.graduationsWeek.toLocaleString() : "\u2014");
+  set("rm-base", s.baseRate === null || s.baseRate === undefined ? "\u2014" : (100 * s.baseRate).toFixed(2) + "%");
+  set("rm-lift", s.decileLift ? s.decileLift.toFixed(2) + "x" : "not validated yet");
+  set("rm-enr", s.enriched && s.total ? s.enriched.toLocaleString() + " of " + s.total.toLocaleString() : "\u2014");
+}
+
 function renderHero() {
   const d = S.feed; if (!d || !d.items) return;
   const top = [...d.items].sort((a, b) => b.probability - a.probability).slice(0, 7);
@@ -715,6 +967,22 @@ function renderBoard() {
 }
 
 $("rows").addEventListener("click", (e) => { const r = e.target.closest(".row"); if (r) location.hash = "#/board/" + r.dataset.token; });
+/**
+ * Copy buttons beside the setup commands.
+ *
+ * Delegated from the document rather than bound per button, because these pages are static markup
+ * that never re-renders; binding once at load is enough and stays correct if more are added.
+ */
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copy]");
+  if (!b) return;
+  const code = b.parentElement && b.parentElement.querySelector("code");
+  if (!code) return;
+  const ok = await copyText(code.textContent);
+  b.textContent = ok ? "copied" : "press ctrl+c";
+  setTimeout(() => { b.textContent = "copy"; }, 1400);
+});
+
 document.querySelectorAll(".f[data-f]").forEach((f) => f.onclick = () => { S.filter = f.dataset.f; renderBoard(); });
 
 /* ── settings ── */
@@ -918,6 +1186,7 @@ async function loadStats() {
   $("k-base").textContent = d.baseRate === null ? "—" : (100 * d.baseRate).toFixed(1) + "%";
   $("k-median").textContent = d.medianSecToGraduate === null ? "—" : d.medianSecToGraduate < 600 ? d.medianSecToGraduate + " s" : Math.round(d.medianSecToGraduate / 60) + " min";
   $("k-lift").textContent = d.decileLift === null ? "—" : d.decileLift.toFixed(2) + "×";
+  renderRoadmap(d);
 }
 
 /* ── model page ── */
