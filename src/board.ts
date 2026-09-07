@@ -73,6 +73,62 @@ function overLimit(req: import("node:http").IncomingMessage): boolean {
 }
 
 /**
+ * Per-window aggregates for the feed, cached briefly.
+ *
+ * Measured on a six-hour window over 170,000 launches: the creator totals cost 678 ms and the ticker
+ * clusters 140 ms, against 62 ms for scoring every row on the board. They were being recomputed on
+ * every poll, and because node:sqlite is synchronous that time is not just the feed's — it is the
+ * whole server's, so opening a card queued behind a number that had not meaningfully changed.
+ *
+ * A cluster size and a creator's launch count barely move in half a minute, and the feed is a live
+ * view where a thirty-second-old count reads identically. Freshness that matters — the launches
+ * themselves, their scores, the staleness banner — is not cached here.
+ */
+const AGG_TTL_MS = 30_000;
+type Aggregates = {
+  clusters: Map<string, { n: number; g: number }>;
+  devTotal: Map<string, number>;
+  counts: { launches: number; graduations: number; enriched: number };
+};
+let aggCache: { at: number; since: number; v: Aggregates } | null = null;
+
+function aggregates(rawSince: number): Aggregates {
+  // The window start moves every second, so it is bucketed to the minute; otherwise the key never
+  // matches its own previous value and the cache can never hit.
+  const since = Math.floor(rawSince / 60) * 60;
+  if (aggCache && aggCache.since === since && Date.now() - aggCache.at < AGG_TTL_MS) return aggCache.v;
+
+  const clusters = new Map<string, { n: number; g: number }>();
+  for (const r of db.prepare(`
+    SELECT l.symbol_key k, count(*) n, sum(g.token IS NOT NULL) g
+    FROM launches l LEFT JOIN graduations g ON g.token = l.token
+    WHERE l.symbol_key IN (SELECT DISTINCT symbol_key FROM launches WHERE ts >= ? AND symbol_key IS NOT NULL)
+    GROUP BY l.symbol_key`).all(since) as Array<{ k: string; n: number; g: number | null }>) {
+    clusters.set(r.k, { n: r.n, g: r.g ?? 0 });
+  }
+
+  // Total launches per creator, not launches before this one. The row only needs this to answer
+  // "has this wallet launched more than once" for the repeat-creators filter; the card computes the
+  // exact prior-only history, which is what the score is allowed to see.
+  const devTotal = new Map<string, number>();
+  for (const r of db.prepare(`
+    SELECT deployer d, count(*) n FROM launches
+    WHERE deployer IN (SELECT DISTINCT deployer FROM launches WHERE ts >= ?)
+    GROUP BY deployer`).all(since) as Array<{ d: string; n: number }>) {
+    devTotal.set(r.d, r.n);
+  }
+
+  const counts = db.prepare(`
+    SELECT (SELECT count(*) FROM launches) launches,
+           (SELECT count(*) FROM graduations) graduations,
+           (SELECT count(*) FROM launches WHERE enriched_at IS NOT NULL) enriched`).get() as Aggregates["counts"];
+
+  const v: Aggregates = { clusters, devTotal, counts };
+  aggCache = { at: Date.now(), since, v };
+  return v;
+}
+
+/**
  * The headline figures on the front page, measured from this database rather than typed in. Cached
  * for a minute: they move slowly and the median needs a sort.
  */
@@ -183,23 +239,33 @@ const server = createServer(async (req, res) => {
     const order: FeedOrder = url.searchParams.get("sort") === "new" ? "new" : "score";
     const rows = model ? scoreRecent(db, model, hours, 150, order) : [];
     const now = Math.floor(Date.now() / 1000);
-    // Everything a row or a filter needs, in one query: the quote asset for "ETH-quoted", the
-    // creator's prior record for "repeat creators" and the grade badge, and the self-buy in the
-    // launch's own units rather than a 1e18 float that reads as zero for a stablecoin.
+    const since = now - hours * 3600;
+
+    /**
+     * Three cheap queries instead of one expensive one.
+     *
+     * This used to be a single SELECT carrying four correlated subqueries — cluster size, cluster
+     * graduations, and the creator's prior counts — evaluated once per row. At six thousand launches
+     * in a six-hour window that measured **10.3 seconds**; the same select without them is 22 ms, and
+     * the same counts as plain GROUP BYs are 105 ms and 35 ms.
+     *
+     * The cost was not confined to the feed. node:sqlite is synchronous, so those ten seconds blocked
+     * the whole server: opening a card queued behind the feed the page had just requested, and since
+     * the page polls every five seconds while the answer took ten, the queue only grew. The slow
+     * card was this query, not the card.
+     */
     const meta = db.prepare(`
       SELECT l.token, l.symbol, l.name, l.ts, l.exempt_count, l.initial_buy_wei, l.pair_token, l.phase,
-             l.launch_sender, l.deployer, l.creator_tax_bps, l.creator_fee_recipient, l.socials_json,
+             l.launch_sender, l.deployer, l.symbol_key,
              q.symbol AS quote_symbol, q.decimals AS quote_decimals,
-             (l.token IN (SELECT token FROM graduations)) AS graduated,
-             (SELECT g.ts - l.ts FROM graduations g WHERE g.token = l.token) AS grad_secs,
-             (SELECT count(*) FROM launches x WHERE x.symbol_key = l.symbol_key) AS cluster_total,
-             (SELECT count(*) FROM launches x JOIN graduations g2 ON g2.token = x.token
-                WHERE x.symbol_key = l.symbol_key) AS cluster_grad,
-             (SELECT count(*) FROM launches x WHERE x.deployer = l.deployer AND x.block < l.block) AS dev_prior,
-             (SELECT count(*) FROM launches x JOIN graduations g3 ON g3.token = x.token
-                WHERE x.deployer = l.deployer AND g3.ts < l.ts) AS dev_prior_grad
-      FROM launches l LEFT JOIN quote_assets q ON q.address = l.pair_token
-      WHERE l.ts >= ?`).all(now - hours * 3600) as Array<Record<string, unknown>>;
+             g.ts AS grad_ts
+      FROM launches l
+      LEFT JOIN quote_assets q ON q.address = l.pair_token
+      LEFT JOIN graduations g ON g.token = l.token
+      WHERE l.ts >= ?`).all(since) as Array<Record<string, unknown>>;
+
+    const { clusters, devTotal, counts } = aggregates(since);
+
     const ZERO = "0x0000000000000000000000000000000000000000";
     for (const m of meta) {
       const eth = m.pair_token === ZERO;
@@ -208,7 +274,14 @@ const server = createServer(async (req, res) => {
       m.quote_decimals = dec;
       m.self_buy = m.initial_buy_wei === null ? null : formatUnits(BigInt(m.initial_buy_wei as string), dec);
       m.is_eth = eth;
+      m.graduated = m.grad_ts !== null ? 1 : 0;
+      m.grad_secs = m.grad_ts === null ? null : Number(m.grad_ts) - Number(m.ts);
+      const c = m.symbol_key ? clusters.get(m.symbol_key as string) : undefined;
+      m.cluster_total = c?.n ?? 0;
+      m.cluster_grad = c?.g ?? 0;
+      m.dev_total = devTotal.get(m.deployer as string) ?? 1;
       delete m.initial_buy_wei;
+      delete m.grad_ts;
     }
     const byToken = new Map(meta.map((m) => [m.token as string, m]));
     const hour = db.prepare(`
@@ -226,10 +299,7 @@ const server = createServer(async (req, res) => {
       // were the whole window. The UI says so out loud, so this has to come back with it.
       shown: rows.length,
       inWindow: rows.length ? rows[0].of : 0,
-      counts: db.prepare(`
-        SELECT (SELECT count(*) FROM launches) launches,
-               (SELECT count(*) FROM graduations) graduations,
-               (SELECT count(*) FROM launches WHERE enriched_at IS NOT NULL) enriched`).get(),
+      counts,
       items: rows.map((r) => ({ ...r, meta: byToken.get(r.token) ?? null })),
     });
     return;

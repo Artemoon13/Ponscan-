@@ -458,10 +458,20 @@ function showHealth(h, d) {
 }
 
 /* ── feed ── */
+/**
+ * One request at a time. The poll is on a timer, so a slow answer used to have the next request
+ * launched on top of it; against a synchronous database that queues rather than parallelises, that
+ * turns one slow response into a growing backlog and the page never catches up.
+ */
+let feedInFlight = false;
 async function loadFeed() {
+  if (feedInFlight) return;
   if (S.paused && S.page === "board") return;
+  feedInFlight = true;
   let d;
-  try { d = await (await fetch("/api/feed?hours=6&sort=" + S.order)).json(); } catch { return; }
+  try { d = await (await fetch("/api/feed?hours=6&sort=" + S.order)).json(); }
+  catch { return; }
+  finally { feedInFlight = false; }
   S.feed = d;
   showHealth(d.health, d);
   renderHero();
@@ -471,7 +481,7 @@ async function loadFeed() {
 function passes(it) {
   const m = it.meta || {};
   if (S.filter === "Top decile") return it.percentile >= 90;
-  if (S.filter === "Repeat creators") return (m.dev_prior || 0) > 0;
+  if (S.filter === "Repeat creators") return (m.dev_total || 1) > 1;
   if (S.filter === "ETH-quoted") return !!m.is_eth;
   return true;
 }
