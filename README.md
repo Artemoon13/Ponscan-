@@ -223,7 +223,7 @@ None of this is in the score today. It is measured, not shipped.
 Node 22.6 or newer. No Python, no build step, no database to install. One runtime dependency.
 
 ```bash
-git clone https://github.com/kingwilliamAI/Ponscan-.git augur && cd augur
+git clone https://github.com/kingwilliamAI/Augur.git augur && cd augur
 npm install
 cp .env.example .env
 npm run doctor

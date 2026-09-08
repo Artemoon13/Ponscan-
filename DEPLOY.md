@@ -213,7 +213,7 @@ node -e "console.log(process.features.typescript)"
 `[сервер]`, под пользователем `augur`:
 
 ```bash
-git clone https://github.com/kingwilliamAI/Ponscan-.git ~/augur
+git clone https://github.com/kingwilliamAI/Augur.git ~/augur
 cd ~/augur
 npm install
 ```
