@@ -1560,11 +1560,11 @@ async function loadCoin() {
     row("supply", d.supply.toLocaleString()) +
     row("self-buy", d.selfBuy === null ? "not declared" : esc(d.selfBuy) + " " + esc(d.quoteSymbol)) +
     row("exempt wallets", String(d.exemptCount)) +
-    // Two rows, because one was doing the work of both and getting it wrong. Labelled "graduated"
-    // it showed "4.2 ETH", which reads as the valuation a launch graduates at. It is not: that is
-    // the reserve which has to flow in, worth about $10.6K, and the cap it implies is $51.9K.
-    row("graduation bar", (d.threshold ? esc(d.threshold) + " " + esc(d.quoteSymbol) : "—")
-        + (d.gradCapUsd ? " &middot; about " + esc(d.gradCapUsd) + " market cap" : "")) +
+    // The cap, and only the cap. This row used to be labelled "graduated" and show "4.2 ETH", which
+    // reads as the valuation a launch graduates at and is not: that is the reserve which has to flow
+    // into the curve. Showing both put a number here that answers a question nobody asked, so the
+    // reserve is gone and what remains is the figure a reader is actually holding this against.
+    row("graduation bar", d.gradCapUsd ? "about " + esc(d.gradCapUsd) + " market cap" : "—") +
     row("graduated", d.graduationTx
         ? "yes" + (d.secondsToGraduate !== null ? ", after " + secs(d.secondsToGraduate) : "")
         : "not yet",
