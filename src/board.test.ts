@@ -62,6 +62,10 @@ before(async () => {
       BOARD_PORT: String(PORT),
       BOARD_HOST: "127.0.0.1",
       DB_PATH: join(dir, "test.db"),
+      // Pinned, not inherited. The board reads this to decide whether a request arrived over TLS,
+      // and a .env on the machine running the tests would otherwise change what the page says: this
+      // suite passed on a laptop with no .env and failed on the server, which has TRUST_PROXY=1.
+      TRUST_PROXY: "0",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -153,6 +157,15 @@ test("gives a chat app something to preview, with absolute links", async () => {
   }
   assert.match(html, /name="twitter:card" content="(summary|summary_large_image)"/);
   assert.match(html, new RegExp(`content="${BASE}/og.png"`), "og:image is not an absolute url");
+});
+
+test("takes the scheme from the proxy when there is one", async () => {
+  // How it actually runs: Caddy terminates TLS and forwards plain http, so the board only knows the
+  // request was secure because the proxy says so. Getting this wrong hands social networks an http
+  // image url on an https page, which some of them refuse to load.
+  const html = await (await fetch(BASE, { headers: { "x-forwarded-proto": "https" } })).text();
+  const host = BASE.replace(/^https?:\/\//, "");
+  assert.match(html, new RegExp(`content="https://${host}/og.png"`), "the proxy's scheme was ignored");
 });
 
 test("serves the preview image", async () => {
