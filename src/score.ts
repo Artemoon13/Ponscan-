@@ -102,6 +102,41 @@ export function dataset(db: DB, since: number): Row[] {
  * Callers that cache an answer derived from it key on this: while it is unchanged the rows are
  * unchanged, so the answer is not stale, it is the same answer.
  */
+/**
+ * Every score in the window, sorted, held for as long as the rows are.
+ *
+ * A card shows where its launch stands among the window, and working that out meant scoring the
+ * whole window again: eleven thousand rows through three hundred trees, 588 ms, for one card. The
+ * feed had already done exactly that work a moment earlier. Held here, a rank costs a binary search.
+ */
+let peerCache: { version: number; hours: number; calibration: string; sorted: Float64Array } | null = null;
+
+function peerScores(rows: Row[], model: GbdtModel, cutoff: number, hours: number, c: { a: number; b: number } | null): Float64Array {
+  const version = datasetVersion();
+  const calibration = c ? `${c.a}:${c.b}` : "-";
+  if (peerCache && peerCache.version === version && peerCache.hours === hours && peerCache.calibration === calibration) {
+    return peerCache.sorted;
+  }
+  const inWindow = rows.filter((r) => r.ts >= cutoff);
+  const sorted = new Float64Array(inWindow.length);
+  for (let i = 0; i < inWindow.length; i++) sorted[i] = corrected(predict(model, inWindow[i].x), c);
+  sorted.sort();
+  peerCache = { version, hours, calibration, sorted };
+  return sorted;
+}
+
+/** How many held scores are strictly greater than `p`, by binary search over the ascending array. */
+function betterThan(sorted: Float64Array, p: number): number {
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] > p) hi = mid;
+    else lo = mid + 1;
+  }
+  return sorted.length - lo;
+}
+
 export function datasetVersion(): number {
   return cached ? cached.builtAt : 0;
 }
@@ -228,10 +263,10 @@ export function scoreOne(db: DB, model: GbdtModel, token: string, windowHours = 
   if (!me) return null;
 
   const c = live();
-  const peers = rows.filter((r) => r.ts >= cutoff).map((r) => corrected(predict(model, r.x), c));
   const raw = predict(model, me.x);
   const p = corrected(raw, c);
-  const better = peers.filter((q) => q > p).length;
+  const peers = peerScores(rows, model, cutoff, windowHours, c);
+  const better = betterThan(peers, p);
   return {
     token: me.token,
     ts: me.ts,

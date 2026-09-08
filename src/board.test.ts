@@ -240,6 +240,23 @@ test("the same feed is not computed twice for the same rows", async () => {
   assert.ok(warm <= Math.max(cold, 50), `held answer took ${warm}ms against ${cold}ms`);
 });
 
+test("a card does not rescore the window to find its rank", async () => {
+  // Where a launch stands among the window is what the feed just computed. Working it out again per
+  // card was 588ms of CPU each: thirty cards took seventeen seconds, and on one thread that is the
+  // whole site for seventeen seconds.
+  await fetch(`${BASE}/api/feed?hours=6`);
+  const first = Date.now();
+  const r = await fetch(`${BASE}/api/token/${TOKEN}`);
+  assert.equal(r.status, 200);
+  const d = await r.json() as { score?: { rank?: number; of?: number } };
+  const cold = Date.now() - first;
+  assert.equal(typeof d.score?.rank, "number", "a card must still know its place");
+
+  const second = Date.now();
+  assert.equal((await fetch(`${BASE}/api/token/${TOKEN}`)).status, 200);
+  assert.ok(Date.now() - second <= Math.max(cold, 60), "the second card paid for the ranking again");
+});
+
 test("reports its own health", async () => {
   const r = await fetch(`${BASE}/api/health`);
   assert.equal(r.status, 200);
