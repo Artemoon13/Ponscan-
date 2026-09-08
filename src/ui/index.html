@@ -124,6 +124,15 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .shot-head,.shot-row{display:grid;grid-template-columns:64px 1fr 48px 48px;gap:0 10px;padding:0 14px;align-items:center;border-bottom:1px solid var(--l06)}
 .shot-head{height:28px;font:500 9.5px var(--mono);color:var(--t4);text-transform:uppercase;letter-spacing:.06em}
 .shot-row{height:44px}
+/* Shown until the first feed answers. The panel is the largest thing on the page, and an empty
+   frame under a live-looking title bar reads as broken rather than as loading. */
+.shot-skel{height:44px;display:grid;grid-template-columns:64px 1fr 48px 48px;gap:0 10px;padding:0 14px;
+  align-items:center;border-bottom:1px solid var(--l06)}
+.shot-skel i{display:block;height:9px;border-radius:3px;background:var(--l08);animation:skel 1.4s ease-in-out infinite}
+.shot-skel i.w{width:70%}
+.shot-skel i.n{width:46%}
+.shot-skel i.s{width:60%;justify-self:end}
+@keyframes skel{0%,100%{opacity:.35}50%{opacity:.75}}
 .shot-row .p{font:600 14px var(--mono)}
 .shot-row .nm{display:flex;gap:6px;align-items:baseline;font-size:12.5px;min-width:0}
 .shot-row .nm span{color:var(--t4);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -588,7 +597,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
       <a class="shot" href="#/board">
         <div class="shot-bar"><i></i><i></i><i></i><span style="margin-left:8px">localhost:4663 · live</span></div>
         <div class="shot-head"><span>Grad</span><span>Launch</span><span style="text-align:right">Rank</span><span style="text-align:right">Age</span></div>
-        <div id="hero-rows"></div>
+        <div id="hero-rows"><div class="shot-skel"><i class="w"></i><i class="n"></i><i class="s"></i><i class="s"></i></div><div class="shot-skel"><i class="w"></i><i class="n"></i><i class="s"></i><i class="s"></i></div><div class="shot-skel"><i class="w"></i><i class="n"></i><i class="s"></i><i class="s"></i></div><div class="shot-skel"><i class="w"></i><i class="n"></i><i class="s"></i><i class="s"></i></div><div class="shot-skel"><i class="w"></i><i class="n"></i><i class="s"></i><i class="s"></i></div><div class="shot-skel"><i class="w"></i><i class="n"></i><i class="s"></i><i class="s"></i></div><div class="shot-skel"><i class="w"></i><i class="n"></i><i class="s"></i><i class="s"></i></div></div>
       </a>
     </div>
 
@@ -1264,6 +1273,7 @@ function renderRoadmap(s) {
 function renderHero() {
   const d = S.feed; if (!d || !d.items) return;
   const top = [...d.items].sort((a, b) => b.probability - a.probability).slice(0, 7);
+  if (!top.length) return;   // keep the placeholders rather than emptying the panel
   $("hero-rows").innerHTML = top.map((it) => { const m = it.meta || {}; const r = it.reasons[0];
     return `<div class="shot-row" style="${it.percentile >= 90 ? "background:rgba(204,255,0,.06)" : ""}">
       <span class="p" style="color:${pcol(it)}">${pct(it.probability)}</span>
