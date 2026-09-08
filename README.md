@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="src/ui/icon-128.png" width="96" alt="gimlet">
+<img src="src/ui/icon-128.png" width="88" alt="gimlet">
 
-# gimlet
+<img src="docs/img/banner.png" alt="GIMLET" width="880">
 
 **a prediction engine for pons v2 launches on Robinhood Chain**<br>
 two models · 23 leak-free features · every call logged before its outcome exists<br>
