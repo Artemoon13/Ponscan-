@@ -197,6 +197,25 @@ test("the page points at the small icons, not the mark", async () => {
   assert.doesNotMatch(html, /rel="icon"[^>]*href="\/logo\.png"/, "the tab is fetching the full mark");
 });
 
+test("the model page answers, and answers faster the second time", async () => {
+  // It was six seconds on the live server: a second and a half to weigh three thousand launches,
+  // and five more because asking for the rows rebuilt the matrix. On a single-threaded server that
+  // is six seconds nobody else is served either, paid again on every page view.
+  const first = Date.now();
+  const r = await fetch(`${BASE}/api/model`);
+  const body = await r.text();
+  assert.equal(r.status, 200, body);
+  const took = Date.now() - first;
+
+  const d = JSON.parse(body) as { importance?: unknown[]; modelId?: string };
+  assert.ok(Array.isArray(d.importance), "no feature influence in the response");
+
+  const again = Date.now();
+  assert.equal((await fetch(`${BASE}/api/model`)).status, 200);
+  const second = Date.now() - again;
+  assert.ok(second <= Math.max(took, 50), `second call took ${second}ms against ${took}ms; the hold is not holding`);
+});
+
 test("reports its own health", async () => {
   const r = await fetch(`${BASE}/api/health`);
   assert.equal(r.status, 200);

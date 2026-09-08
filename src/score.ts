@@ -78,6 +78,17 @@ export function dataset(db: DB, since: number): Row[] {
  * a full build rather than looping. It is rare — cards are opened from the feed — and slow, which is
  * the right trade against silently answering "unknown token" for a launch that exists.
  */
+/**
+ * Whatever matrix is already in hand, or nothing.
+ *
+ * For readers that want the rows but do not need them current, and must not be the one paying for a
+ * rebuild. The model page is the case: a five-second pass to recompute feature influence that moves
+ * over days, triggered by whoever happened to open the tab.
+ */
+export function datasetCachedOnly(): Row[] | null {
+  return cached ? cached.rows : null;
+}
+
 export function datasetWith(db: DB, token: string): Row[] {
   if (cached?.tokens.has(token)) return cached.rows;
   const rows = rebuild(db, cached?.since ?? Math.floor(Date.now() / 1000) - 6 * 3600);
