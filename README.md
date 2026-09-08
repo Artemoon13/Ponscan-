@@ -1,143 +1,303 @@
+<div align="center">
+
+<img src="src/ui/icon-128.png" width="96" alt="gimlet">
+
 # gimlet
 
-New tokens launch on [pons](https://www.ponsfamily.com) faster than anyone can read them. Almost all
-of them die. About **two in a hundred** make it off the bonding curve and into a real
-Uniswap pool.
+**the launch scanner for pons v2 on Robinhood Chain**<br>
+local · open · no wallet · no key · nothing leaves your machine
 
-gimlet watches every launch as it happens and puts the ones worth a look at the top. It runs on your
-own machine, needs no wallet and no key, and sends nothing anywhere.
+<br>
+
+![tests](https://img.shields.io/badge/tests-70%20passing-9ae600?style=flat-square)
+![node](https://img.shields.io/badge/node-%E2%89%A522.6-9ae600?style=flat-square)
+![runtime deps](https://img.shields.io/badge/runtime%20deps-1-9ae600?style=flat-square)
+![chain](https://img.shields.io/badge/chain-Robinhood-333?style=flat-square)
+![custody](https://img.shields.io/badge/custody-none-9ae600?style=flat-square)
+![license](https://img.shields.io/badge/license-MIT-333?style=flat-square)
+
+</div>
+
+<br>
+
+New tokens launch on [pons](https://www.ponsfamily.com) faster than anyone can read them — about
+**24,000 a day**, and **two in a hundred** ever reach a Uniswap pool. Half of the ones that make it
+decide inside **two minutes**. So the job is not analysis, it is triage: out of the thousand
+launches of the last hour, which three are worth opening?
+
+gimlet reads every launch as it lands, scores it against every other launch of the last six hours,
+and says in plain sentences why. It holds no key, signs nothing, and sends nothing anywhere.
+
+<br>
+
+<img src="docs/img/board-hero.png" alt="gimlet board">
+
+<br>
+
+| The problem | What gimlet does | Command |
+|---|---|---|
+| 24,000 launches a day, 530 graduate | scores every one at the moment it lands and ranks it against the last six hours | `board` · `watch` |
+| a bare "4%" means nothing | gives you `#3 of 412` instead — the rank is the part you can act on | `board` |
+| "why this one?" | three plain sentences per launch, each linked to the transaction it came from | `board` |
+| "is the tool any good, or is it telling me a story?" | every score is written down **before** the outcome exists, then graded against the chain | `scoreboard` · `verify` |
+| "does following it make money, or just rank well?" | replays the ranking against the price paths that actually happened | `backtest` |
+| "is there a shape that runs?" | searches the opening seconds, then attacks what it finds three ways | `patterns` |
+| `deployer` is not the creator | reads `tx.from`; Multicall3 is the single largest "deployer" in a day | `board` |
+| half of launches aren't quoted in ETH | resolves each quote asset's decimals so amounts aren't printed as `0.0000` | everywhere |
+
+<br>
+
+## How it works
+
+The left half of this is what every scanner does. The right half — a score written down before the
+outcome exists, graded later against the chain, and fed back as a calibration — is the part that
+makes the record checkable rather than a claim.
+
+```mermaid
+flowchart LR
+  A["pons v2 factory<br/>TokenLaunched"] -->|"websocket push<br/>or 300 ms poll"| B["detect"]
+  B --> C["enrich<br/>decode the launch tx"]
+  C --> D["features at T+0<br/>nothing later is readable"]
+  D --> E["GBDT"]
+  E --> F["rank against<br/>the last 6 hours"]
+  F --> G["card<br/>score · 3 reasons · tx links"]
+  F --> H{"scored within<br/>5 min of launch?"}
+  H -->|"no"| N["not recorded<br/>its fate was half-known"]
+  H -->|"yes"| L[("prediction log<br/>insert-only")]
+  L -.->|"4 hours later"| M["grade against<br/>the chain"]
+  M --> S["scoreboard · verify"]
+  S -.->|"live correction"| E
+```
 
 ## What you actually see
 
-A list of recent launches, ordered by score rather than by clock. For each one:
+```
+  1.7%  # 192/6727  MERCURY    mercuryagent.sh      https://robinhoodchain.blockscout.com/token/0x4df224…
+         + creator bought 0.039 of the quote asset in their own launch
+         - quoted in ETH
+         - busy hour: 849 launches in the last 60 minutes
+  0.9%  # 655/6727  KIMA       Kima Protocol        https://robinhoodchain.blockscout.com/token/0xd3e799…
+         + creator bought 0.070 of the quote asset in their own launch
+         - quoted in ETH
+         - busy hour: 845 launches in the last 60 minutes
+  0.2%  #4392/6727  BABY STONE Baby STONE           https://robinhoodchain.blockscout.com/token/0x986213…
+```
 
-- **A number** — the chance this launch reaches the pool, and where it sits against every other
-  launch of the last six hours. `#3 of 412` is the useful half: on its own a figure like 4% means
-  little, but "third-highest of the last four hundred" tells you whether to look now or never.
-- **Three reasons** — plain sentences saying what moved that number. *"creator bought 0.185 ETH of
-  their own launch"*, *"creator waived the opening tax for 4 wallets"*, *"this creator has launched
-  31 tokens before, none reached the pool"*.
-- **A card**, if you click through — everything known about the launch. Who really created it, how
-  much they bought themselves, which wallets they let in before the 99% opening tax, where the
-  creator fees are routed, how many times this exact ticker has been launched before and how those
-  ended. Every line links to the transaction it came from, so you can check any of it.
+**`#192 of 6,727`** is the useful half. On its own "1.7%" means little; "192nd best of the last six
+hours" tells you whether to look now or never.
 
-The point is not to be told what to buy. The point is to not read four hundred launches by hand.
+Or the same feed on a local page, which is the same engine behind `npm run board`:
 
-## Does it actually work?
+<img src="docs/img/board-feed.png" alt="the feed">
 
-Yes, a bit. Here is the honest version.
+Click any launch and the card holds everything known about it: who really created it, how much they
+bought themselves, which wallets they let in before the 99% opening tax, where the creator fees are
+routed, how many times this exact ticker has launched before and how those ended.
 
-gimlet ranks every launch of the last six hours against the others — several thousand of them on a
-busy evening. Call the top tenth of that ranking the **shortlist**.
+<img src="docs/img/board-card.png" alt="a launch card">
 
-**Out of a hundred launches picked at random, about two reach the pool. Out of a hundred
-taken from the shortlist, about eight do.**
+Every line links to the transaction it came from, so you can check any of it without trusting this
+tool. `Outcome · reached the pool after 3 min` is read back off the chain, not from anything gimlet
+decided.
 
-So roughly **3.7x better than guessing**. That is worth having. It is also nowhere near
-certainty — even on the shortlist, ninety-two out of every hundred still go nowhere. Anyone who
-tells you their model does better than this on launch data alone is selling something.
+<br>
 
-Why the top tenth and not the top ten? Because at these rates the top ten launches hold one or two
-graduations on a good day, and a percentage computed from two events is noise. A tenth is the
-smallest slice that is both near the top and large enough for the number to mean anything.
+## Does it work?
 
-Two more things worth knowing before you lean on it:
+Three different questions, three different answers, and only one of them is about money.
 
-- **You have about two minutes.** Half of all graduations happen within two minutes of launch, 90%
-  within seventy minutes. A launch you read an hour later has already decided.
-- **It held up across the whole week, but a week is all we know.** Six separate test periods, every
-  one better than chance, and the spread between them was narrow: ROC-AUC 0.734 to 0.795, shortlist
-  lift 3.0x to 4.4x. That is an edge across many launches, not a guarantee on any single one, and
-  nothing here has been through a market-wide change of mood.
+### 1. Does the ranking carry information? — yes
 
-These numbers come from a full week — 164,700 launches and 3,480 graduations of real launches, tested the hard way: the model is only ever
-scored on launches that happened *after* the ones it learned from, never on a random shuffle. You can
-re-run that yourself in one command, and you should.
+Call the top tenth of the ranking the **shortlist**.
 
-## Can I check any of this, or do I just trust you?
+> Out of a hundred launches picked at random, about **two** reach the pool.
+> Out of a hundred taken from the shortlist, about **eight** do.
 
-You can check it, and you should not trust it.
+Roughly **3.7x better than guessing**, across a full week — 164,700 launches and 3,480 graduations,
+tested the hard way: the model is only ever scored on launches that happened *after* the ones it
+learned from. Six sequential test periods, every one better than chance, ROC-AUC 0.734 to 0.795.
 
-gimlet writes down every score it gives, at the moment it gives it, **before the outcome exists**.
-Four hours later it looks up what actually happened and grades itself. `npm run scoreboard` shows you
-that record. `npm run verify` dumps the whole log to a file and recomputes the numbers from the file
-alone, so you can hand it to someone who does not trust the code at all.
+### 2. Does following it make money? — a little, and not the way you would hope
 
-Every row in that file names a token, the exact moment the score was written, and what happened. All
-three are on-chain. You can verify any of it in a block explorer without this tool.
+Ranking well and paying well are different questions, and a model can win the first and lose the
+second. `npm run backtest` replays the board against the price paths that actually happened: buy at
++3.5 s (just past the opening tax), sell on a 10x target, a 30% stop, or six minutes, whichever comes
+first.
 
-Two rules keep that log honest:
+```
+window     14 covered hours, 2026-09-06 20:00 to 2026-09-07 19:00 UTC
+coverage   >=98.0% of each hour's launches had their curve read
+eligible   18,544 launches, each settled at least 4h
+entry      +35 blocks (3.5 s), just past the 3 s / 99% opening tax
+costs      1.6% a side, from the fee and tax charged on every CurveBuy
+impact     2.9% at 0.05 of the quote asset, from how far real buys moved the curve
+handover   curve's last price vs the pool's first, over 237 graduated tokens: median 1.00x, 96.6% inside 2x
+```
 
-- **A launch older than five minutes is never recorded.** Half of graduations are decided by then, so
-  scoring late would flatter the record with launches whose fate was already half-known.
-- **A score cannot be edited afterwards.** The first thing gimlet says about a launch is the thing
-  it gets graded on.
+Nothing in that header is an assumption. Costs come off the `fee` and `tax` fields of every CurveBuy;
+slippage comes from how far real buys moved the curve; and the `handover` line is a unit test that
+runs on live data — a token hands over from its curve to its pool at one price, so the two readings
+of it should divide to 1.00, and they do.
 
-Live record so far: run `npm run scoreboard` — it reports whatever has settled on your own machine, which is the only record worth anything to you
+| cohort | launches | win rate | median | mean |
+|---|---|---|---|---|
+| everything | 18,544 | 6.0% | 0.84x | **0.92x** |
+| top half | 8,981 | 7.1% | 0.80x | **0.94x** |
+| shortlist (top 10%) | 1,641 | 13.2% | 0.76x | **1.12x** |
+| top 1% | 157 | 21.0% | 0.66x | **1.65x** |
 
-## Running it
+Read that carefully, because the honest parts are the ones that don't fit on a poster:
 
-You need [Node](https://nodejs.org) 22.6 or newer. Nothing else — no Python, no build step, no
-database to install.
+- **The ranking is the whole product.** Buying everything returns 0.92x. Buying the shortlist returns
+  1.12x. That gap is what the model is worth.
+- **You lose on 87% of positions.** Median position is 0.76x. The return lives in a tail, and if that
+  ratio does not fit how you trade, nothing here fixes it.
+- **Resampling the 1,631 shortlist positions puts the mean between 1.06x and 1.18x nine times out of
+  ten.** Remove the ten best of them and it is still 1.07x, so it is not one lucky token — but it is
+  a thin edge measured over fourteen hours, not a week.
+- **Speed past the tax window buys little.** Entering at +3.5 s returns 1.12x; at +60 s, 1.07x. The
+  whole minute is worth about five percent, so being 200 ms faster than the next person is worth
+  nothing measurable. The opening tax has already eaten that race, and this is a scanner rather than
+  a sniper for the same reason.
+
+### 3. Is there a green flag in the opening seconds? — yes, and it is costly signalling
+
+`npm run patterns` searches the first 30 seconds of trading for shapes that precede a run. A search
+that wide will *always* find something, so every candidate is attacked three ways: proposed on older
+launches and judged on newer ones, floored at 40 launches of support, and raced against **the same
+search run on shuffled outcomes** — which is what the search invents from nothing.
+
+The noise line sits at 3.69x lift. What clears it:
+
+| pattern (first 30 s) | held-out | n |
+|---|---|---|
+| `priceMove ≥ 3.3` and `snipers ≥ 6` | **7.40x** | 62 |
+| `snipers ≥ 10` and `buys ≥ 41` | **7.17x** | 76 |
+| `buys ≥ 58` and `snipers ≥ 6` | **6.26x** | 87 |
+
+`snipers` is the number of wallets that **paid the 99% opening tax** to get in during the first three
+seconds. Six of them is six wallets each burning almost their whole entry for the privilege — the
+most expensive vote of confidence this chain allows anyone to cast. Against a base rate of 3.5%
+tripling from the 30-second price, those launches triple about 20% of the time.
+
+None of this is in the score today. It is measured, not shipped.
+
+<br>
+
+## Install
+
+Node 22.6 or newer. No Python, no build step, no database to install — one runtime dependency.
 
 ```bash
+git clone https://github.com/Artemoon13/Ponscan-.git gimlet && cd gimlet
 npm install
 cp .env.example .env
 npm run doctor
 ```
 
-`doctor` checks it can reach the chain and that pons hasn't moved its contracts. If it fails, stop
+`doctor` checks it can reach the chain and that pons has not moved its contracts. If it fails, stop
 there; nothing else will work.
 
-Then collect what the board needs:
+| | |
+|---|---|
+| **Required** | Node ≥ 22.6 |
+| **Runtime dependencies** | `viem`. That is the list. |
+| **Key** | none, for anything. There is no command that signs. |
+| **Detection** | publicnode's websocket for pushes; `RPC_WS_URL=off` falls back to 300 ms polling |
+| **Public RPCs** | two on purpose: only the official one serves `eth_getLogs`, only publicnode has a socket. Raise `RPC_IN_FLIGHT` if you bring your own provider. |
+| **Storage** | `node:sqlite`, shipped with Node. One file under `data/`. |
+
+<br>
+
+## Sixty seconds
 
 ```bash
-npm run setup
-```
-
-About thirteen minutes, measured on a busy machine. It pulls a week of launches and graduations,
-then decodes the last eight hours of launch transactions — and the split matters: reading factory
-events costs one request per sixty thousand blocks, while decoding a launch costs one request per
-launch. A week of the first is five minutes; a week of the second is forty. You need the whole week
-of history for creator records to be right, and only the visible window decoded.
-
-A trained model ships with the repository, so there is nothing to fit before you can look:
-
-```bash
+npm run doctor      # is the chain there, and are pons's addresses what we think
+npm run setup       # a week of launches, and the last eight hours decoded (~13 min)
 npm run board       # the list, at http://localhost:4663
-npm run watch       # the same thing live in a terminal
 npm run scoreboard  # how its past calls actually turned out
 ```
 
-Two things worth doing once it is running:
+A trained model ships with the repository, so there is nothing to fit before you can look. Two things
+worth doing once it is running:
 
 ```bash
-npm run enrich-window -- --hours 168   # decode the rest of the week, about forty minutes
+npm run enrich-window -- --hours 168   # decode the rest of the week (~40 min)
 npm run train                          # refit on your own data rather than the shipped model
 ```
 
+<br>
+
+## Commands
+
+Nothing here needs a key, because nothing here signs.
+
+| Command | What it does |
+|---|---|
+| `doctor` | endpoints, chain id, contract addresses against the factory's own getters |
+| `board` | the list on a local web page, `http://localhost:4663` |
+| `watch` | the same feed in a terminal, logging each score it prints |
+| `scoreboard` | the live record, by model era |
+| `verify` | dumps the prediction log to JSONL and recomputes the numbers from the file alone |
+| `stats` | what is in the database |
+| `backtest` | what following the ranking would have returned, with costs measured from the trades |
+| `patterns` | searches the opening seconds for shapes, against a permutation null |
+| `early` | whether those shapes improve the peak model, on rolling-origin folds |
+| `setup` | everything a fresh clone needs |
+| `backfill` | factory events: who launched, when, and what graduated |
+| `enrich-window` | decodes launch transactions across a contiguous span |
+| `curves` | reads curve trades in bulk, so peaks exist for more than what somebody clicked |
+| `train` · `validate` | fit and print held-out metrics · rolling-origin folds |
+| `nightly` | backfill, enrich, retrain, in that order |
+| `telegram` | optional bot — the only part of this project that talks to a third party |
+
+<br>
+
 ## Where it lets you down
 
-- **You are wrong most of the time even when you follow it.** Ninety-two launches out of every
-  hundred on the shortlist still go nowhere. Eight in a hundred beats two in a hundred and is still
-  mostly failure. If that ratio does not fit how you trade, this tool will not fix that.
-- **The multipliers carry more precision than they deserve.** The shortlist holds roughly 130
-  graduations in a typical test period. The direction is solid; the second decimal place is not.
-  `scoreboard` prints raw hit counts next to every rate so the sample size stays visible.
-- **An earlier, smaller sample said the model broke sometimes. It did not.** On a single day of data
-  one test period in six landed at chance, and this file used to say so out loud. With a full week —
-  ten times the graduations in each period — that vanished entirely. It was too few events, not a
-  model that stops working. Worth knowing because it cuts both ways: a small sample invents
-  instability, and it invents edges just as easily.
+- **You are wrong most of the time even when you follow it.** Ninety-two launches in a hundred on the
+  shortlist never reach the pool, and 87% of positions lose money. Eight in a hundred beats two in a
+  hundred and is still mostly failure.
 - **It has not lived through a regime change.** Launch tactics drift, and a scanner that works this
-  month can quietly stop working next month. The live scoreboard is the thing that will tell you —
-  watch it, not the numbers in this file.
+  month can quietly stop working next month. The live scoreboard is what will tell you — watch that,
+  not the numbers in this file.
+- **The money section is fourteen hours, not a week.** Curve trades are read on demand, so only hours
+  where nearly every launch was read can be tested at all. `npm run curves` widens that.
 - **It knows nothing about anything except pons v2 launches.** Not price, not safety, not whether a
   token is a scam. It answers one question and has no opinion on any other.
 - **A public score invites gaming.** If enough people trade off the same signal, the signal changes.
 
+<br>
+
+## Can I check any of this?
+
+You can, and you should not trust it otherwise.
+
+gimlet writes down every score at the moment it gives it, **before the outcome exists**. Four hours
+later it looks up what happened and grades itself. Two rules keep that log honest:
+
+- **A launch older than five minutes is never recorded.** Half of graduations are decided by then, so
+  scoring late would flatter the record with launches whose fate was already half-known.
+- **A score cannot be edited afterwards.** The first thing gimlet says about a launch is the thing it
+  gets graded on.
+
+```bash
+npm run scoreboard   # the record on your own machine, which is the only one worth anything to you
+npm run verify       # export the log, recompute from the file, hand it to someone who trusts nothing
+```
+
+The board shows the same thing, including the folds that landed at chance:
+
+<img src="docs/img/board-model.png" alt="the model page">
+
+Every row names a token, the exact moment the score was written, and what happened. All three are on
+chain. You can verify any of it in a block explorer without this tool.
+
+<br>
+
 ---
+
+<br>
 
 # Under the hood
 
@@ -153,83 +313,64 @@ factory logs  ──▶  SQLite  ──▶  features at T+0  ──▶  GBDT  �
 - **Ingest** (`src/ingest.ts`, `src/live.ts`) follows the pons v2 factory. The official RPC has no
   websocket, so a publicnode socket carries detection while the official endpoint serves the log
   reads. Every path funnels through the same catch-up read, so a dropped socket, a missed
-  notification or a restart all recover by pulling the gap. Writes are upserts keyed on on-chain
-  identifiers, so replaying a range is harmless.
-- **Storage** (`src/db.ts`) is `node:sqlite`, which ships with Node — no native module to build.
-  Amounts are stored twice: exact integers as strings, and floats for sorting.
+  notification or a restart all recover by pulling the gap.
+- **Storage** (`src/db.ts`) is `node:sqlite` — no native module to build. Amounts are stored twice:
+  exact integers as strings, and floats for sorting.
 - **Features** (`src/features.ts`) are computed strictly from what is knowable when the launch
   transaction lands. Nothing reads a trade, a price, or an outcome.
 - **Model** (`src/model/gbdt.ts`) is gradient-boosted trees written out rather than pulled in, so the
   whole tool stays one runtime. Contributions decompose exactly, which is where the reasons come from.
 - **Prediction log** (`src/track.ts`) records each live score before its outcome exists and grades it
   against the same label the model is trained on.
+- **Backtest** (`src/backtest.ts`) prices positions only at levels the token actually traded at, and
+  only on hours where nearly every launch was read.
 
-## Commands
+## Four things that are easy to get wrong
 
-```bash
-npm run setup          # everything a fresh clone needs: a week of history, the visible window decoded
-npm run doctor         # endpoints, chain id, contract addresses against the factory's own getters
-npm run backfill       # factory events: who launched, when, and what graduated
-npm run enrich-window  # decode launch transactions across a contiguous span
-npm run train          # fit, print held-out metrics, write data/model.json
-npm run validate       # rolling-origin folds: does the signal repeat, or was that one lucky split?
-npm run stats          # what is in the database
-npm run board          # http://localhost:4663
-npm run watch          # live feed, logging each score it prints
-npm run scoreboard     # the live record, by model era
-npm run verify         # export the log as JSONL, recompute from the file
-npm run nightly        # backfill, enrich, retrain, in that order
-npm run names          # ask token contracts for names the launch never declared
-npm test               # the parts that fail silently when broken
-```
+Each of these silently produces a plausible, wrong answer.
 
-`backfill` covers a week in about five minutes. `enrich-window` is the slow part at roughly
-fifty launches a second, because it reads every launch transaction; a full week is
-about forty minutes. The two use different endpoints on purpose: only one public node serves
-`eth_getLogs`, so enrichment deliberately reads transactions from the other one and leaves that
-budget to the watcher.
+1. **The docs list a stale factory.** `docs.ponsfamily.com` defaults to its v1 page, and the v1
+   factory has been idle for weeks. v1 has no curve and no migration, and its graduation rate is
+   indistinguishable from zero. `doctor` re-checks the addresses against the live factory's getters.
+2. **`deployer` is not the creator.** `TokenLaunched` reports whoever called the factory, which is
+   often a batching contract — Multicall3 alone is the largest "deployer" in a day. The human is the
+   transaction sender, which is why the card reads `tx.from`.
+3. **Roughly half of launches are not quoted in ETH**, and those quote assets are tokenised stocks
+   and a 6-decimal stablecoin. Formatting their amounts as 18-decimal wei prints `0.0000` for real
+   values, so decimals are resolved and cached (`src/quote.ts`). The same trap bit the backtest: a
+   curve price is raw-over-raw and a pool price is whole-over-whole, and one position came back at
+   4,051,207,400x before the two were put on the same scale.
+4. **About half of launches do not go through the pons router**, so their calldata cannot be decoded
+   and the creator's declared terms are unknown. Folding that into "bought nothing" would poison the
+   strongest signal, so absence is its own feature.
+
+## How the evaluation avoids lying to itself
+
+- **Splits are by time, never at random.** Launch tactics drift day to day, so a random split lets
+  the model see the same hour it is tested on.
+- **Creator history accumulates by graduation time, not launch time.** A creator's earlier launch can
+  graduate *after* the launch being scored; counting it by the earlier launch's own timestamp would
+  read the future.
+- **Unsettled launches are dropped.** A launch from ten minutes ago has not graduated *yet*, which is
+  not the same as not graduating.
+- **Average precision is the headline, not ROC-AUC.** At a 2.2% positive rate, ROC-AUC flatters a
+  model that is useless at the top of the ranking, and the top is the only part anyone looks at.
+- **A target may never contain the evidence.** The pattern search first reported that launches
+  already up 3.8x in their opening seconds tend to reach 5x — true, circular and worthless, because
+  the lifetime peak contains the window the feature was measured in. It now scores against the peak
+  reached *after* the window, which is the multiple a buyer could still capture.
+- **A wide search is raced against itself on shuffled data.** The best of three hundred noisy
+  estimates is not a typical noisy estimate, so `patterns` reports what the same search finds when
+  there is nothing to find, and a candidate has to beat that rather than the base rate.
 
 ## Why `enrich-window` and not `enrich`
 
 Training needs an *unbiased* sample. Enriching "all the graduated ones plus a scattering of others"
 is fine for asking whether a feature separates the classes, but a model fitted on it is calibrated to
-a positive rate that does not exist, and the score reads far too high. `enrich-window` fills a
-contiguous span completely, and `train` refuses to run on anything else — it finds the longest run of
-hours with ≥98% coverage and uses only that.
-
-## Four things that are easy to get wrong
-
-Each of these silently produces a plausible, wrong answer:
-
-1. **The docs list a stale factory.** `docs.ponsfamily.com` defaults to its v1 page, and the v1
-   factory has been idle for weeks. v1 and v2 are different protocols: v1 has no curve and no
-   migration, and its graduation rate is indistinguishable from zero. This tool targets v2 only, and
-   `doctor` re-checks the addresses against the live factory's own getters.
-2. **`deployer` is not the creator.** The `TokenLaunched` event reports whoever called the factory,
-   which is often a batching contract — Multicall3 alone is the single largest "deployer" in a day.
-   The human is the transaction sender, which is why the card reads `tx.from`.
-3. **Roughly half of launches are not quoted in ETH**, and those quote assets are tokenised stocks
-   and a 6-decimal stablecoin. Formatting their amounts as 18-decimal wei prints `0.0000` for real
-   values, so the quote asset's decimals are resolved and cached (`src/quote.ts`).
-4. **About half of launches do not go through the pons router**, so their calldata cannot be decoded
-   and the creator's declared terms are simply unknown. Folding that into "bought nothing" would
-   poison the strongest signal, so absence is its own feature.
-
-## How the evaluation avoids lying to itself
-
-- **Splits are by time, never at random.** Launch tactics drift day to day, so a random split lets
-  the model see the same hour it is tested on and reports a number the live product never reaches.
-- **Creator history accumulates by graduation time, not launch time.** A creator's earlier launch can
-  graduate *after* the launch being scored; counting it by the earlier launch's own timestamp would
-  read the future.
-- **Unsettled launches are dropped.** A launch from ten minutes ago has not graduated *yet*, which is
-  not the same as not graduating. Training on it as a negative teaches the model that recent launches
-  fail.
-- **Average precision is the headline, not ROC-AUC.** At a 2.2% positive rate, ROC-AUC
-  flatters a model that is useless at the top of the ranking, and the top is the only part anyone
-  looks at.
-- **`validate` refits at several sequential cut points** and reports the spread. A single split on a
-  rare class swings widely enough to either flatter a model with no signal or damn one that has some.
+a positive rate that does not exist. `enrich-window` fills a contiguous span completely, and `train`
+refuses to run on anything else. The backtest applies the same rule to curve reads, for the same
+reason: a curve that was read *because somebody opened its card* is a launch selected by the very
+score being measured.
 
 ## Retraining
 
@@ -238,9 +379,8 @@ npm run nightly
 ```
 
 Labels settle quickly — the 4-hour horizon captures 98.5% of graduations — so a nightly retrain
-always has fresh, fully resolved labels. `board` reloads the model per request, so a retrain is
-picked up without restarting anything, and `scoreboard` starts a new era rather than pooling the new
-model's calls with the old one's.
+always has fresh, fully resolved labels. `board` reloads the model per request, and `scoreboard`
+starts a new era rather than pooling the new model's calls with the old one's.
 
 ## Tests
 
@@ -248,11 +388,9 @@ model's calls with the old one's.
 npm test
 ```
 
-Deliberately narrow. They cover the two places where a bug produces no error and no log line, just
-quietly wrong output: the block-timestamp interpolation (where wrongly spaced anchors turned a
-five-minute backfill into a ten-hour one), the booster itself (where a subtle split-finding or
-attribution bug still trains, still reports plausible metrics, and is worthless), and the prediction
-log's two honesty rules.
+Deliberately narrow. They cover the places where a bug produces no error and no log line, just
+quietly wrong output: block-timestamp interpolation, the booster itself, the prediction log's two
+honesty rules, the backtest's lookahead and unit joins, and the pattern search's tautology trap.
 
 ## License
 
