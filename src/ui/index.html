@@ -43,7 +43,7 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Geist,system-ui,sans-serif;min-width:1100px;font-size:14px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Geist,system-ui,sans-serif;font-size:14px}
 /**
  * Hover is scoped to plain links on purpose. `a:hover{color}` outranks a class rule, so it used to
  * repaint every anchor-shaped component too: lime text on a lime button, and a whole card turning
@@ -78,6 +78,21 @@ button{font-family:inherit;border:0;background:none;color:inherit;cursor:pointer
 .btn{padding:9px 16px;border-radius:6px;background:var(--lime);color:#111;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;line-height:1;border:1px solid var(--lime)}
 .btn:hover{background:var(--lime2);border-color:var(--lime2);color:#111}
 .btn:active{background:#b8e600;border-color:#b8e600}
+/* Below the desktop width the bar has to give somewhere. The links scroll rather than wrap, so the
+   bar stays one row and every destination is still reachable; the status pill keeps its dot, which
+   is the part that carries meaning, and lets the block and model detail truncate. */
+@media (max-width:1100px){
+  .nav{padding:0 20px;gap:16px}
+  .links{gap:16px;font-size:15px;min-width:0;overflow-x:auto;scrollbar-width:none}
+  .links::-webkit-scrollbar{display:none}
+  .nav .live{min-width:0}
+  .nav .live #livetxt{overflow:hidden;text-overflow:ellipsis}
+}
+@media (max-width:720px){
+  .nav{padding:0 14px}
+  .nav .live{display:none}
+  .brand b{font-size:17px}
+}
 .btn:focus-visible{outline:2px solid var(--lime2);outline-offset:2px}
 .btn.ghost{background:transparent;border-color:rgba(255,255,255,.2);color:var(--ink);font-weight:500;font-family:var(--mono)}
 .btn.ghost:hover{background:var(--l07);border-color:rgba(204,255,0,.4);color:var(--ink)}
@@ -165,7 +180,11 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .foot span{display:flex;gap:18px}
 
 /* ── board ── */
-.board{flex:1;display:grid;grid-template-columns:minmax(620px,1fr) 6px var(--panelW,400px);min-height:0;height:calc(100vh - 56px)}
+/* The one page with a hard width requirement: 620 for the list, 6 for the handle, 400 for the
+   card, and no useful way to show that in less. It carries the minimum itself and scrolls
+   sideways below it. This used to live on `body`, where it pinned all eight pages to the
+   widest one and left every narrow screen scrolling horizontally through prose. */
+.board{flex:1;display:grid;grid-template-columns:minmax(620px,1fr) 6px var(--panelW,400px);min-height:0;min-width:1040px;height:calc(100vh - 56px)}
 .board.dragging{user-select:none}
 .list{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--l10);min-height:0}
 .lhead{display:flex;align-items:center;gap:10px;padding:0 24px;height:52px;border-bottom:1px solid var(--l08);flex:none}
@@ -185,7 +204,10 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .doc h1{margin:0;font:700 44px/1 Geist,sans-serif;letter-spacing:-.035em}
 .doc .sub{margin-top:10px;font-size:14px;color:var(--t55)}
 .doc .cols2{display:grid;grid-template-columns:minmax(0,680px) minmax(0,1fr);gap:44px;margin-top:34px;align-items:start}
-@media (max-width:900px){.doc .cols2{grid-template-columns:1fr}}
+/* Stacked at 1100 rather than 900: the main column is a fixed 680, so everything below about
+   1100 goes to the sidebar, and by 1005 it is a 200px strip breaking endpoints one character
+   at a time. Full width and underneath is the readable arrangement. */
+@media (max-width:1100px){.doc .cols2{grid-template-columns:1fr}}
 .prose{font-size:14.5px;line-height:1.65;color:var(--t78)}
 .prose p{margin:14px 0 0;text-wrap:pretty}
 .prose h2{margin:40px 0 0;font:700 22px Geist,sans-serif;letter-spacing:-.025em;color:var(--ink);display:flex;align-items:center;gap:12px}
@@ -268,6 +290,9 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .envt td{padding:8px 10px 8px 0;border-bottom:1px solid var(--l06);vertical-align:top}
 .envt td.k{color:var(--lime);white-space:nowrap}
 .envt td.v{color:var(--ink);white-space:nowrap}
+/* An endpoint is one long token, and nowrap makes the table wider than the sidebar holding it
+   rather than wider than itself. Below the desktop width it wraps instead of pushing the page. */
+@media (max-width:520px){.envt td.v{white-space:normal;overflow-wrap:anywhere}}
 .envt td.d{color:var(--t55);font-family:Geist,sans-serif;font-size:12.5px;line-height:1.45}
 /* the honest banner for a page describing something that does not exist yet */
 /* The coin page splits the other way round from the reading pages: the chart wants the width and
