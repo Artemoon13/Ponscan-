@@ -92,4 +92,12 @@ export const EXPLORER = {
   address: (a: string): string => `https://robinhoodchain.blockscout.com/address/${a}`,
   token: (a: string): string => `https://robinhoodchain.blockscout.com/token/${a}`,
   pons: (a: string): string => `https://www.ponsfamily.com/token/${a}`,
+  /**
+   * A place to trade the thing, one tap from an alert.
+   *
+   * `chain` is the part that matters: without it the address is looked up on the wrong chain. The
+   * other parameters a shared link carries are that reader's own sidebar state, so they are left off
+   * rather than imposed on everyone who taps.
+   */
+  axiom: (a: string): string => `https://axiom.trade/token/${a}?chain=robinhood`,
 } as const;

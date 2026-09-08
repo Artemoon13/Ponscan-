@@ -1,3 +1,4 @@
+import { EXPLORER } from "../config.ts";
 import { openDb, type DB } from "../db.ts";
 import { loadModel, scoreRecent, type Scored } from "../score.ts";
 import { claimsFor } from "../alerts.ts";
@@ -80,15 +81,33 @@ async function tg<T = unknown>(method: string, body?: Record<string, unknown>): 
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-async function send(chatId: number, text: string): Promise<boolean> {
+type Button = { text: string; url: string };
+
+async function send(chatId: number, text: string, buttons?: Button[]): Promise<boolean> {
   const r = await tg("sendMessage", {
     chat_id: chatId,
     text,
     parse_mode: "HTML",
     disable_web_page_preview: true,
+    // One row. Telegram stacks a second row into its own line, and three links about one launch do
+    // not need two lines.
+    ...(buttons?.length ? { reply_markup: { inline_keyboard: [buttons] } } : {}),
   });
   return r !== null;
 }
+
+/**
+ * The links that belong under a launch, as buttons rather than as text.
+ *
+ * A reader who wants to act on an alert wants one tap, not a link buried in a paragraph they have to
+ * find first. Trading comes first because it is the thing being decided; the explorer and the pons
+ * page are for checking, and checking happens after.
+ */
+const linksFor = (token: string): Button[] => [
+  { text: "Buy on Axiom", url: EXPLORER.axiom(token) },
+  { text: "Explorer", url: EXPLORER.token(token) },
+  { text: "pons", url: EXPLORER.pons(token) },
+];
 
 const db: DB = openDb();
 
@@ -152,7 +171,18 @@ async function handle(chatId: number, text: string): Promise<void> {
       await send(chatId, topText(db, WINDOW_HOURS));
       return;
     case "/token":
-      await send(chatId, rest[0] ? tokenText(db, rest[0]) : "give an address, e.g. <code>/token 0x…</code>");
+      if (!rest[0]) {
+        await send(chatId, "give an address, e.g. <code>/token 0x…</code>");
+        return;
+      }
+      // Buttons only once the address is one we recognise; a reply that says "not in the database"
+      // has nothing to link to.
+      {
+        const t = rest[0].trim().toLowerCase();
+        const known = /^0x[0-9a-f]{40}$/.test(t)
+          && db.prepare("SELECT 1 x FROM launches WHERE token = ?").get(t) !== undefined;
+        await send(chatId, tokenText(db, rest[0]), known ? linksFor(t) : undefined);
+      }
       return;
     default:
       if (name.startsWith("/")) await send(chatId, HELP);
@@ -196,7 +226,7 @@ async function deliver(chatId: number, items: Scored[]): Promise<number> {
     // Marked before sending, not after: a message that fails is better skipped than repeated on
     // every pass, and Telegram gives no way to know a timeout did not arrive.
     mark.run(chatId, s.token, Math.floor(Date.now() / 1000));
-    if (await send(chatId, alertText(db, s, m))) sent++;
+    if (await send(chatId, alertText(db, s, m), linksFor(s.token))) sent++;
     // Telegram allows about one message a second to a single chat.
     await sleep(1100);
   }
@@ -242,6 +272,24 @@ if (!me) {
   console.error("Telegram refused the token. Check TELEGRAM_BOT_TOKEN in .env.");
   process.exit(1);
 }
+/**
+ * The list Telegram offers when someone types "/".
+ *
+ * Registering it is the difference between commands that have to be read about first and commands
+ * that announce themselves, with what they do beside them, at the moment a reader is looking for
+ * one. Re-sent on every start so a changed description does not need remembering.
+ */
+await tg("setMyCommands", {
+  commands: [
+    { command: "watch", description: "only alert me at or above n%, e.g. /watch 8" },
+    { command: "top", description: "strongest launches on the board right now" },
+    { command: "token", description: "everything known about one launch: /token 0x…" },
+    { command: "status", description: "is the watcher keeping up, how old is the model" },
+    { command: "help", description: "what the numbers mean" },
+    { command: "stop", description: "no more alerts, and delete my record" },
+  ],
+});
+
 console.log(`gimlet telegram — @${me.username}`);
 console.log(`  default threshold ${DEFAULT_MIN}%, window ${WINDOW_HOURS}h`);
 console.log(`  alerting on each claim as the watcher writes it, with a full pass every ${INTERVAL_SEC}s`);
