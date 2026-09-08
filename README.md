@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="src/ui/icon-128.png" width="88" alt="augur">
+<img src="src/ui/icon-128.png" width="88" alt="Augur">
 
-# augur
+# Augur
 
 **a prediction engine for pons v2 launches on Robinhood Chain**<br>
 two models · 23 leak-free features · every call logged before its outcome exists<br>
@@ -42,7 +42,7 @@ local · open · no wallet · no key · nothing leaves your machine
 Uniswap pool, and half of those decide inside **two minutes**. No one reads that stream. Almost
 nobody has ever measured it.
 
-augur is a quantitative research stack pointed at it. As each launch transaction lands it is
+Augur is a quantitative research stack pointed at it. As each launch transaction lands it is
 decoded, turned into a 23-dimensional feature vector built strictly from what is knowable at that
 instant, and put through two gradient-boosted models: one for the **probability it reaches the
 pool**, one for **how high it climbs** if it does. The result is a rank against every other launch
@@ -65,11 +65,11 @@ is a file you can export and recompute without trusting a line of this code.
 
 <br>
 
-<img src="docs/img/board-hero.png" alt="augur board">
+<img src="docs/img/board-hero.png" alt="Augur board">
 
 <br>
 
-| What you would otherwise do by hand | What augur does instead | Command |
+| What you would otherwise do by hand | What Augur does instead | Command |
 |---|---|---|
 | 24,000 launches a day, 530 graduate | scores every one at the moment it lands and ranks it against the last six hours | `board` · `watch` |
 | a bare "4%" means nothing | gives you `#3 of 412` instead, and the rank is the part you can act on | `board` |
@@ -107,7 +107,7 @@ flowchart LR
 
 ## What you actually see
 
-<img src="docs/img/term-watch.png" alt="augur watch">
+<img src="docs/img/term-watch.png" alt="Augur watch">
 
 **`#175 of 6,176`** is the useful half. On its own "1.8%" means little; "175th best of the last six
 hours" tells you whether to look now or never. The line reading *"not logged: seen too late for the
@@ -125,7 +125,7 @@ routed, how many times this exact ticker has launched before and how those ended
 <img src="docs/img/board-card.png" alt="a launch card">
 
 Every line links to the transaction it came from, so you can check any of it without trusting this
-tool. `Outcome · reached the pool after 3 min` is read back off the chain, not from anything augur
+tool. `Outcome · reached the pool after 3 min` is read back off the chain, not from anything Augur
 decided.
 
 <br>
@@ -324,12 +324,12 @@ this repository changes when an address exists.
 
 You can, and you should not trust it otherwise.
 
-augur writes down every score at the moment it gives it, **before the outcome exists**. Four hours
+Augur writes down every score at the moment it gives it, **before the outcome exists**. Four hours
 later it looks up what happened and grades itself. Two rules keep that log honest:
 
 - **A launch older than five minutes is never recorded.** Half of graduations are decided by then, so
   scoring late would flatter the record with launches whose fate was already half-known.
-- **A score cannot be edited afterwards.** The first thing augur says about a launch is the thing it
+- **A score cannot be edited afterwards.** The first thing Augur says about a launch is the thing it
   gets graded on.
 
 ```bash

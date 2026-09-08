@@ -234,7 +234,7 @@ npm run stats
 
 ```ini
 [Unit]
-Description=augur board
+Description=Augur board
 After=network-online.target
 Wants=network-online.target
 
@@ -256,7 +256,7 @@ WantedBy=multi-user.target
 
 ```ini
 [Unit]
-Description=augur live watcher
+Description=Augur live watcher
 After=network-online.target
 Wants=network-online.target
 
@@ -278,7 +278,7 @@ WantedBy=multi-user.target
 
 ```ini
 [Unit]
-Description=augur nightly retrain
+Description=Augur nightly retrain
 
 [Service]
 Type=oneshot
@@ -291,7 +291,7 @@ ExecStart=/usr/bin/npm run nightly
 
 ```ini
 [Unit]
-Description=augur nightly retrain
+Description=Augur nightly retrain
 
 [Timer]
 OnCalendar=*-*-* 04:30:00
