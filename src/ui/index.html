@@ -201,8 +201,8 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .rmbar .sp{margin-left:auto;display:flex;align-items:center;gap:7px;color:var(--lime)}
 .rmbar .sp .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:pulse 2s infinite}
 .rmwrap{border:1px solid var(--l08);border-radius:0 0 10px 10px;background:var(--bg2);padding:30px 28px 26px}
-/* Absolute positions on a 190px stage, the geometry the design uses: one line, marks sitting on it,
-   captions alternating above and below so five of them fit without colliding. */
+/* One line, marks sitting on it, captions alternating above and below so five of them fit without
+   colliding. The stage's height is set from JS once the captions can be measured, not fixed here. */
 .rmwrap h1{margin:0}
 .rmwrap .sub{margin:10px 0 36px}
 .tl{position:relative}
@@ -966,6 +966,7 @@ function route() {
   if (S.page === "model") loadModel();
   if (S.page === "token") loadCoin();
   if (S.page === "home" || S.page === "roadmap") loadStats();
+  if (S.page === "roadmap") layoutRoadmap();
   loadFeed();
   window.scrollTo(0, 0);
 }
@@ -1058,8 +1059,8 @@ function passes(it) {
  * The roadmap, drawn on one line rather than listed.
  *
  * Five marks on a rule, captions alternating above and below so they fit side by side, and the rule
- * filled in lime only as far as the work actually got. The stage is 190px and the rule sits at 94,
- * so each caption is placed to land its own mark on that line rather than near it.
+ * filled in lime only as far as the work actually got. The stage's height and the rule's position
+ * come from measuring the captions, so a long one is never clipped: see layoutRoadmap.
  *
  * Status lives in the data, not in the markup: the header's "n of five shipped" and the length of
  * the fill are both counted from the same array the marks come from, so a milestone cannot move
@@ -1108,23 +1109,8 @@ function drawRoadmap() {
         '<div class="de">' + esc(m.d) + '</div></div>';
     }).join("");
 
-  // Measured rather than assumed: the tallest caption on each side decides where the rule sits and
-  // how tall the stage is, so a short row leaves no dead band above it and a long one is not cut off.
-  const caps = [...stage.querySelectorAll(".m")];
-  const tallest = (up) => Math.max(0, ...caps.filter((c) => (c.dataset.up === "1") === up).map((c) => c.offsetHeight));
-  const above = tallest(true), below = tallest(false);
-  const rule = above + GAP;
-
-  stage.style.height = rule + 2 + GAP + below + "px";
-  stage.querySelector(".line").style.top = rule + "px";
-  const fill = stage.querySelector(".fill");
-  fill.style.top = rule + "px";
-  fill.style.width = fillTo + "%";
-  stage.querySelectorAll(".mk").forEach((mk) => { mk.style.top = rule - 6 + "px"; });
-  caps.forEach((c) => {
-    if (c.dataset.up === "1") c.style.top = rule - GAP - c.offsetHeight + "px";
-    else c.style.top = rule + 2 + GAP + "px";
-  });
+  stage.dataset.fill = fillTo;
+  layoutRoadmap();
 
   $("rm-count").textContent = shipped + " of " + n + " shipped";
   $("rm-now").textContent = building ? building.title.toLowerCase() : "nothing in flight";
@@ -1133,6 +1119,45 @@ function drawRoadmap() {
     '<div class="r' + (s.ok ? "" : " no") + '"><i>' + (s.ok ? "\u2713" : "\u00b7") + "</i><b>" +
     esc(s.t) + "</b><span>" + esc(s.w) + "</span></div>").join("");
 }
+
+/**
+ * Where the rule sits and how tall the stage is, measured from the captions themselves.
+ *
+ * Separate from drawing them because it has to run more than once. `loadStats` feeds both the front
+ * page and this one, so the markup was being built while `#page-roadmap` was still `hidden` — and a
+ * hidden element measures zero. Every caption came back 0px tall, the stage sized itself to 38px,
+ * and then the page was shown and five 81px captions spilled out of it and over the prose below. The
+ * build only happens once; the measurement happens whenever the stage is visible, which is also what
+ * makes a resize or a late-arriving webfont reflow it instead of leaving stale offsets behind.
+ */
+function layoutRoadmap() {
+  const stage = $("rm-tl");
+  // offsetParent is null while an ancestor is hidden, which is exactly when the measurement lies.
+  if (!stage || !stage.dataset.drawn || stage.offsetParent === null) return;
+
+  const GAP = 18;
+  const caps = [...stage.querySelectorAll(".m")];
+  if (!caps.length) return;
+  const tallest = (up) => Math.max(0, ...caps.filter((c) => (c.dataset.up === "1") === up).map((c) => c.offsetHeight));
+  const above = tallest(true), below = tallest(false);
+  const rule = above + GAP;
+
+  stage.style.height = rule + 2 + GAP + below + "px";
+  stage.querySelector(".line").style.top = rule + "px";
+  const fill = stage.querySelector(".fill");
+  fill.style.top = rule + "px";
+  fill.style.width = stage.dataset.fill + "%";
+  stage.querySelectorAll(".mk").forEach((mk) => { mk.style.top = rule - 6 + "px"; });
+  caps.forEach((c) => {
+    if (c.dataset.up === "1") c.style.top = rule - GAP - c.offsetHeight + "px";
+    else c.style.top = rule + 2 + GAP + "px";
+  });
+}
+
+// A caption's height depends on how wide it is and on which font is drawing it, so both events that
+// change either one have to re-measure.
+addEventListener("resize", layoutRoadmap);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutRoadmap);
 
 /**
  * The roadmap's figures, from the same request the front page already makes.
