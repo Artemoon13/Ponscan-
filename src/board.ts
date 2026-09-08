@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { buildCard } from "./card.ts";
 import { dataset, datasetAgeSec, datasetCachedOnly, FEATURES, loadModel, scoreOne, scoreRecent, type FeedOrder } from "./score.ts";
 import { getMeta, openDb } from "./db.ts";
-import { contributions } from "./model/gbdt.ts";
+import { contributions, type GbdtModel } from "./model/gbdt.ts";
 import { grade, modelId, pending, score as scoreLog, settled } from "./track.ts";
 import { formatUnits, quoteFromCache } from "./quote.ts";
 import { formatUsd, marketCapUsd, usdOf } from "./prices.ts";
@@ -23,8 +23,40 @@ const indexing = new Set<string>();
 
 const SEC_PER_BLOCK = 86400 / BLOCKS_PER_DAY;
 
-/** Feature influence, kept for a minute. Recomputed on a model change regardless of the clock. */
-let importanceCache: { id: string; at: number; value: Array<{ name: string; value: number }> } | null = null;
+type Influence = Array<{ name: string; value: number }>;
+
+/**
+ * Feature influence, computed off the hot path and served while the next one is being made.
+ *
+ * Weighing three thousand launches is a second and a quarter, and on a single thread that second is
+ * every other request too — a stall the whole site takes, once per cache expiry, so that one page
+ * can show a figure that moves over days. It is now done two hundred rows at a time, yielding
+ * between slices, so nothing waits longer than a slice; the previous answer is served meanwhile.
+ *
+ * Ten minutes rather than one, for the same reason: the panel is honest at that age, and the work
+ * is not worth repeating sooner.
+ */
+const INFLUENCE_TTL_MS = 10 * 60_000;
+const INFLUENCE_SLICE = 200;
+let importanceCache: { id: string; at: number; value: Influence } | null = null;
+let importanceRunning = false;
+
+async function computeInfluence(db: DB, model: GbdtModel): Promise<Influence> {
+  const rows = (datasetCachedOnly() ?? dataset(db, Math.floor(Date.now() / 1000) - 6 * 3600)).slice(-3000);
+  const acc = new Float64Array(FEATURES.length);
+  for (let i = 0; i < rows.length; i += INFLUENCE_SLICE) {
+    const end = Math.min(i + INFLUENCE_SLICE, rows.length);
+    for (let k = i; k < end; k++) {
+      const { contribs } = contributions(model, rows[k].x);
+      for (let f = 0; f < acc.length; f++) acc[f] += Math.abs(contribs[f]);
+    }
+    // Hand the loop back so a request waiting behind this is answered between slices.
+    await new Promise((r) => setImmediate(r));
+  }
+  return FEATURES.map((name, i) => ({ name, value: rows.length ? acc[i] / rows.length : 0 }))
+    .sort((a, b) => b.value - a.value)
+    .filter((f) => f.value > 0.0005);
+}
 
 /**
  * How far behind the chain the data is, and how long since the watcher last said anything.
@@ -317,34 +349,18 @@ const server = createServer(async (req, res) => {
     const id = modelId(path);
     const trainedAt = existsSync(path) ? Math.floor(statSync(path).mtimeMs / 1000) : null;
 
-    /**
-     * Global influence: mean absolute contribution over the launches currently on the board.
-     *
-     * Held for a minute, and taken from whatever matrix the feed has already built rather than
-     * asking for a fresh one. Both matter. The pass over three thousand rows is a second and a half,
-     * and rebuilding the matrix is five more — so an uncached model page cost six seconds of a
-     * single-threaded server, and every other request waited behind it. Neither number is worth
-     * paying per page view for a figure that moves over days.
-     *
-     * The sample stays at three thousand: cutting it to a thousand reorders the top eight, and this
-     * page exists to report what the model weighs, not an approximation of it.
-     */
-    const cachedImportance = importanceCache && Date.now() - importanceCache.at < 60_000 && importanceCache.id === id
-      ? importanceCache.value
-      : null;
-    let importance: Array<{ name: string; value: number }> = cachedImportance ?? [];
-    if (model && !cachedImportance) {
-      const rows = (datasetCachedOnly() ?? dataset(db, Math.floor(Date.now() / 1000) - 6 * 3600)).slice(-3000);
-      const acc = new Float64Array(FEATURES.length);
-      for (const r of rows) {
-        const { contribs } = contributions(model, r.x);
-        for (let i = 0; i < acc.length; i++) acc[i] += Math.abs(contribs[i]);
-      }
-      importance = FEATURES.map((name, i) => ({ name, value: rows.length ? acc[i] / rows.length : 0 }))
-        .sort((a, b) => b.value - a.value)
-        .filter((f) => f.value > 0.0005);
-      importanceCache = { id, at: Date.now(), value: importance };
+    const usable = importanceCache && importanceCache.id === id ? importanceCache.value : null;
+    const fresh = usable !== null && Date.now() - (importanceCache as { at: number }).at < INFLUENCE_TTL_MS;
+    if (model && !fresh && !importanceRunning) {
+      importanceRunning = true;
+      const work = computeInfluence(db, model)
+        .then((value) => { importanceCache = { id, at: Date.now(), value }; })
+        .catch(() => { /* a failed pass leaves the previous answer standing */ })
+        .finally(() => { importanceRunning = false; });
+      // Only the very first caller after a restart waits; everyone else gets the last answer.
+      if (!usable) await work;
     }
+    const importance: Influence = (importanceCache && importanceCache.id === id ? importanceCache.value : null) ?? [];
 
     // Two kinds of evidence, kept apart on purpose. Validation is retrospective and comes from
     // `npm run validate`; the live log is claims written before their outcome existed, graded by
