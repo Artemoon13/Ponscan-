@@ -39,76 +39,77 @@ export const HELP = [
 ].join("\n");
 
 /**
+ * Label and value in aligned columns.
+ *
+ * Telegram renders `pre` in a monospace face, which is the only way to get a column out of a chat
+ * message. It earns its keep: a reader comparing two alerts is comparing numbers in the same place
+ * on the screen rather than reading two paragraphs and holding both in their head.
+ */
+export type Row = [label: string, value: string, mark?: "up" | "down"];
+
+function table(rows: Row[]): string {
+  const w = Math.max(...rows.map(([k]) => k.length));
+  // A sign gutter only when something in this table has a sign, so tables without one keep their
+  // left edge flush instead of sitting two spaces in for no reason.
+  const gutter = rows.some((r) => r[2]);
+  return `<pre>${rows.map(([k, v, mark]) => {
+    const g = !gutter ? "" : mark === "up" ? "+ " : mark === "down" ? "− " : "  ";
+    return esc(`${g}${k.padEnd(w)}  ${v}`);
+  }).join("\n")}</pre>`;
+}
+
+/**
  * The forecast, written so it can be read without knowing how the model works.
  *
- * A range on its own says nothing. "$4.2K to $7.4K" only means something once the reader knows a
- * launch opens near $4K and that graduating takes about $47K, at which point the same three numbers
- * say something plain: this one is not expected to make it. Both anchors are measured from this
- * database rather than asserted, and both are near-constants, which is what lets them sit in every
- * message: the opening cap is fixed by the curve, and a pool opens at the price the curve ended on.
- *
- * Both anchors are taken per quote asset, not globally. The global median graduation cap is $41K,
- * but an ETH-quoted launch graduates at $51.9K and a TTWO-quoted one at $28.0K, so quoting the
- * average to an ETH launch understates its bar by a fifth. Being roughly right about the anchor is
- * what makes a reader stop trusting the exact numbers standing next to it.
+ * A range on its own says nothing. "$21K to $32.1K" only means something once the reader knows a
+ * launch opens near $4.4K and that graduating takes about $51.9K, at which point the same three
+ * numbers say something plain. Both anchors are measured from this database rather than asserted,
+ * and both are taken per quote asset: the global median graduation cap is $41K, but an ETH-quoted
+ * launch graduates at $51.9K and a TTWO-quoted one at $28.0K, and being roughly right about the
+ * anchor is what makes a reader stop trusting the exact numbers standing next to it.
  *
  * Where the quote asset has no dollar price the same forecast is given as a multiple, with a
  * price-free anchor: graduation sits at a median of x10.9 of the opening price across 174 graduated
- * tokens, tenth to ninetieth x7.7 to x11.8. That is a protocol constant, not a market one.
+ * tokens. That is a protocol constant, not a market one.
  *
- * The band is labelled with the share of unseen launches it actually caught, not the share it was
- * built for. Those differ right now, and a range printed bare would claim a confidence the model has
- * not earned.
+ * The band carries the share of unseen launches it actually caught, not the share it was built for.
+ * Those differ right now, and a range printed bare would claim a confidence the model has not earned.
  */
-function forecastLines(db: DB, card: NonNullable<ReturnType<typeof buildCard>>): string[] {
+function forecastRows(db: DB, card: NonNullable<ReturnType<typeof buildCard>>): string {
   const a = card.ath;
-  if (!a.available || a.multiple === null) return [];
+  if (!a.available || a.multiple === null) return "";
 
   const L = card.launch;
   const dollars = a.pointUsd !== null && a.loUsd !== null && a.hiUsd !== null;
-
-  // Dollars need a price for the quote asset, and the price book does not cover every asset a launch
-  // can be quoted against: 9.7% of a week's launches are quoted in something it has no price for.
-  // Those used to lose the forecast entirely, which was the worst of the options, since the multiple
-  // is what the model predicts and the dollar figure is only that multiple times a price we happen
-  // to know. So the same forecast is given in whichever unit is available.
   const times = (v: number | null): string => (v === null ? "—" : `×${v < 10 ? v.toFixed(1) : Math.round(v)}`);
 
-  const anchors: string[] = [];
+  const point = dollars ? (a.pointUsd as string) : `${times(a.multiple)} of the open`;
+  const lo = dollars ? (a.loUsd as string) : times(a.loMultiple);
+  const hi = dollars ? (a.hiUsd as string) : times(a.hiMultiple);
+
+  const rows: Row[] = [
+    ["expected", `~${point}`],
+    ["range", `${lo} – ${hi}${a.coverage !== null ? `   right ${(100 * a.coverage).toFixed(0)}% of the time` : ""}`],
+  ];
+  if (a.tailChance !== null) {
+    rows.push(["×10 or more", `${(100 * a.tailChance).toFixed(0)}%`
+      + (a.tailBase !== null && a.tailBase > 0 ? `   typical ${(100 * a.tailBase).toFixed(0)}%` : "")]);
+  }
+
   if (dollars) {
     const opens = startingCapUsd(db, L.quoteSymbol, L.quoteDecimals);
     const grad = graduationCapUsd(
-      db,
-      (pt) => quoteFromCache(db, pt).decimals,
-      (pt) => quoteFromCache(db, pt).symbol,
-      L.quoteSymbol,
+      db, (pt) => quoteFromCache(db, pt).decimals, (pt) => quoteFromCache(db, pt).symbol, L.quoteSymbol,
     );
-    if (opens !== null) anchors.push(`opens at ${formatUsd(opens)}`);
-    if (grad !== null) anchors.push(`graduates near ${formatUsd(grad)}`);
+    if (opens !== null) rows.push(["opens at", formatUsd(opens)]);
+    if (grad !== null) rows.push(["graduates at", formatUsd(grad)]);
   } else {
-    // The price-free anchor. A protocol constant rather than a market one, so it holds for any asset.
     const gm = graduationMultiple(db);
-    if (gm !== null) anchors.push(`graduating takes about ${times(gm)}`);
+    if (gm !== null) rows.push(["graduates at", `${times(gm)} of the open`]);
   }
-  const tail = anchors.length ? `  (${anchors.join(" · ")})` : "";
 
-  const point = dollars ? esc(a.pointUsd as string) : `${times(a.multiple)} of its opening price`;
-  const lo = dollars ? esc(a.loUsd as string) : times(a.loMultiple);
-  const hi = dollars ? esc(a.hiUsd as string) : times(a.hiMultiple);
-
-  const out = [`<b>peak market cap</b> around ${point}${tail}`];
-  out.push(a.coverage === null
-    ? `usually between ${lo} and ${hi}`
-    : `usually between ${lo} and ${hi}, where the real peak landed ${(100 * a.coverage).toFixed(0)}% of the time`);
-  if (a.tailChance !== null) {
-    const base = a.tailBase !== null && a.tailBase > 0
-      ? `, against ${(100 * a.tailBase).toFixed(0)}% for a typical launch` : "";
-    out.push(`chance of ×10 or better: ${(100 * a.tailChance).toFixed(0)}%${base}`);
-  }
-  if (!dollars) {
-    out.push(`<i>no dollar price on record for ${esc(L.quoteSymbol)}, so this is a multiple rather than a cap</i>`);
-  }
-  return out;
+  const note = dollars ? "" : `\n<i>no dollar price for ${esc(L.quoteSymbol)}, so these are multiples</i>`;
+  return `<b>peak market cap</b>\n${table(rows)}${note}`;
 }
 
 export type LaunchMeta = { symbol: string | null; name: string | null; deployer: string };
@@ -127,69 +128,89 @@ export type LaunchMeta = { symbol: string | null; name: string | null; deployer:
 export function alertText(db: DB, s: Scored, m: LaunchMeta, now = Math.floor(Date.now() / 1000)): string {
   const pct = (s.probability * 100).toFixed(1);
   const card = buildCard(db, s.token);
+  const out: string[] = [];
 
-  const head = [
-    `<b>${esc(m.symbol ?? short(s.token))}</b>  <b>${pct}%</b> to reach the pool`,
-    `rank #${s.rank} of ${s.of.toLocaleString()} · ${ago(now - s.ts)} old${card ? ` · ${esc(card.launch.quoteSymbol)}` : ""}`,
-  ];
-
-  const blocks: string[][] = [head];
+  out.push(
+    `<b>${esc(m.symbol ?? short(s.token))}</b>   <b>${pct}%</b> to reach the pool`,
+    `<i>#${s.rank} of ${s.of.toLocaleString()} · ${ago(now - s.ts)} old${card ? ` · ${esc(card.launch.quoteSymbol)}` : ""}</i>`,
+  );
 
   // A forecast only while the answer is still open; printing one beside a known outcome reads as the
   // tool arguing with itself. A launch can graduate inside the alert window, though, and one that
   // did is the most interesting thing on the board, so it gets the fact instead of the guess.
   if (card && !card.outcome.graduated) {
-    const f = forecastLines(db, card);
-    if (f.length) blocks.push(f);
+    const f = forecastRows(db, card);
+    if (f) out.push("", f);
   } else if (card?.outcome.graduated) {
     const p = card.pool;
     const took = card.outcome.secondsToGraduate;
-    const done = [`<b>reached the pool</b>${took !== null ? ` after ${ago(took)}` : ""}`];
-    if (p?.tracked && p.peakUsd) done.push(`peak ${esc(p.peakUsd)}${p.lastUsd ? ` · ${esc(p.lastUsd)} now` : ""}`);
-    blocks.push(done);
+    out.push("", `<b>reached the pool</b>${took !== null ? ` after ${ago(took)}` : ""}`
+      + (p?.tracked && p.peakUsd ? `\npeak ${esc(p.peakUsd)}${p.lastUsd ? ` · ${esc(p.lastUsd)} now` : ""}` : ""));
   }
 
   if (card) {
     const H = card.creatorHistory;
     const L = card.launch;
-    const who = [
-      `<b>creator</b> ${H.priorLaunches} earlier launch${H.priorLaunches === 1 ? "" : "es"}, ${H.priorGraduations} graduated`,
-    ];
-    if (H.bestPeak) {
-      who.push(`their best ever: ${H.bestPeak.usd ?? `×${H.bestPeak.multiple.toFixed(1)}`}${H.bestPeak.symbol ? ` (${esc(H.bestPeak.symbol)})` : ""}`);
-    }
-    blocks.push(who);
+    const rows: Row[] = [];
 
-    const facts: string[] = [];
-    if (L.selfBuy) facts.push(`self-buy ${esc(L.selfBuy)} ${esc(L.quoteSymbol)}`);
-    if (L.creatorTaxBps !== null) facts.push(`tax ${(L.creatorTaxBps / 100).toFixed(2)}%`);
-    if (card.exemptions.length) facts.push(`${card.exemptions.length} tax-exempt`);
-    const line: string[] = [];
-    if (facts.length) line.push(facts.join(" · "));
+    rows.push(["creator", H.priorLaunches === 0
+      ? "first launch"
+      : `${H.priorLaunches} before, ${H.priorGraduations} graduated`]);
+    if (H.bestPeak) {
+      rows.push(["their best", `${H.bestPeak.usd ?? `×${H.bestPeak.multiple.toFixed(1)}`}${H.bestPeak.symbol ? ` (${H.bestPeak.symbol})` : ""}`]);
+    }
+    if (L.selfBuy) rows.push(["self-buy", `${L.selfBuy} ${L.quoteSymbol}`]);
+    if (L.creatorTaxBps !== null) rows.push(["tax", `${(L.creatorTaxBps / 100).toFixed(2)}%`]);
+    if (card.exemptions.length) rows.push(["tax-exempt", `${card.exemptions.length} wallet${card.exemptions.length === 1 ? "" : "s"}`]);
     if (card.trading.indexed && card.trading.buyersFirstMinute) {
-      line.push(`${card.trading.buyersFirstMinute} buyer${card.trading.buyersFirstMinute === 1 ? "" : "s"} in the first minute`);
+      rows.push(["first minute", `${card.trading.buyersFirstMinute} buyer${card.trading.buyersFirstMinute === 1 ? "" : "s"}`]);
     }
-    // A ticker dozens of launches share is the single loudest signal on a fresh launch, so it is
-    // spelled out rather than left to the reason chips.
+    // A ticker dozens of launches share is the loudest signal on a fresh launch, so it gets a row of
+    // its own rather than being left to the reasons.
     if (card.cluster.total > 1) {
-      line.push(`ticker shared by ${card.cluster.total} launches, ${card.cluster.graduated} graduated`);
+      rows.push(["ticker", `${card.cluster.total} launches, ${card.cluster.graduated} graduated`]);
     }
-    if (line.length) blocks.push(line);
+
+    /**
+     * Reasons, minus whatever the table already said.
+     *
+     * The two overlapped badly: a launch with a 2% tax and three exempt wallets printed both facts
+     * in the table and then again as "+ tax 2.00%" and "+ 3 tax-exempt", so a third of the message
+     * was a second copy of another third. What a reason adds over a fact is the direction, so the
+     * ones that survive are those naming something the table does not carry.
+     */
+    const covered: Record<string, string> = {
+      creator_tax_bps: "tax",
+      exempt_count: "tax-exempt",
+      exempt_is_zero: "tax-exempt",
+      log_initial_buy: "self-buy",
+      initial_buy_is_zero: "self-buy",
+      dev_prior_launches: "creator",
+      dev_prior_graduations: "creator",
+      dev_prior_grad_rate: "creator",
+      dev_is_first_launch: "creator",
+    };
+    // A reason naming a fact already in the table marks that row rather than repeating it. What a
+    // reason adds over a fact is its direction, and a value with a sign beside it carries both on
+    // one line; printing "tax 3.00%" and then "+ tax 3.00%" spent a third of the message twice.
+    const mark = new Map<string, "up" | "down">();
+    const spare: string[] = [];
+    for (const r of s.reasons) {
+      const label = covered[r.feature as string];
+      if (label && rows.some(([k]) => k === label)) mark.set(label, r.direction);
+      else spare.push(`${r.direction === "up" ? "+" : "−"} ${esc(r.short)}`);
+    }
+    for (const row of rows) {
+      const d = mark.get(row[0]);
+      if (d) row[2] = d;
+    }
+
+    out.push("", table(rows));
+    if (spare.length) out.push("", spare.slice(0, 3).join("\n"));
   }
 
-  // Reasons carry a short label for exactly this: a chat line has less room than a card.
-  blocks.push([
-    s.reasons.slice(0, 3).map((r) => `${r.direction === "up" ? "+" : "−"} ${esc(r.short)}`).join("\n")
-      // A launch can score on nothing in particular; the alert should still read as a sentence.
-      || "no reason stood out",
-  ]);
-
-  blocks.push([
-    `<code>${s.token}</code>`,
-    `<a href="${EXPLORER.token(s.token)}">explorer</a>`,
-  ]);
-
-  return blocks.map((b) => b.join("\n")).join("\n\n");
+  out.push("", `<code>${s.token}</code>`, `<a href="${EXPLORER.token(s.token)}">explorer</a>`);
+  return out.join("\n");
 }
 
 export function statusText(db: DB, now = Math.floor(Date.now() / 1000)): string {
@@ -249,8 +270,8 @@ export function tokenText(db: DB, raw: string): string {
   blocks.push(done);
 
   if (!card.outcome.graduated) {
-    const f = forecastLines(db, card);
-    if (f.length) blocks.push(f);
+    const f = forecastRows(db, card);
+    if (f) blocks.push([f]);
   }
 
   const facts: string[] = [];
