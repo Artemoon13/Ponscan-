@@ -1,3 +1,4 @@
+import { amber, bold, dim, faint, lime, money, white } from "../ansi.ts";
 import { openDb } from "../db.ts";
 import { loadModel } from "../score.ts";
 import {
@@ -60,21 +61,23 @@ const x = (v: number): string => `${v.toFixed(2)}x`;
 const started = Date.now();
 const ctx = prepare(db, model, { minCoverage: coverage, settleSec });
 
-console.log("\ngimlet backtest — what the ranking is worth in money\n");
-console.log(`window     ${ctx.hours.length} covered hours, ${iso(ctx.hours[0] * 3600)} to ${iso((ctx.hours[ctx.hours.length - 1] + 1) * 3600)} UTC`);
-console.log(`coverage   >=${pct(coverage)} of each hour's launches had their curve read`);
-console.log(`eligible   ${ctx.rows.length.toLocaleString()} launches, each settled at least ${settleSec / 3600}h`);
-console.log(`entry      +${delayBlocks} blocks (${(delayBlocks / BLOCKS_PER_SECOND).toFixed(1)} s), just past the 3 s / 99% opening tax`);
-console.log(`costs      ${pct(costs.buy)} a side, from the fee and tax charged on every CurveBuy`);
-console.log(`impact     ${pct(impact)} at ${sizeEth} of the quote asset, from how far real buys moved the curve`);
+const label = (k: string): string => dim(k.padEnd(11));
+console.log(`\n${bold(lime("gimlet backtest"))}  ${dim("what the ranking is worth in money")}\n`);
+console.log(label("window") + white(`${ctx.hours.length} covered hours`) + dim(`, ${iso(ctx.hours[0] * 3600)} to ${iso((ctx.hours[ctx.hours.length - 1] + 1) * 3600)} UTC`));
+console.log(label("coverage") + dim(`>=${pct(coverage)} of each hour's launches had their curve read`));
+console.log(label("eligible") + white(`${ctx.rows.length.toLocaleString()} launches`) + dim(`, each settled at least ${settleSec / 3600}h`));
+console.log(label("entry") + white(`+${delayBlocks} blocks (${(delayBlocks / BLOCKS_PER_SECOND).toFixed(1)} s)`) + dim(", just past the 3 s / 99% opening tax"));
+console.log(label("costs") + white(`${pct(costs.buy)} a side`) + dim(", from the fee and tax charged on every CurveBuy"));
+console.log(label("impact") + white(`${pct(impact)} at ${sizeEth}`) + dim(" of the quote asset, from how far real buys moved the curve"));
 
 // The curve and the pool are the same price seen twice at the moment a token graduates, so their
 // ratio is a unit check that runs on real data. Printed rather than asserted: a reader who does not
 // trust the two legs are on the same scale can see whether they meet.
 const join = checkPoolJoin(ctx.paths, ctx.pools);
 if (join.n) {
-  console.log(`handover   curve's last price vs the pool's first, over ${join.n} graduated tokens: ` +
-    `median ${join.median.toFixed(2)}x, ${pct(join.within2x)} inside 2x`);
+  const sane = join.median > 0.8 && join.median < 1.25;
+  console.log(label("handover") + dim(`curve's last price vs the pool's first, over ${join.n} graduated tokens: median `) +
+    (sane ? lime(`${join.median.toFixed(2)}x`) : amber(`${join.median.toFixed(2)}x`)) + dim(`, ${pct(join.within2x)} inside 2x`));
 }
 
 const COHORTS = [
@@ -98,33 +101,39 @@ const rule = (e: ExitRule): string =>
 const attempts = simulate(ctx, entry, exit, costs);
 const summaries = COHORTS.map((c) => summarise(c.label, cohort(ctx, attempts, c.minPercentile)));
 
-console.log(`\nrule: ${rule(exit)}\n`);
-console.log("cohort                 launches   filled    win%    median      mean    staked");
+console.log(`\n${dim("rule:")} ${white(rule(exit))}\n`);
+console.log(dim("cohort                 launches   filled    win%    median      mean    staked"));
+console.log(faint("-".repeat(72)));
 for (const s of summaries) {
+  // The shortlist and the top percentile are the two rows anyone came here to read; the other two
+  // are the baseline they only mean anything against.
+  const headline = s.label.startsWith("shortlist") || s.label.startsWith("top 1");
   console.log(
-    s.label.padEnd(21) +
-    String(s.launches).padStart(9) +
-    pct(s.launches ? s.trades / s.launches : 0).padStart(9) +
-    pct(s.trades ? s.wins / s.trades : 0).padStart(8) +
-    x(s.medianNet).padStart(10) +
-    x(s.meanNet).padStart(10) +
-    x(s.totalReturn).padStart(10),
+    (headline ? bold(white(s.label.padEnd(21))) : dim(s.label.padEnd(21))) +
+    white(String(s.launches).padStart(9)) +
+    dim(pct(s.launches ? s.trades / s.launches : 0).padStart(9)) +
+    white(pct(s.trades ? s.wins / s.trades : 0).padStart(8)) +
+    money(s.medianNet, x(s.medianNet).padStart(10)) +
+    money(s.meanNet, x(s.meanNet).padStart(10)) +
+    money(s.totalReturn, x(s.totalReturn).padStart(10)),
   );
 }
-console.log(
+console.log(dim(
   "\n  median and mean are per position actually filled. `staked` is the whole cohort bought\n" +
-  "  equally, with launches that could not be filled returning their stake untouched — which is\n" +
+  "  equally, with launches that could not be filled returning their stake untouched, which is\n" +
   "  what a reader who follows the whole list experiences.",
-);
+));
 
 const shortNets = nets(pick(ctx, attempts, 90));
 if (shortNets.length) {
   const ci = bootstrapMean(shortNets);
+  const mean = shortNets.reduce((a, b) => a + b, 0) / shortNets.length;
   console.log(`
-how sure is the shortlist's ${x(shortNets.reduce((a, b) => a + b, 0) / shortNets.length)}?`);
-  console.log(`  resampling those ${shortNets.length} positions: 90% of the time between ${x(ci.lo)} and ${x(ci.hi)}`);
+${dim("how sure is the shortlist's")} ${money(mean)}${dim("?")}`);
+  console.log(dim(`  resampling those ${shortNets.length} positions: 90% of the time between `) + money(ci.lo) + dim(" and ") + money(ci.hi));
   for (const k of [1, 3, 10]) {
-    console.log(`  with the best ${String(k).padStart(2)} position${k > 1 ? "s" : " "} removed: ${x(withoutBest(shortNets, k))}`);
+    const v = withoutBest(shortNets, k);
+    console.log(dim(`  with the best ${String(k).padStart(2)} position${k > 1 ? "s" : " "} removed: `) + money(v));
   }
 }
 

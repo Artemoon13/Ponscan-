@@ -4,12 +4,14 @@
 
 # gimlet
 
-**the launch scanner for pons v2 on Robinhood Chain**<br>
+**a prediction engine for pons v2 launches on Robinhood Chain**<br>
+two models · 23 leak-free features · every call logged before its outcome exists<br>
 local · open · no wallet · no key · nothing leaves your machine
 
 <br>
 
 ![tests](https://img.shields.io/badge/tests-70%20passing-9ae600?style=flat-square)
+![models](https://img.shields.io/badge/models-2%20GBDT-9ae600?style=flat-square)
 ![node](https://img.shields.io/badge/node-%E2%89%A522.6-9ae600?style=flat-square)
 ![runtime deps](https://img.shields.io/badge/runtime%20deps-1-9ae600?style=flat-square)
 ![chain](https://img.shields.io/badge/chain-Robinhood-333?style=flat-square)
@@ -32,13 +34,30 @@ local · open · no wallet · no key · nothing leaves your machine
 
 <br>
 
-New tokens launch on [pons](https://www.ponsfamily.com) faster than anyone can read them: about
-**24,000 a day**, and **two in a hundred** ever reach a Uniswap pool. Half of the ones that make it
-decide inside **two minutes**. So the job is not analysis, it is triage: out of the thousand
-launches of the last hour, which three are worth opening?
+**24,000 tokens a day** launch on [pons](https://www.ponsfamily.com). **Two in a hundred** reach a
+Uniswap pool, and half of those decide inside **two minutes**. No one reads that stream. Almost
+nobody has ever measured it.
 
-gimlet reads every launch as it lands, scores it against every other launch of the last six hours,
-and says in plain sentences why. It holds no key, signs nothing, and sends nothing anywhere.
+gimlet is a quantitative research stack pointed at it. As each launch transaction lands it is
+decoded, turned into a 23-dimensional feature vector built strictly from what is knowable at that
+instant, and put through two gradient-boosted models: one for the **probability it reaches the
+pool**, one for **how high it climbs** if it does. The result is a rank against every other launch
+of the last six hours, and three plain sentences saying which features moved it.
+
+Then the part almost nothing in this category does. Every score is **written down before the outcome
+exists**, graded four hours later against the chain, and fed back as a live calibration. The record
+is a file you can export and recompute without trusting a line of this code.
+
+| | |
+|---|---|
+| **Detection** | websocket push off the pons v2 factory, 300 ms polling as fallback, gap-recovering catch-up reads |
+| **Features** | 23, computed strictly at T+0. Nothing reads a trade, a price, or an outcome |
+| **Models** | gradient-boosted trees, written out rather than imported, so contributions decompose exactly into the reasons shown |
+| **Validation** | rolling-origin folds, time-ordered, never a random split |
+| **Prediction log** | insert-only, pre-registered, refuses any launch older than five minutes |
+| **Backtest** | replayed against the price paths that actually happened, costs measured off the chain |
+| **Pattern mining** | candidate search raced against a permutation null, so a finding has to beat what the search invents from noise |
+| **Runtime** | one dependency, one file of SQLite, no key, nothing leaves the machine |
 
 <br>
 
@@ -46,7 +65,7 @@ and says in plain sentences why. It holds no key, signs nothing, and sends nothi
 
 <br>
 
-| The problem | What gimlet does | Command |
+| What you would otherwise do by hand | What gimlet does instead | Command |
 |---|---|---|
 | 24,000 launches a day, 530 graduate | scores every one at the moment it lands and ranks it against the last six hours | `board` · `watch` |
 | a bare "4%" means nothing | gives you `#3 of 412` instead, and the rank is the part you can act on | `board` |
@@ -61,9 +80,10 @@ and says in plain sentences why. It holds no key, signs nothing, and sends nothi
 
 ## How it works
 
-The left half of this is what every scanner does. The right half is what makes the record checkable
-rather than a claim: a score written down before the outcome exists, graded later against the chain,
-and fed back as a calibration.
+The left half is inference: chain to feature vector to model to a rank you can act on. The right half
+is what turns a claim into a record, and it is the half nothing else in this category has: the score
+is written down before the outcome exists, graded later against the chain, and fed back as a live
+calibration on the model that produced it.
 
 ```mermaid
 flowchart LR
@@ -110,7 +130,7 @@ decided.
 
 Three different questions, three different answers, and only one of them is about money.
 
-### 1. Does the ranking carry information? Yes
+### 1. Do the predictions carry information? Yes
 
 Call the top tenth of the ranking the **shortlist**.
 

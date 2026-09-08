@@ -1,3 +1,4 @@
+import { amber, bold, dim, faint, green, lift as liftColour, lime, red, white } from "../ansi.ts";
 import { openDb } from "../db.ts";
 import { coveredHours } from "../backtest.ts";
 import { earlyFeatures, outcomes, type Early } from "../early.ts";
@@ -66,11 +67,12 @@ for (const [token, e] of early) {
 }
 
 const pct = (v: number): string => `${(100 * v).toFixed(1)}%`;
-console.log("\ngimlet patterns — what the opening seconds are worth\n");
-console.log(`window     ${hours.size} covered hours, ${rows.length.toLocaleString()} launches with a price path`);
-console.log(`sees       the first ${atSec}s of trading, and nothing after it`);
-console.log(`measures   the peak reached AFTER those ${atSec}s, over the price at the end of them`);
-console.log(`predicts   ${target.label}`);
+const key = (k: string): string => dim(k.padEnd(11));
+console.log(`\n${bold(lime("gimlet patterns"))}  ${dim("what the opening seconds are worth")}\n`);
+console.log(key("window") + white(`${hours.size} covered hours`) + dim(`, ${rows.length.toLocaleString()} launches with a price path`));
+console.log(key("sees") + dim("the first ") + white(`${atSec}s`) + dim(" of trading, and nothing after it"));
+console.log(key("measures") + dim("the peak reached ") + white("AFTER") + dim(` those ${atSec}s, over the price at the end of them`));
+console.log(key("predicts") + white(target.label));
 
 if (rows.length < 4 * minSupport) {
   console.error(`\nOnly ${rows.length} launches — too few to search. Widen coverage with \`npm run curves\`.`);
@@ -88,21 +90,23 @@ const label = (set: Early[]): Float64Array =>
 const yDiscover = label(discover);
 const yHoldout = label(holdout);
 
-console.log(`split      ${discover.length.toLocaleString()} launches propose, ${holdout.length.toLocaleString()} later ones judge`);
+console.log(key("split") + white(discover.length.toLocaleString()) + dim(" launches propose, ") + white(holdout.length.toLocaleString()) + dim(" later ones judge"));
 
 const conds = candidates(discover);
 const members = membership(discover, conds);
 const found = search(discover, yDiscover, conds, members, minSupport);
 const baseHold = yHoldout.reduce((s, v) => s + v, 0) / Math.max(1, yHoldout.length);
 
-console.log(`base rate  ${pct(found.baseRate)} of proposing launches ${target.label}, ${pct(baseHold)} of judging ones`);
-console.log(`tested     ${found.tested} conditions at a floor of ${minSupport} launches each`);
+console.log(key("base rate") + white(pct(found.baseRate)) + dim(` of proposing launches ${target.label}, ${pct(baseHold)} of judging ones`));
+console.log(key("tested") + white(String(found.tested)) + dim(` conditions at a floor of ${minSupport} launches each`));
 
 const noise = permutationNull(discover, yDiscover, conds, members, minSupport, runs);
-console.log(`noise      the same search on shuffled outcomes finds ${noise.p95.toFixed(2)}x lift at the 95th percentile (${runs} shuffles, worst ${noise.max.toFixed(2)}x)`);
+console.log(key("noise") + dim("the same search on shuffled outcomes finds ") + amber(`${noise.p95.toFixed(2)}x`) +
+  dim(` lift at the 95th percentile (${runs} shuffles, worst ${noise.max.toFixed(2)}x)`));
 
-console.log("\npattern                                                        found-on   held-out");
-console.log("                                                             n   lift      n   lift");
+console.log(dim("\npattern                                                        found-on   held-out"));
+console.log(dim("                                                             n   lift      n   lift"));
+console.log(faint("-".repeat(80)));
 let survived = 0;
 for (const v of found.verdicts.slice(0, 12)) {
   const c = confirm(v.pattern, holdout, yHoldout);
@@ -112,19 +116,20 @@ for (const v of found.verdicts.slice(0, 12)) {
   // and 1.6x where it was tested, which is exactly what failing to replicate looks like.
   const holds = c.n >= minSupport / 2 && c.lift > noise.p95;
   if (beatsNoise && holds) survived++;
-  const mark = beatsNoise && holds ? " ok" : beatsNoise ? " --" : "  .";
+  const mark = beatsNoise && holds ? green(" ok") : beatsNoise ? red(" --") : dim("  .");
+  const name = show(v.pattern).slice(0, 56).padEnd(57);
   console.log(
-    show(v.pattern).slice(0, 56).padEnd(57) +
-    String(v.n).padStart(5) + `${v.lift.toFixed(2)}x`.padStart(7) +
-    String(c.n).padStart(7) + `${c.lift.toFixed(2)}x`.padStart(7) + mark,
+    (beatsNoise && holds ? white(name) : dim(name)) +
+    dim(String(v.n).padStart(5)) + liftColour(v.lift, noise.p95, `${v.lift.toFixed(2)}x`.padStart(7)) +
+    dim(String(c.n).padStart(7)) + liftColour(c.lift, noise.p95, `${c.lift.toFixed(2)}x`.padStart(7)) + mark,
   );
 }
 
-console.log(
+console.log(dim(
   "\n  ok = beat the noise line on the half that proposed it AND held up on the half that did not.\n" +
   "  -- = beat the noise line and then did not survive the held-out half.\n" +
   "   . = did not even beat what the same search finds on shuffled outcomes.",
-);
+));
 
 if (!survived) {
   console.log(
