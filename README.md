@@ -10,7 +10,7 @@ local · open · no wallet · no key · nothing leaves your machine
 
 <br>
 
-![tests](https://img.shields.io/badge/tests-70%20passing-9ae600?style=flat-square)
+![tests](https://img.shields.io/badge/tests-79%20passing-9ae600?style=flat-square)
 ![models](https://img.shields.io/badge/models-2%20GBDT-9ae600?style=flat-square)
 ![node](https://img.shields.io/badge/node-%E2%89%A522.6-9ae600?style=flat-square)
 ![runtime deps](https://img.shields.io/badge/runtime%20deps-1-9ae600?style=flat-square)
@@ -158,27 +158,28 @@ of it should divide to 1.00, and they do.
 | cohort | launches | win rate | median | mean |
 |---|---|---|---|---|
 | everything | 30,434 | 6.2% | 0.83x | **0.92x** |
-| top half | 15,306 | 7.1% | 0.80x | **0.94x** |
-| shortlist (top 10%) | 3,170 | 11.4% | 0.75x | **1.07x** |
-| top 1% | 305 | 19.2% | 0.68x | **1.49x** |
+| top half | 13,986 | 8.1% | 0.79x | **0.97x** |
+| shortlist (top 10%) | 2,741 | 13.8% | 0.68x | **1.17x** |
+| top 1% | 322 | 27.8% | 0.67x | **1.92x** |
 
 Read that carefully, because the honest parts are the ones that don't fit on a poster:
 
-- **The ranking is the whole product.** Buying everything returns 0.92x. Buying the shortlist returns
-  1.07x, and the top percentile 1.49x. That gap is what the model is worth.
-- **You lose on 89% of positions.** The median one is 0.75x. The return lives in a tail, and if that
-  ratio does not fit how you trade, nothing here fixes it.
-- **Resampling the 3,144 shortlist positions puts the mean between 1.03x and 1.11x nine times out of
-  ten.** Remove the ten best and it is still 1.05x, so it is not one lucky token. It is still a thin
-  edge measured over twenty-seven hours, not a week.
-- **The edge shrank as the sample grew, and got sturdier.** At fourteen hours the shortlist read
-  1.12x and lost all of it when the ten best positions were removed. At twenty-seven it reads 1.07x
-  and keeps 1.05x. Small samples overstate the mean and understate how much of it survives. Worth
-  remembering when the next number here moves.
-- **Speed past the tax window buys little.** Entering at +3.5 s returns 1.07x; at +60 s, 1.03x. The
-  whole minute is worth about four percent, so being 200 ms faster than the next person is worth
-  nothing measurable. The opening tax has already eaten that race, and this is a scanner rather than
-  a sniper for the same reason.
+- **The predictions are the whole product.** Buying everything returns 0.92x. Buying the shortlist
+  returns 1.17x, and the top percentile 1.92x. That gap is what the models are worth.
+- **You still lose on 86% of positions.** The median one is 0.68x. The return lives in a tail, and if
+  that ratio does not fit how you trade, nothing here fixes it.
+- **Resampling the 2,701 shortlist positions puts the mean between 1.12x and 1.22x nine times out of
+  ten.** Remove the ten best and it is still 1.14x, so it is not one lucky token. It is still an edge
+  measured over twenty-seven hours, not a week.
+- **This number moves, and you should watch it move.** The first run of this backtest, on fourteen
+  hours and an older model, read 1.12x and lost all of it when the ten best positions were removed.
+  Two things changed since: the sample roughly doubled and the model was refit. Both matter, neither
+  can be credited alone, and the figure will move again. The reason to trust the direction is not
+  this paragraph, it is that `npm run backtest` recomputes it on your own data in six seconds.
+- **Speed past the tax window buys little.** Entering at +3.5 s returns 1.17x; at +60 s, 1.08x. The
+  whole minute is worth about nine percent, so being 200 ms faster than the next person is worth
+  nothing measurable. The opening tax has already eaten that race, which is why this predicts rather
+  than races.
 
 ### 3. Is there a green flag in the opening seconds? Yes, and it is costly signalling
 
