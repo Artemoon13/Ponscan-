@@ -96,6 +96,16 @@ export function dataset(db: DB, since: number): Row[] {
  * For readers that want the rows but do not need them current, and must not be the one paying for a
  * rebuild. The model page is the case: feature influence moves over days.
  */
+/**
+ * Which build of the matrix is in hand.
+ *
+ * Callers that cache an answer derived from it key on this: while it is unchanged the rows are
+ * unchanged, so the answer is not stale, it is the same answer.
+ */
+export function datasetVersion(): number {
+  return cached ? cached.builtAt : 0;
+}
+
 export function datasetCachedOnly(): Row[] | null {
   return cached ? cached.rows : null;
 }

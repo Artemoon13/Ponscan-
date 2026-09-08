@@ -224,6 +224,22 @@ test("the landing panel is not an empty frame before the feed answers", async ()
   assert.ok(rows.length >= 5, `only ${rows.length} placeholder rows in the served page`);
 });
 
+test("the same feed is not computed twice for the same rows", async () => {
+  // Ranking the window is two thirds of a second, every open tab asks for it every fifteen seconds,
+  // and on one thread the fifth reader waits for the four identical answers before it.
+  const first = Date.now();
+  assert.equal((await fetch(`${BASE}/api/feed?hours=6`)).status, 200);
+  const cold = Date.now() - first;
+
+  const second = Date.now();
+  const r = await fetch(`${BASE}/api/feed?hours=6`);
+  const warm = Date.now() - second;
+  assert.equal(r.status, 200);
+  const d = await r.json() as { items?: unknown[] };
+  assert.ok(Array.isArray(d.items), "a held answer must still be a whole answer");
+  assert.ok(warm <= Math.max(cold, 50), `held answer took ${warm}ms against ${cold}ms`);
+});
+
 test("reports its own health", async () => {
   const r = await fetch(`${BASE}/api/health`);
   assert.equal(r.status, 200);
