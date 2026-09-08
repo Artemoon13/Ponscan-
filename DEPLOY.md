@@ -321,6 +321,57 @@ curl -s localhost:4663/api/health
 
 ---
 
+### Перекалибровка на таймере
+
+Модель со временем начинает завышать: она обучена на одной частоте успеха, а рынок живёт на другой.
+Поправка подгоняется по собственному логу предсказаний и двигает только показываемый процент —
+порядок в списке она изменить не может, поправка монотонная.
+
+Почему таймером, а не в ночной работе: поправка привязана к отпечатку модели и для другой модели не
+применяется. Ночное переобучение выдаёт новую модель, значит поправка, подогнанная перед ним, ей уже
+не годится. Новая модель должна поработать без поправки, пока не отстоятся её собственные заявки, и
+только потом получить свою.
+
+```bash
+sudo tee /etc/systemd/system/ponscan-recalibrate.service > /dev/null <<'EOF'
+[Unit]
+Description=augur live recalibration
+
+[Service]
+Type=oneshot
+User=ponscan
+WorkingDirectory=/home/ponscan/ponscan
+ExecStart=/usr/bin/npm run --silent recalibrate -- --write
+EOF
+sudo tee /etc/systemd/system/ponscan-recalibrate.timer > /dev/null <<'EOF'
+[Unit]
+Description=augur live recalibration
+
+[Timer]
+OnBootSec=30min
+OnUnitActiveSec=2h
+
+[Install]
+WantedBy=timers.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now ponscan-recalibrate.timer
+```
+
+Раз в два часа. Команда сама молчит и ничего не пишет, пока под текущей моделью не отстоятся 500
+заявок, и отказывается применять поправку, которая слишком велика для двух параметров — это признак,
+что смотреть надо на модель, а не подкручивать её вывод.
+
+**Проверка:**
+
+```bash
+npm run recalibrate
+```
+
+Без `--write` она только считает и показывает, что сделала бы.
+
+---
+
 ## 8. Caddy и TLS
 
 `[сервер]`, под root:
