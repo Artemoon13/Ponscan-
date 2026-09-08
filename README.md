@@ -109,10 +109,10 @@ flowchart LR
 
 <img src="docs/img/term-watch.png" alt="Augur watch">
 
-**`#175 of 6,176`** is the useful half. On its own "1.8%" means little; "175th best of the last six
-hours" tells you whether to look now or never. The line reading *"not logged: seen too late for the
-claim to count"* is the prediction log refusing a launch it saw more than five minutes in. The
-record is allowed to be thin, but never flattering.
+**`#70 of 11,158`** is the useful half. On its own LEATHER's "8.2%" means little; "seventieth best
+of the last six hours" tells you whether to look now or never, and the `16` beside it is sixteen
+wallets the creator waived the opening tax for. Every launch on that screen was scored the second it
+landed and written to the prediction log before anyone knew how it ended.
 
 Or the same feed on a local page, which is the same engine behind `npm run board`:
 

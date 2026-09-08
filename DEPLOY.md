@@ -335,7 +335,7 @@ curl -s localhost:4663/api/health
 ```bash
 sudo tee /etc/systemd/system/ponscan-recalibrate.service > /dev/null <<'EOF'
 [Unit]
-Description=augur live recalibration
+Description=Augur live recalibration
 
 [Service]
 Type=oneshot
@@ -345,7 +345,7 @@ ExecStart=/usr/bin/npm run --silent recalibrate -- --write
 EOF
 sudo tee /etc/systemd/system/ponscan-recalibrate.timer > /dev/null <<'EOF'
 [Unit]
-Description=augur live recalibration
+Description=Augur live recalibration
 
 [Timer]
 OnBootSec=30min
