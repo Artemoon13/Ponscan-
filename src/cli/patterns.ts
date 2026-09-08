@@ -107,7 +107,10 @@ let survived = 0;
 for (const v of found.verdicts.slice(0, 12)) {
   const c = confirm(v.pattern, holdout, yHoldout);
   const beatsNoise = v.lift > noise.p95;
-  const holds = c.n >= minSupport / 2 && c.lift > 1.15;
+  // The held-out half is judged against the same noise line as the half that proposed the pattern.
+  // A weaker bar here — merely "above 1" — passes a candidate that scored 6.5x where it was found
+  // and 1.6x where it was tested, which is exactly what failing to replicate looks like.
+  const holds = c.n >= minSupport / 2 && c.lift > noise.p95;
   if (beatsNoise && holds) survived++;
   const mark = beatsNoise && holds ? " ok" : beatsNoise ? " --" : "  .";
   console.log(

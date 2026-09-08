@@ -71,20 +71,12 @@ flowchart LR
 
 ## What you actually see
 
-```
-  1.7%  # 192/6727  MERCURY    mercuryagent.sh      https://robinhoodchain.blockscout.com/token/0x4df224…
-         + creator bought 0.039 of the quote asset in their own launch
-         - quoted in ETH
-         - busy hour: 849 launches in the last 60 minutes
-  0.9%  # 655/6727  KIMA       Kima Protocol        https://robinhoodchain.blockscout.com/token/0xd3e799…
-         + creator bought 0.070 of the quote asset in their own launch
-         - quoted in ETH
-         - busy hour: 845 launches in the last 60 minutes
-  0.2%  #4392/6727  BABY STONE Baby STONE           https://robinhoodchain.blockscout.com/token/0x986213…
-```
+<img src="docs/img/term-watch.png" alt="gimlet watch">
 
-**`#192 of 6,727`** is the useful half. On its own "1.7%" means little; "192nd best of the last six
-hours" tells you whether to look now or never.
+**`#175 of 6,176`** is the useful half. On its own "1.8%" means little; "175th best of the last six
+hours" tells you whether to look now or never. The line reading *"not logged: seen too late for the
+claim to count"* is the prediction log refusing a launch it saw more than five minutes in — the
+record is allowed to be thin, but not flattering.
 
 Or the same feed on a local page, which is the same engine behind `npm run board`:
 
@@ -124,15 +116,7 @@ second. `npm run backtest` replays the board against the price paths that actual
 +3.5 s (just past the opening tax), sell on a 10x target, a 30% stop, or six minutes, whichever comes
 first.
 
-```
-window     14 covered hours, 2026-09-06 20:00 to 2026-09-07 19:00 UTC
-coverage   >=98.0% of each hour's launches had their curve read
-eligible   18,544 launches, each settled at least 4h
-entry      +35 blocks (3.5 s), just past the 3 s / 99% opening tax
-costs      1.6% a side, from the fee and tax charged on every CurveBuy
-impact     2.9% at 0.05 of the quote asset, from how far real buys moved the curve
-handover   curve's last price vs the pool's first, over 237 graduated tokens: median 1.00x, 96.6% inside 2x
-```
+<img src="docs/img/term-backtest.png" alt="npm run backtest">
 
 Nothing in that header is an assumption. Costs come off the `fee` and `tax` fields of every CurveBuy;
 slippage comes from how far real buys moved the curve; and the `handover` line is a unit test that
@@ -141,22 +125,26 @@ of it should divide to 1.00, and they do.
 
 | cohort | launches | win rate | median | mean |
 |---|---|---|---|---|
-| everything | 18,544 | 6.0% | 0.84x | **0.92x** |
-| top half | 8,981 | 7.1% | 0.80x | **0.94x** |
-| shortlist (top 10%) | 1,641 | 13.2% | 0.76x | **1.12x** |
-| top 1% | 157 | 21.0% | 0.66x | **1.65x** |
+| everything | 30,434 | 6.2% | 0.83x | **0.92x** |
+| top half | 15,306 | 7.1% | 0.80x | **0.94x** |
+| shortlist (top 10%) | 3,170 | 11.4% | 0.75x | **1.07x** |
+| top 1% | 305 | 19.2% | 0.68x | **1.49x** |
 
 Read that carefully, because the honest parts are the ones that don't fit on a poster:
 
 - **The ranking is the whole product.** Buying everything returns 0.92x. Buying the shortlist returns
-  1.12x. That gap is what the model is worth.
-- **You lose on 87% of positions.** Median position is 0.76x. The return lives in a tail, and if that
+  1.07x, and the top percentile 1.49x. That gap is what the model is worth.
+- **You lose on 89% of positions.** The median one is 0.75x. The return lives in a tail, and if that
   ratio does not fit how you trade, nothing here fixes it.
-- **Resampling the 1,631 shortlist positions puts the mean between 1.06x and 1.18x nine times out of
-  ten.** Remove the ten best of them and it is still 1.07x, so it is not one lucky token — but it is
-  a thin edge measured over fourteen hours, not a week.
-- **Speed past the tax window buys little.** Entering at +3.5 s returns 1.12x; at +60 s, 1.07x. The
-  whole minute is worth about five percent, so being 200 ms faster than the next person is worth
+- **Resampling the 3,144 shortlist positions puts the mean between 1.03x and 1.11x nine times out of
+  ten.** Remove the ten best and it is still 1.05x, so it is not one lucky token — but it is a thin
+  edge measured over twenty-seven hours, not a week.
+- **The edge shrank as the sample grew, and got sturdier.** At fourteen hours the shortlist read
+  1.12x and lost all of it when the ten best positions were removed. At twenty-seven it reads 1.07x
+  and keeps 1.05x. Small samples overstate the mean and understate how much of it survives — worth
+  remembering when the next number here moves.
+- **Speed past the tax window buys little.** Entering at +3.5 s returns 1.07x; at +60 s, 1.03x. The
+  whole minute is worth about four percent, so being 200 ms faster than the next person is worth
   nothing measurable. The opening tax has already eaten that race, and this is a scanner rather than
   a sniper for the same reason.
 
@@ -167,18 +155,24 @@ that wide will *always* find something, so every candidate is attacked three way
 launches and judged on newer ones, floored at 40 launches of support, and raced against **the same
 search run on shuffled outcomes** — which is what the search invents from nothing.
 
-The noise line sits at 3.69x lift. What clears it:
+<img src="docs/img/term-patterns.png" alt="npm run patterns">
+
+The noise line sits at 3.45x lift. What clears it, on the half that did not propose it:
 
 | pattern (first 30 s) | held-out | n |
 |---|---|---|
-| `priceMove ≥ 3.3` and `snipers ≥ 6` | **7.40x** | 62 |
-| `snipers ≥ 10` and `buys ≥ 41` | **7.17x** | 76 |
-| `buys ≥ 58` and `snipers ≥ 6` | **6.26x** | 87 |
+| `snipers ≥ 10` and `priceMove ≥ 2.55` | **8.87x** | 77 |
+| `snipers ≥ 10` and `buys ≥ 49` | **7.40x** | 96 |
+| `priceMove ≥ 7.27` | **6.75x** | 81 |
+
+The `--` row in that screenshot is the point of the whole exercise: a pattern that scored 4.52x
+where it was found and 1.61x where it was tested is not a finding, and the tool says so rather than
+printing the first number and stopping.
 
 `snipers` is the number of wallets that **paid the 99% opening tax** to get in during the first three
-seconds. Six of them is six wallets each burning almost their whole entry for the privilege — the
-most expensive vote of confidence this chain allows anyone to cast. Against a base rate of 3.5%
-tripling from the 30-second price, those launches triple about 20% of the time.
+seconds. Ten of them is ten wallets each burning almost their whole entry for the privilege — the
+most expensive vote of confidence this chain allows anyone to cast. Against a base rate of 3.7%
+tripling from the 30-second price, those launches triple about a third of the time.
 
 None of this is in the score today. It is measured, not shipped.
 
@@ -261,7 +255,7 @@ Nothing here needs a key, because nothing here signs.
 - **It has not lived through a regime change.** Launch tactics drift, and a scanner that works this
   month can quietly stop working next month. The live scoreboard is what will tell you — watch that,
   not the numbers in this file.
-- **The money section is fourteen hours, not a week.** Curve trades are read on demand, so only hours
+- **The money section is twenty-seven hours, not a week.** Curve trades are read on demand, so only hours
   where nearly every launch was read can be tested at all. `npm run curves` widens that.
 - **It knows nothing about anything except pons v2 launches.** Not price, not safety, not whether a
   token is a scam. It answers one question and has no opinion on any other.
