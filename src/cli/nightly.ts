@@ -14,14 +14,27 @@ import { spawnSync } from "node:child_process";
  * chain-wide against Uniswap v4's singleton, so one pass covers every graduated token at once at
  * roughly 430 reads a day, against the curve indexer's 1.7 a second.
  */
+/**
+ * `recalibrate` is deliberately not here.
+ *
+ * It was, running just before the retrain on the reasoning that the model trained a minute later
+ * would inherit the fit. It does not: a correction is stamped with the model that produced the
+ * claims and refused for any other, and training reads no correction at all. So the step fitted a
+ * correction for a model that was replaced sixty seconds later, and nothing ever applied it — on the
+ * live server the file had never once been written.
+ *
+ * Nor should it inherit. The correction exists because the market moved away from what the model was
+ * fitted on; a model retrained overnight has just been fitted on that same moved market, so it
+ * starts closer to right, and carrying yesterday's correction onto it would push it past. The honest
+ * sequence is to let the new model serve uncorrected until its own claims settle, then fit from
+ * those — which is a job for a timer through the day, not for a step that runs once at half past
+ * four. See DEPLOY.md.
+ */
 const steps: Array<[string, string[]]> = [
   ["backfill", ["--hours", "26"]],
   ["enrich-window", ["--hours", "20", "--workers", "6"]],
   ["curves", ["--limit", "4000", "--min-age-hours", "4", "--max-age-hours", "168"]],
   ["pools", ["--max-blocks", "900000"]],
-  // Before the retrain, so the fit is stamped with the model that actually produced the claims. The
-  // model trained a minute later inherits it, which is the whole point: it faces the same market.
-  ["recalibrate", []],
   ["train", []],
   // Housekeeping last, once the night's reading is in. Folding a curve costs its per-transaction
   // detail and nothing else: checked across every curve in the database, the summary reports the
