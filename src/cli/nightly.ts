@@ -35,6 +35,11 @@ const steps: Array<[string, string[]]> = [
   ["enrich-window", ["--hours", "20", "--workers", "6"]],
   ["curves", ["--limit", "4000", "--min-age-hours", "4", "--max-age-hours", "168"]],
   ["pools", ["--max-blocks", "900000"]],
+  // The chain-wide swap pass folds every pool to a high, low and last, which is all four thousand of
+  // them can afford. The coin page draws a line, and a line needs the series: this reads that one
+  // pool on its own, where a chunk covers a hundred and fifty thousand blocks instead of a thousand.
+  // Without it the chart is empty and looks broken, which is how it was found.
+  ["coin", []],
   ["train", []],
   // Housekeeping last, once the night's reading is in. Folding a curve costs its per-transaction
   // detail and nothing else: checked across every curve in the database, the summary reports the
