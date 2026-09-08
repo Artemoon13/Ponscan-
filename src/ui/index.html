@@ -176,8 +176,24 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .keys div{background:var(--l05);border-radius:6px;padding:10px 12px}
 .keys b{display:block;font:600 16px var(--mono)}
 .keys span{color:var(--t5);margin-top:3px;display:block}
-.foot{margin:48px 0 0;padding:18px 0 28px;border-top:1px solid var(--l08);display:flex;justify-content:space-between;font-size:12px;color:var(--t45)}
-.foot span{display:flex;gap:18px}
+/* The footer. Four columns on desktop, stacking to two and then one, and hidden on the board, which
+   locks the document scroll and fills the viewport. */
+.ft{margin-top:64px;border-top:1px solid var(--l08);background:var(--bg)}
+.ft.off{display:none}
+.ftin{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr);gap:40px;padding-top:38px;padding-bottom:32px;align-items:start}
+.ftlogo{display:flex;align-items:center;gap:10px;color:var(--ink)}
+.ftlogo b{font-size:17px;letter-spacing:-.02em}
+.ftbrand p{margin:14px 0 0;font-size:12.5px;line-height:1.6;color:var(--t45);max-width:34ch}
+.ftcol h4{margin:0 0 14px;font:500 10.5px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--t45)}
+.ftcol a{display:block;padding:5px 0;font-size:13.5px;color:var(--t65);cursor:pointer}
+.ftcol a:hover{color:var(--ink)}
+.ftaddr{border:1px solid var(--l14);border-radius:8px;background:var(--bg2);padding:11px 13px;font:500 12px var(--mono);color:var(--t65);overflow-wrap:anywhere}
+.ftlink{display:inline-block;margin-top:10px;font-size:13px;color:var(--lime)}
+.ftwarn{margin:12px 0 0;font:11.5px var(--mono);line-height:1.5;color:var(--t35)}
+.ftbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:16px;padding-bottom:26px;border-top:1px solid var(--l06);font:11.5px var(--mono);color:var(--t35)}
+.ftstat{display:flex;align-items:center;gap:7px}
+@media (max-width:900px){.ftin{grid-template-columns:1fr 1fr;gap:32px}}
+@media (max-width:560px){.ftin{grid-template-columns:1fr}.ftbar{flex-direction:column;align-items:flex-start;gap:8px}}
 
 /* ── board ── */
 /* The one page with a hard width requirement: 620 for the list, 6 for the handle, 400 for the
@@ -623,7 +639,6 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
       </div>
     </div>
 
-    <div class="foot"><span>Augur · MIT · not a safety rating, not a price forecast, not advice</span><span><a href="#/roadmap">Roadmap</a><a href="#/run">Run it</a><a href="#/telegram">Telegram</a><a href="#/pro">Pro</a><a href="https://github.com/Artemoon13/Ponscan-" target="_blank" rel="noopener">GitHub</a><a href="https://github.com/Artemoon13/Ponscan-#readme" target="_blank" rel="noopener">Docs</a><code>npm run validate</code></span></div>
   </div>
 </section>
 
@@ -916,7 +931,43 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
   </div>
 </section>
 
-
+<!-- One footer for every page. It used to live inside #page-home, which meant seven of the eight
+     pages simply had none: the element existed in the DOM the whole time and was hidden along with
+     the section around it. The board is the exception and opts out below, because it is a 100vh
+     grid with the document scroll locked, so anything under it could never be reached. -->
+<footer class="ft" id="ft">
+  <div class="wrap ftin">
+    <div class="ftbrand">
+      <div class="ftlogo"><img class="mark img" src="/icon-64.png" alt=""><b>augur</b></div>
+      <p>Scores every pons v2 launch on Robinhood Chain the second it lands. MIT, no wallet, no keys. Not a safety rating, not a price forecast, not advice.</p>
+    </div>
+    <div class="ftcol">
+      <h4>Product</h4>
+      <a href="#/board">Board</a>
+      <a href="#/model">Model</a>
+      <a href="#/roadmap">Roadmap</a>
+      <a href="#/run">Run it locally</a>
+      <a href="https://github.com/Artemoon13/Ponscan-#readme" target="_blank" rel="noopener">Docs ↗</a>
+    </div>
+    <div class="ftcol">
+      <h4>Community</h4>
+      <a href="https://github.com/Artemoon13/Ponscan-" target="_blank" rel="noopener">GitHub ↗</a>
+      <a href="https://x.com/kingwilliam_" target="_blank" rel="noopener">@kingwilliam_ ↗</a>
+      <a href="#/telegram">Telegram</a>
+      <a href="#/pro">Pro</a>
+    </div>
+    <div class="ftcol ftcoin">
+      <h4>$AUGUR · the only contract</h4>
+      <div class="ftaddr" id="ft-addr">not launched yet</div>
+      <a class="ftlink" href="#/token">Coin page →</a>
+      <p class="ftwarn">No address has been published. Every other address with this name is not ours.</p>
+    </div>
+  </div>
+  <div class="wrap ftbar">
+    <span>© 2026 augur · MIT</span>
+    <span class="ftstat"><span class="dot"></span><span id="ftstat">—</span></span>
+  </div>
+</footer>
 
 </div>
 
@@ -987,6 +1038,7 @@ function route() {
   for (const p of ["home", "board", "model", "token", "roadmap", "run", "telegram", "pro"]) $("page-" + p).hidden = S.page !== p;
   document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("on", a.dataset.nav === S.page));
   document.body.style.overflow = S.page === "board" ? "hidden" : "";
+  $("ft").classList.toggle("off", S.page === "board");
   if (S.page === "board" && arg && arg.startsWith("0x")) openCard(arg.toLowerCase());
   if (S.page === "model") loadModel();
   if (S.page === "token") loadCoin();
@@ -1017,6 +1069,8 @@ function showHealth(h, d) {
   st.className = "stale " + cls; st.textContent = msg;
   const when = d.modelTrainedAt ? new Date(d.modelTrainedAt * 1000).toISOString().slice(11, 16) + " UTC" : "—";
   txt.textContent = (cls === "bad" ? "stale" : "live") + " · block " + (h && h.headBlock ? h.headBlock.toLocaleString("en-US") : "—") + " · model " + when;
+  const fs = $("ftstat");
+  if (fs) { fs.textContent = txt.textContent; fs.parentElement.className = "ftstat live " + cls; }
 }
 
 /* ── feed ── */
