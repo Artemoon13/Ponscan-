@@ -864,13 +864,11 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
             <div class="prose">
               <p>The board runs on a node and a model that costs money to retrain every night. Rather than sell a subscription, the plan is a coin launched on the same factory the board watches, with its creator fee pointed at the cost of running it. Trading it is how the board stays free.</p>
               <p>That is the whole arrangement. No roadmap for the token itself, no unlock, no share of anything, and nobody holding a reserved allocation.</p>
-              <p style="color:var(--t45);font-size:12.5px">Holders and pool liquidity are not on this page. Holders would need every transfer indexed; liquidity would need each position's range, and a guess at that here is the last thing worth shipping. Everything shown is read from the chain and exact.</p>
             </div>
           </div>
           <div>
             <div class="h2r" style="margin-top:0"><h2>Fee ledger</h2><span class="q" id="coin-ledger-since"></span></div>
             <div class="ldg" id="coin-ledger"></div>
-            <div class="note" id="coin-ledger-note" style="font:11.5px var(--mono);color:var(--t35);line-height:1.55;margin-top:14px"></div>
           </div>
         </div>
       </div>
@@ -1530,10 +1528,6 @@ async function loadCoin() {
         s.quote.toFixed(4) + " " + esc(d.quoteSymbol) + "</span></div>").join("")
     : '<div class="r"><span class="w">\u2014</span><span class="d">no sweeps read yet</span><span class="a"></span></div>';
   $("coin-ledger-since").textContent = fees ? fees.sweeps.toLocaleString() + " sweeps to date" : "";
-  $("coin-ledger-note").textContent = fees
-    ? fees.quote.toFixed(6) + " " + d.quoteSymbol + " to the creator so far. Read from the hook, not from the swaps: the pool's own fee is zero on every one of them."
-    : "";
-
   $("coin-lg").textContent = sym.replace(/^\$/, "").slice(0, 1).toUpperCase();
   $("coin-name").textContent = "$" + sym.replace(/^\$/, "");
   $("coin-sub").textContent = (d.pool && d.pool.lastUsd !== null ? "market cap " + usd(d.pool.lastUsd) + " \u00b7 " : "") + "quoted in " + d.quoteSymbol;
