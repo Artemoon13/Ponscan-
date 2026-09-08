@@ -12,7 +12,7 @@ import { formatUsd, marketCapUsd, usdOf } from "./prices.ts";
 import { BLOCKS_PER_DAY } from "./config.ts";
 import { CFG } from "./config.ts";
 import { indexCurve } from "./curve.ts";
-import { poolCaps, quotePerToken } from "./pool.ts";
+import { graduationCapUsd, poolCaps, quotePerToken } from "./pool.ts";
 import { logsClient, sleep, stateClient, withRetry } from "./chain.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -449,6 +449,22 @@ const server = createServer(async (req, res) => {
       quoteSymbol: q.symbol,
       threshold: l.graduation_threshold_wei === null
         ? null : formatUnits(BigInt(l.graduation_threshold_wei as string), dec),
+      /**
+       * The graduation bar as a market cap, beside the reserve that has to flow in to clear it.
+       *
+       * Showing only "4.2 ETH" invited exactly the wrong reading: it looks like the valuation a
+       * launch graduates at, and it is not. The reserve is about $10.6K of ETH; the cap it implies
+       * is $51.9K, because a cap is the price per token times the supply. Measured per quote asset
+       * rather than globally, since ETH graduates at $51.9K and TTWO at $28.0K.
+       */
+      gradCapUsd: (() => {
+        const c = graduationCapUsd(
+          db, (pt) => quoteFromCache(db, pt).decimals, (pt) => quoteFromCache(db, pt).symbol, q.symbol,
+        );
+        return c === null ? null : formatUsd(c);
+      })(),
+      x: CFG.coinX || null,
+      repo: CFG.coinRepo || null,
       graduated: Boolean(g),
       graduationTx: g?.tx ?? null,
       secondsToGraduate: g ? g.ts - Number(l.ts) : null,

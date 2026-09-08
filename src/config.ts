@@ -43,6 +43,16 @@ export const CFG = {
   coinToken: str("COIN_TOKEN", "0xb19f5a6e22f9057980b08ff05b7f5a6878ab0c8a").toLowerCase(),
   /** Set once $GIMLET itself is the token above, so the page stops calling itself a stand-in. */
   coinIsOurs: str("COIN_IS_OURS", "0") === "1",
+  /**
+   * Who stands behind the coin, so a reader can check the name against an account rather than
+   * against this page alone. A page vouching only for itself is worth nothing to someone deciding
+   * whether an address is genuine.
+   *
+   * The handle only, without the @ or the URL. Empty hides the line rather than showing a dead one.
+   */
+  coinX: str("COIN_X", "kingwilliam_"),
+  /** Public source for the coin, once there is one. Empty until then. */
+  coinRepo: str("COIN_REPO", ""),
   dbPath: str("DB_PATH", "./data/gimlet.db"),
   boardPort: num("BOARD_PORT", 4663),
   /**
