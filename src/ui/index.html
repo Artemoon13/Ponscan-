@@ -133,6 +133,12 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .shot-skel i.n{width:46%}
 .shot-skel i.s{width:60%;justify-self:end}
 @keyframes skel{0%,100%{opacity:.35}50%{opacity:.75}}
+/* The model page holds two panes that stay empty while their figures are being made. An empty
+   bordered box under a heading reads as a page that failed, not one that is working. */
+.rowskel{display:flex;align-items:center;gap:10px;height:26px}
+.rowskel i{display:block;height:9px;border-radius:3px;background:var(--l08);animation:skel 1.4s ease-in-out infinite}
+.rowskel i:first-child{width:34%}
+.rowskel i:last-child{flex:1}
 .shot-row .p{font:600 14px var(--mono)}
 .shot-row .nm{display:flex;gap:6px;align-items:baseline;font-size:12.5px;min-width:0}
 .shot-row .nm span{color:var(--t4);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -882,8 +888,8 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
     <div class="pipe" id="pipe"></div>
     <div class="metrics" id="metrics"></div>
     <div class="two2">
-      <div class="pane"><div class="k">Feature influence · mean |contribution| on the current board</div><div id="imp"></div></div>
-      <div class="pane"><div class="k">Live scoreboard · claims written before the outcome existed</div><div class="log" id="livelog"></div></div>
+      <div class="pane"><div class="k">Feature influence · mean |contribution| on the current board</div><div id="imp"><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div></div></div>
+      <div class="pane"><div class="k">Live scoreboard · claims written before the outcome existed</div><div class="log" id="livelog"><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div><div class="rowskel"><i></i><i></i></div></div></div>
     </div>
     <p class="honest" id="honest"></p>
   </div>
@@ -1817,7 +1823,7 @@ async function loadModel() {
     M("Folds at chance", `${v.atChance} / ${v.folds.length}`, `worst ROC ${v.roc.worst.toFixed(3)} · disclosed`, v.atChance ? "amb" : ""),
   ].join("") : `<div class="cell" style="grid-column:1/-1;color:var(--t5)">No validation on record. Run <code>npm run validate</code> and this fills in with what it printed.</div>`;
   const max = d.importance.length ? d.importance[0].value : 1;
-  $("imp").innerHTML = d.importance.slice(0, 12).map((f) => `<div class="imp"><span>${f.name.replace(/_/g, " ")}</span><span class="bar"><i style="width:${(100 * f.value / max).toFixed(0)}%"></i></span><span class="n">${f.value.toFixed(3)}</span></div>`).join("") || `<div style="color:var(--t5)">no launches on the board to measure against</div>`;
+  if (d.importance && d.importance.length) $("imp").innerHTML = d.importance.slice(0, 12).map((f) => `<div class="imp"><span>${f.name.replace(/_/g, " ")}</span><span class="bar"><i style="width:${(100 * f.value / max).toFixed(0)}%"></i></span><span class="n">${f.value.toFixed(3)}</span></div>`).join("") || `<div style="color:var(--t5)">no launches on the board to measure against</div>`;
   const row = (t, m, c = "") => `<div><span class="t">${t}</span><span class="${c}">${m}</span></div>`;
   const sc = live.thisModel.score, all = live.allModels.score;
   $("livelog").innerHTML = [
