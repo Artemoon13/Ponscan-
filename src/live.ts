@@ -88,8 +88,18 @@ export async function runLive(db: DB, ev: LiveEvents = {}): Promise<void> {
     lastRead = Date.now();
     busy = true;
     try {
-      // A restart after a long pause must not ask for a million blocks in one call.
-      const from = Math.max(cursor + 1, head - 200_000);
+      // A restart after a long pause must not ask for a million blocks in one call, and the cap has
+      // to be a width the endpoint will actually serve. It was 200,000, more than three times
+      // `logsChunk`, and the official RPC answers a range that wide with "Missing or invalid
+      // parameters" rather than a result. So a watcher restarted after a ten-hour outage printed
+      // "run backfill to fill it", asked for 200,000 blocks anyway, failed, retried, and never
+      // advanced a single block: it could not recover from exactly the situation its own message
+      // was about.
+      //
+      // The cap does not close the gap — the cursor still jumps to head below, so the older blocks
+      // stay missing until backfill reads them. What it fixes is that the watcher gets back to live
+      // instead of stalling forever on a request the endpoint will never answer.
+      const from = Math.max(cursor + 1, head - CFG.logsChunk);
       if (from > cursor + 1) status(`  skipping ${from - cursor - 1} blocks: gap too wide, run backfill to fill it`);
 
       const logs = (await withRetry(() =>
