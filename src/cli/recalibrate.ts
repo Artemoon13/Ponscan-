@@ -16,6 +16,7 @@ const db = openDb();
 grade(db);
 
 const id = modelId();
+
 // Fitted against the model's own opinion, never against a number a previous correction already
 // moved. Older rows predate the column and were never corrected, so their shown value is the raw one.
 const claims = settled(db, id);
@@ -25,7 +26,9 @@ const shownRows = claims.map((r) => ({ probability: r.probability, label: r.labe
 console.log(`\nmodel ${id}: ${rows.length} settled claims scored by it\n`);
 
 if (rows.length < MIN_CLAIMS) {
-  console.log(`  too few to fit against, needs ${MIN_CLAIMS}. Nothing written.\n`);
+  console.log(`  too few to fit against, needs ${MIN_CLAIMS}. Nothing written.`);
+  console.log(`  a model gathers about a thousand claims an hour and they settle after four,`);
+  console.log(`  so a model this fresh is simply not old enough yet. Nothing is wrong.\n`);
   db.close();
   process.exit(0);
 }

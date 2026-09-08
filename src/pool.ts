@@ -540,24 +540,50 @@ export { SUPPLY };
  *
  * Cached for an hour. It moves only as quote-asset prices move, and it costs a scan of every pool.
  */
-let gradCap: { at: number; v: number | null } | null = null;
+let gradCap: { at: number; v: number | null; byAsset: Map<string, number> } | null = null;
 
-export function graduationCapUsd(db: DB, quoteDecimalsFor: (pairToken: string) => number, symbolFor: (pairToken: string) => string | null): number | null {
-  if (gradCap && Date.now() - gradCap.at < 3_600_000) return gradCap.v;
+export function graduationCapUsd(
+  db: DB,
+  quoteDecimalsFor: (pairToken: string) => number,
+  symbolFor: (pairToken: string) => string | null,
+  quoteSymbol?: string | null,
+): number | null {
+  if (!gradCap || Date.now() - gradCap.at >= 3_600_000) gradCap = { at: Date.now(), v: null, byAsset: new Map() };
+  else if (quoteSymbol === undefined) return gradCap.v;
+  else if (gradCap.v !== null) return gradCap.byAsset.get(quoteSymbol ?? "") ?? gradCap.v;
 
   const rows = db.prepare(
     "SELECT p.init_sqrt, p.token_is_c1, p.dec0, p.dec1, l.pair_token FROM pools p JOIN launches l USING(token)",
   ).all() as Array<PoolRow & { pair_token: string }>;
 
   const caps: number[] = [];
+  const perAsset = new Map<string, number[]>();
   for (const p of rows) {
-    const cap = marketCapUsd(quotePerToken(p.init_sqrt, p), symbolFor(p.pair_token));
-    if (cap !== null && Number.isFinite(cap) && cap > 0) caps.push(cap);
+    const sym = symbolFor(p.pair_token);
+    const cap = marketCapUsd(quotePerToken(p.init_sqrt, p), sym);
+    if (cap === null || !Number.isFinite(cap) || cap <= 0) continue;
+    caps.push(cap);
+    if (sym) {
+      const list = perAsset.get(sym);
+      if (list) list.push(cap); else perAsset.set(sym, [cap]);
+    }
   }
   caps.sort((a, b) => a - b);
   const v = caps.length >= 50 ? caps[Math.floor(caps.length / 2)] : null;
-  gradCap = { at: Date.now(), v };
-  return v;
+
+  // Per asset as well as overall, because the two differ by more than rounding: the global median is
+  // $41K while an ETH-quoted launch graduates at $52K and a TTWO-quoted one at $28K. Quoting the
+  // global figure to an ETH launch understates its bar by a fifth, which is exactly the sort of
+  // "roughly right" that makes a reader stop trusting the specific numbers around it.
+  const byAsset = new Map<string, number>();
+  for (const [sym, list] of perAsset) {
+    if (list.length < 5) continue;
+    list.sort((a, b) => a - b);
+    byAsset.set(sym, list[Math.floor(list.length / 2)]);
+  }
+
+  gradCap = { at: Date.now(), v, byAsset };
+  return quoteSymbol === undefined ? v : byAsset.get(quoteSymbol ?? "") ?? v;
 }
 
 /**
@@ -575,14 +601,23 @@ let gradMult: { at: number; v: number | null } | null = null;
 export function graduationMultiple(db: DB): number | null {
   if (gradMult && Date.now() - gradMult.at < 3_600_000) return gradMult.v;
 
+  // The summary arm is not an optimisation. This figure is measured across every graduated token
+  // ever read, and compaction removes their trades within days of the launch; on trades alone the
+  // constant would quietly narrow to whatever graduated this week.
   const rows = db.prepare(`
     WITH firsts AS (
       SELECT token, CAST(quote_wei AS REAL) / CAST(token_amt AS REAL) px,
              row_number() OVER (PARTITION BY token ORDER BY block, log_index) rn
       FROM curve_trades WHERE CAST(token_amt AS REAL) > 0 AND CAST(quote_wei AS REAL) > 0
+    ),
+    opens AS (
+      SELECT token, px FROM firsts WHERE rn = 1
+      UNION ALL
+      SELECT token, first_price px FROM curve_summary
+      WHERE first_price > 0 AND token NOT IN (SELECT token FROM firsts WHERE rn = 1)
     )
-    SELECT p.token_is_c1, p.dec0, p.dec1, p.init_sqrt, f.px first_px
-    FROM pools p JOIN firsts f ON f.token = p.token AND f.rn = 1`).all() as
+    SELECT p.token_is_c1, p.dec0, p.dec1, p.init_sqrt, o.px first_px
+    FROM pools p JOIN opens o ON o.token = p.token`).all() as
     Array<PoolRow & { first_px: number }>;
 
   const ratios: number[] = [];

@@ -14,7 +14,7 @@ import { indexCurve } from "../curve.ts";
  * whatever it will do, and its peak so far is not the peak — recording that as the answer would
  * teach a model that recent launches peak low.
  *
- * gimlet curves [--limit N] [--min-age-hours N] [--max-age-hours N]
+ * gimlet curves [--limit N] [--min-age-hours N] [--max-age-hours N] [--workers N]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {
@@ -25,6 +25,17 @@ const arg = (name: string, dflt: number): number => {
 const limit = arg("limit", 3000);
 const minAge = arg("min-age-hours", 4);
 const maxAge = arg("max-age-hours", 168);
+/**
+ * How many curves to read at once.
+ *
+ * A curve is one `eth_getLogs` call and the block range barely matters: 20,000 blocks and 900,000
+ * both come back in about 1.4 seconds, so the cost is round-trip latency, not scanning. That makes
+ * concurrency the only lever, and the endpoint answers it with diminishing returns. Measured over
+ * 96 curves each: 4 workers 1.00/s, 8 workers 1.66/s, 16 workers 1.81/s, and 24 workers 1.89/s but
+ * with failures jumping from 2 to 14. Four stays the default because the nightly shares the
+ * endpoint with the watcher; a backfill that is the only thing running can ask for eight.
+ */
+const workers = Math.max(1, Math.min(16, arg("workers", 4)));
 
 const db = openDb();
 const now = Math.floor(Date.now() / 1000);
@@ -37,17 +48,18 @@ const rows = db.prepare(`
 
 const already = (db.prepare("SELECT count(*) c FROM curve_indexed").get() as { c: number }).c;
 console.log(`${already} curves already read; reading ${rows.length} more`);
-console.log(`window: launches between ${minAge}h and ${maxAge}h old, so each has had time to settle\n`);
+console.log(`window: launches between ${minAge}h and ${maxAge}h old, so each has had time to settle`);
+console.log(`${workers} at a time\n`);
 if (!rows.length) { db.close(); process.exit(0); }
 
 const head = Number(await withRetry(() => logsClient.getBlockNumber()));
 const started = Date.now();
 let done = 0, trades = 0, failed = 0, last = 0;
 
-// Four at a time: the endpoint's own limiter is the ceiling, and this is a background job that must
-// not starve the watcher or the board sharing it.
+// The endpoint's own limiter is the ceiling, and this is a background job that must not starve the
+// watcher or the board sharing it.
 const queue = [...rows];
-await Promise.all(Array.from({ length: 4 }, async () => {
+await Promise.all(Array.from({ length: workers }, async () => {
   for (;;) {
     const r = queue.shift();
     if (!r) return;

@@ -347,10 +347,12 @@ h1{font:700 56px/1.02 Geist,sans-serif;letter-spacing:-.035em;margin:18px 0 0;te
 .verify .hd{display:flex;align-items:center;gap:10px}
 .verify h3{margin:0;font:600 15px Geist,sans-serif;letter-spacing:-.01em;color:var(--ink)}
 .verify .hd button{margin-left:auto;border:1px solid var(--lime);background:var(--lime);color:#111;border-radius:5px;padding:4px 10px;font:600 10.5px var(--mono);cursor:pointer}
-.verify .r{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;padding:8px 0;border-top:1px solid var(--l06);font:11.5px var(--mono);align-items:baseline}
+.verify #coin-verify{margin-top:14px}
+.verify .r{display:grid;grid-template-columns:112px minmax(0,1fr);gap:16px;padding:11px 0;border-top:1px solid var(--l06);font:11.5px var(--mono);align-items:baseline;line-height:1.55}
+.verify .r:first-child{border-top:0;padding-top:0}
 .verify .r .k{color:var(--t45)}
 .verify .r .v{color:var(--ink);overflow-wrap:anywhere}
-.verify .note{margin-top:12px;font:12.5px Geist,sans-serif;color:var(--t55);line-height:1.5}
+.verify .note{margin-top:16px;padding-top:14px;border-top:1px solid var(--l06);font:12.5px Geist,sans-serif;color:var(--t55);line-height:1.5}
 .notyet{margin-top:0;margin-bottom:26px;border:1px solid rgba(232,184,58,.35);background:rgba(232,184,58,.07);border-radius:9px;padding:14px 16px;font-size:13.5px;color:var(--ink);line-height:1.55}
 .notyet b{color:var(--amber)}
 .settings{display:flex;align-items:center;gap:16px;padding:0 24px;height:42px;border-bottom:1px solid var(--l08);flex:none;font-size:11.5px;color:var(--t45);white-space:nowrap;overflow-x:auto}
@@ -853,7 +855,7 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
         <div class="chart"><div id="coin-chart"></div><div class="ax" id="coin-ax"></div></div>
         <div class="rng" id="coin-rng"></div>
 
-        <div class="h2r"><h2>Where the fee goes</h2><span class="q">the only thing wired into this coin</span></div>
+        <div class="h2r"><h2>Where the fee goes</h2></div>
         <div class="flow2" id="coin-fee"></div>
 
         <div class="cols2" style="margin-top:38px;gap:36px;grid-template-columns:1fr 1fr">
@@ -862,13 +864,11 @@ h2{margin:0;font:700 26px Geist,sans-serif;letter-spacing:-.02em}
             <div class="prose">
               <p>The board runs on a node and a model that costs money to retrain every night. Rather than sell a subscription, the plan is a coin launched on the same factory the board watches, with its creator fee pointed at the cost of running it. Trading it is how the board stays free.</p>
               <p>That is the whole arrangement. No roadmap for the token itself, no unlock, no share of anything, and nobody holding a reserved allocation.</p>
-              <p style="color:var(--t45);font-size:12.5px">Holders and pool liquidity are not on this page. Holders would need every transfer indexed; liquidity would need each position's range, and a guess at that here is the last thing worth shipping. Everything shown is read from the chain and exact.</p>
             </div>
           </div>
           <div>
             <div class="h2r" style="margin-top:0"><h2>Fee ledger</h2><span class="q" id="coin-ledger-since"></span></div>
             <div class="ldg" id="coin-ledger"></div>
-            <div class="note" id="coin-ledger-note" style="font:11.5px var(--mono);color:var(--t35);line-height:1.55;margin-top:14px"></div>
           </div>
         </div>
       </div>
@@ -1528,10 +1528,6 @@ async function loadCoin() {
         s.quote.toFixed(4) + " " + esc(d.quoteSymbol) + "</span></div>").join("")
     : '<div class="r"><span class="w">\u2014</span><span class="d">no sweeps read yet</span><span class="a"></span></div>';
   $("coin-ledger-since").textContent = fees ? fees.sweeps.toLocaleString() + " sweeps to date" : "";
-  $("coin-ledger-note").textContent = fees
-    ? fees.quote.toFixed(6) + " " + d.quoteSymbol + " to the creator so far. Read from the hook, not from the swaps: the pool's own fee is zero on every one of them."
-    : "";
-
   $("coin-lg").textContent = sym.replace(/^\$/, "").slice(0, 1).toUpperCase();
   $("coin-name").textContent = "$" + sym.replace(/^\$/, "");
   $("coin-sub").textContent = (d.pool && d.pool.lastUsd !== null ? "market cap " + usd(d.pool.lastUsd) + " \u00b7 " : "") + "quoted in " + d.quoteSymbol;
@@ -1558,8 +1554,19 @@ async function loadCoin() {
     row("supply", d.supply.toLocaleString()) +
     row("self-buy", d.selfBuy === null ? "not declared" : esc(d.selfBuy) + " " + esc(d.quoteSymbol)) +
     row("exempt wallets", String(d.exemptCount)) +
-    row("graduated", d.graduationTx ? esc(d.threshold || "") + " " + esc(d.quoteSymbol) : "not yet",
-        d.graduationTx ? EXP + "/tx/" + d.graduationTx : "");
+    // The cap, and only the cap. This row used to be labelled "graduated" and show "4.2 ETH", which
+    // reads as the valuation a launch graduates at and is not: that is the reserve which has to flow
+    // into the curve. Showing both put a number here that answers a question nobody asked, so the
+    // reserve is gone and what remains is the figure a reader is actually holding this against.
+    row("graduation bar", d.gradCapUsd ? "about " + esc(d.gradCapUsd) + " market cap" : "—") +
+    row("graduated", d.graduationTx
+        ? "yes" + (d.secondsToGraduate !== null ? ", after " + secs(d.secondsToGraduate) : "")
+        : "not yet",
+        d.graduationTx ? EXP + "/tx/" + d.graduationTx : "") +
+    // Who stands behind the name, so an address can be checked against an account and not only
+    // against this page. A page vouching for itself is worth nothing to somebody deciding.
+    (d.x ? row("account", "@" + esc(d.x), "https://x.com/" + encodeURIComponent(d.x)) : "") +
+    (d.repo ? row("code", esc(d.repo), d.repo.startsWith("http") ? d.repo : "https://" + d.repo) : "");
 
   $("coin-copy").onclick = async () => {
     const ok = await copyText(d.token);

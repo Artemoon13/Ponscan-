@@ -1,5 +1,6 @@
 import { openDb, type DB } from "../db.ts";
-import { loadModel, scoreRecent } from "../score.ts";
+import { loadModel, scoreRecent, type Scored } from "../score.ts";
+import { claimsFor } from "../alerts.ts";
 import { alertText, HELP, statusText, tokenText, topText, type LaunchMeta } from "../tgtext.ts";
 
 /**
@@ -181,39 +182,55 @@ async function pollCommands(): Promise<void> {
   }
 }
 
+const already = db.prepare("SELECT 1 x FROM tg_sent WHERE chat_id = ? AND token = ?");
+const mark = db.prepare("INSERT INTO tg_sent (chat_id, token, sent_at) VALUES (?,?,?) ON CONFLICT DO NOTHING");
+const metaOf = db.prepare("SELECT symbol, name, deployer FROM launches WHERE token = ?");
+
+/** Sends one chat the launches it has not been told about yet. Shared by both passes. */
+async function deliver(chatId: number, items: Scored[]): Promise<number> {
+  let sent = 0;
+  for (const s of items) {
+    if (already.get(chatId, s.token)) continue;
+    const m = metaOf.get(s.token) as LaunchMeta | undefined;
+    if (!m) continue;
+    // Marked before sending, not after: a message that fails is better skipped than repeated on
+    // every pass, and Telegram gives no way to know a timeout did not arrive.
+    mark.run(chatId, s.token, Math.floor(Date.now() / 1000));
+    if (await send(chatId, alertText(db, s, m))) sent++;
+    // Telegram allows about one message a second to a single chat.
+    await sleep(1100);
+  }
+  db.prepare("UPDATE tg_subs SET last_at = ? WHERE chat_id = ?").run(Math.floor(Date.now() / 1000), chatId);
+  return sent;
+}
+
+const subsOf = (): Array<{ chat_id: number; min_score: number }> =>
+  db.prepare("SELECT chat_id, min_score FROM tg_subs").all() as Array<{ chat_id: number; min_score: number }>;
+
+/** The fast path: everything the watcher has claimed inside the window, per subscriber threshold. */
+async function claimsPass(): Promise<number> {
+  const since = Math.floor(Date.now() / 1000) - WINDOW_HOURS * 3600;
+  let sent = 0;
+  for (const sub of subsOf()) sent += await deliver(sub.chat_id, claimsFor(db, sub.min_score / 100, since));
+  return sent;
+}
+
 /**
- * Pushes launches that clear a subscriber's threshold, once each.
+ * The floor: the same scored page the board serves, on the old interval.
  *
- * Scored per subscriber rather than once for everybody, because the threshold is what the scoring
- * call filters on and thresholds differ. That is cheap: the matrix behind it is shared and cached,
- * and the number of subscribers on a machine somebody runs themselves is small.
+ * Kept beside the fast path rather than replaced by it, because the two see different things. A
+ * claim is written once, at first sight, and never revised; the board re-scores, so a launch whose
+ * standing changes, or one a subscriber has only just lowered their threshold past, is picked up
+ * here. `tg_sent` dedupes across both, so the fast path can only ever make an alert earlier, never
+ * duplicate or miss one.
  */
 async function alertPass(): Promise<number> {
   const model = loadModel();
   if (!model) return 0;
-  const subs = db.prepare("SELECT chat_id, min_score FROM tg_subs").all() as
-    Array<{ chat_id: number; min_score: number }>;
-  if (!subs.length) return 0;
-
-  const already = db.prepare("SELECT 1 x FROM tg_sent WHERE chat_id = ? AND token = ?");
-  const mark = db.prepare("INSERT INTO tg_sent (chat_id, token, sent_at) VALUES (?,?,?) ON CONFLICT DO NOTHING");
-  const metaOf = db.prepare("SELECT symbol, name, deployer FROM launches WHERE token = ?");
   let sent = 0;
-
-  for (const sub of subs) {
+  for (const sub of subsOf()) {
     const page = scoreRecent(db, model, WINDOW_HOURS, 25, "score", sub.min_score / 100);
-    for (const s of page.items) {
-      if (already.get(sub.chat_id, s.token)) continue;
-      const m = metaOf.get(s.token) as LaunchMeta | undefined;
-      if (!m) continue;
-      // Marked before sending, not after: a message that fails is better skipped than repeated on
-      // every pass, and Telegram gives no way to know a timeout did not arrive.
-      mark.run(sub.chat_id, s.token, Math.floor(Date.now() / 1000));
-      if (await send(sub.chat_id, alertText(db, s, m))) sent++;
-      // Telegram allows about one message a second to a single chat.
-      await sleep(1100);
-    }
-    db.prepare("UPDATE tg_subs SET last_at = ? WHERE chat_id = ?").run(Math.floor(Date.now() / 1000), sub.chat_id);
+    sent += await deliver(sub.chat_id, page.items);
   }
   return sent;
 }
@@ -226,12 +243,13 @@ if (!me) {
   process.exit(1);
 }
 console.log(`gimlet telegram — @${me.username}`);
-console.log(`  default threshold ${DEFAULT_MIN}%, window ${WINDOW_HOURS}h, checking every ${INTERVAL_SEC}s`);
+console.log(`  default threshold ${DEFAULT_MIN}%, window ${WINDOW_HOURS}h`);
+console.log(`  alerting on each claim as the watcher writes it, with a full pass every ${INTERVAL_SEC}s`);
 console.log(`  ${(db.prepare("SELECT count(*) c FROM tg_subs").get() as { c: number }).c} chat(s) subscribed`);
 console.log(`  send /start to @${me.username} to subscribe this machine's alerts to a chat\n`);
 
 if (ONCE) {
-  console.log(`sent ${await alertPass()} alert(s)`);
+  console.log(`sent ${await claimsPass() + await alertPass()} alert(s)`);
   db.close();
   process.exit(0);
 }
@@ -239,12 +257,35 @@ if (ONCE) {
 process.on("SIGINT", () => { db.close(); process.exit(0); });
 
 void pollCommands();
+
+/** One tick between checking whether the watcher has written anything. */
+const TICK_MS = 1000;
+/**
+ * The sentinel, chosen for being free: `count(*)` here costs 0.01ms because SQLite answers it from
+ * the table header, against 7ms for `max(scored_at)`, which has no index and scans. Rows in this
+ * table are only ever inserted, so the count rising means the watcher has scored a launch, and
+ * nothing else does that.
+ */
+const claimCount = (): number =>
+  (db.prepare("SELECT count(*) c FROM predictions").get() as { c: number }).c;
+
+let seen = claimCount();
+let lastFull = 0;
 for (;;) {
   try {
-    const n = await alertPass();
-    if (n) console.log(`${new Date().toISOString().slice(11, 19)}  sent ${n} alert(s)`);
+    const n = claimCount();
+    if (n !== seen) {
+      seen = n;
+      const sent = await claimsPass();
+      if (sent) console.log(`${new Date().toISOString().slice(11, 19)}  sent ${sent} alert(s)`);
+    }
+    if (Date.now() - lastFull >= INTERVAL_SEC * 1000) {
+      lastFull = Date.now();
+      const sent = await alertPass();
+      if (sent) console.log(`${new Date().toISOString().slice(11, 19)}  sent ${sent} alert(s) on the full pass`);
+    }
   } catch (e) {
     console.error(`alert pass failed: ${(e as Error).message}`);
   }
-  await sleep(INTERVAL_SEC * 1000);
+  await sleep(TICK_MS);
 }

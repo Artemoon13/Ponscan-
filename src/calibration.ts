@@ -103,37 +103,25 @@ export function saveLive(c: LiveCalibration, path = "./data/calibration.json"): 
 }
 
 /**
- * How stale an inherited correction may be before it is dropped.
+ * The correction to use, or null when this model has not been corrected yet.
  *
- * A correction is a statement about the market, and a three-day-old statement about a market that
- * turns over twenty-eight thousand launches a day is no longer evidence.
+ * A correction belongs to one model. Claims were scored by whatever was loaded at the time, and
+ * their residuals describe that model, so a fit is stamped with the model it came from and ignored
+ * the moment that changes.
+ *
+ * This was briefly relaxed to let a fit carry across a retrain, on the reasoning that a model is
+ * always retired before it can be corrected: five hundred settled claims, four hours to settle, a
+ * retrain every twenty-four. The arithmetic was wrong. A model gathers about a thousand claims an
+ * hour here, so it clears five hundred settled ones after roughly four and a half hours of service
+ * and then has some twenty hours left in which its own claims can correct it. Measured across six
+ * models: 624, 403, 1038, 860, 1287 and 952 claims an hour.
+ *
+ * The cost of the relaxed version was not theoretical. The correction fitted against a model that
+ * over-predicted twofold was inherited by its successor, which the log shows saying 1.43% where
+ * 1.40% happened; carried over, it would have printed 0.35%. A model that needs no correction is
+ * the ordinary case, and inheriting one is a guess dressed as a measurement.
  */
-export const MAX_INHERIT_SEC = 3 * 24 * 3600;
-
-/**
- * The correction to use, and whether it was fitted against this model or an earlier one.
- *
- * Refusing a correction stamped with another model is right in principle and was wrong in practice,
- * because it can never be satisfied. A model needs five hundred settled claims, a claim takes four
- * hours to settle, and a nightly retrain replaces the model every twenty-four: by the time a fit is
- * possible, the model it describes has already been retired. The board therefore ran uncorrected
- * from the day the correction was written, printing 7.06% where 2.51% happened.
- *
- * So a fit from a recent model is inherited rather than discarded. What it corrects is drift between
- * the base rate a model was fitted on and the one the market is running at, and the model trained
- * last night on nearly the same days inherits that gap along with everything else. The alternative
- * is not a purer number, it is a number that is three times too high.
- *
- * `inherited` travels with it so the model page can say which it is, and the correction is still
- * monotone either way: the ranking, the shortlist and every lift figure are untouched.
- */
-export function liveFor(
-  modelId: string,
-  path?: string,
-  now = Math.floor(Date.now() / 1000),
-): (LiveCalibration & { inherited: boolean }) | null {
+export function liveFor(modelId: string, path?: string): LiveCalibration | null {
   const c = loadLive(path);
-  if (!c) return null;
-  if (c.modelId === modelId) return { ...c, inherited: false };
-  return now - c.fittedAt <= MAX_INHERIT_SEC ? { ...c, inherited: true } : null;
+  return c && c.modelId === modelId ? c : null;
 }
