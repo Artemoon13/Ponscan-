@@ -201,9 +201,11 @@ function frame(): Seg[][] {
   const lines: Seg[][] = [[seg(fit(status, W), LIME_BG + BOLD)], [seg(" ")]];
 
   /* left: the table */
-  const nameW = Math.max(12, LW - 2 - 10 - 8 - 7 - 8 - 7 - 4 - 10);
+  // The symbol field is nine wide for an eight-character symbol, so a full-width ticker still has a
+  // space after it. At eight it rendered as PADSTOCKPadstock, with the two columns touching.
+  const nameW = Math.max(12, LW - 2 - 10 - 8 - 7 - 9 - 7 - 4 - 10);
   const left: Seg[][] = [];
-  left.push([seg(fit(`  TIME        GRAD  RANK   SYM     ${"NAME".padEnd(nameW)}SELF   EX  CLUSTER`, LW), DIM)]);
+  left.push([seg(fit(`  TIME        GRAD  RANK   SYM      ${"NAME".padEnd(nameW)}SELF   EX  CLUSTER`, LW), DIM)]);
   left.push([seg("-".repeat(LW), FAINT)]);
   const rowsAvail = body - 2;
   const start = Math.max(0, Math.min(state.selIdx - Math.floor(rowsAvail / 2), list.length - rowsAvail));
@@ -218,7 +220,7 @@ function frame(): Seg[][] {
       seg(fit(new Date(i.ts * 1000).toTimeString().slice(0, 8), 10), DIM, b),
       seg(rfit(i.graduated ? "GRAD" : (100 * i.probability).toFixed(1) + "%", 6) + "  ", pc + w, b),
       seg(rfit("#" + i.rank, 6) + " ", DIM, b),
-      seg(fit(i.sym, 8), pc + w, b),
+      seg(fit(i.sym, 8) + " ", pc + w, b),
       seg(fit(i.name, nameW), WHITE, b),
       seg(rfit(i.selfBuy ?? "-", 5) + "  ", i.selfBuy === null ? FAINT : WHITE, b),
       seg(rfit(String(i.exempt), 2) + "  ", i.exempt >= 3 ? RED : WHITE, b),
@@ -285,9 +287,19 @@ function frame(): Seg[][] {
   return lines;
 }
 
+/**
+ * The screen as bytes, colour included.
+ *
+ * Shared with the single-frame path rather than written twice: that path exists to be looked at, and
+ * a frame that drops every colour is not what the screen looks like. The status bar's lime, the red
+ * on a launch the creator is selling into, the dim on everything you skim past — those carry as much
+ * as the text does.
+ */
+const serialize = (rows: Seg[][]): string =>
+  rows.map((segs) => segs.map((s) => `${s.b ?? ""}${s.c}${s.t}${RESET}`).join("")).join("\n");
+
 function paint(): void {
-  const out = frame().map((segs) => segs.map((s) => `${s.b ?? ""}${s.c}${s.t}${RESET}`).join("")).join("\n");
-  process.stdout.write(`${ESC}H${out}${ESC}J`);
+  process.stdout.write(`${ESC}H${serialize(frame())}${ESC}J`);
 }
 
 function copyToClipboard(text: string): void {
@@ -309,7 +321,7 @@ if (!PLAIN) {
   seed();
   if (ONCE) {
     // One frame, no terminal: what the screen looks like right now, for a screenshot or a test.
-    process.stdout.write(frame().map((segs) => segs.map((s) => s.t).join("")).join("\n") + "\n");
+    process.stdout.write(`${serialize(frame())}\n`);
     process.exit(0);
   }
   if (!model) { console.log("no model at ./data/model.json. Run: npm run train"); process.exit(1); }
