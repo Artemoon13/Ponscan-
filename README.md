@@ -30,6 +30,10 @@ and says in plain sentences why. It holds no key, signs nothing, and sends nothi
 
 <br>
 
+<img src="docs/img/board-hero.png" alt="gimlet board">
+
+<br>
+
 | The problem | What gimlet does | Command |
 |---|---|---|
 | 24,000 launches a day, 530 graduate | scores every one at the moment it lands and ranks it against the last six hours | `board` · `watch` |
@@ -42,6 +46,28 @@ and says in plain sentences why. It holds no key, signs nothing, and sends nothi
 | half of launches aren't quoted in ETH | resolves each quote asset's decimals so amounts aren't printed as `0.0000` | everywhere |
 
 <br>
+
+## How it works
+
+The left half of this is what every scanner does. The right half — a score written down before the
+outcome exists, graded later against the chain, and fed back as a calibration — is the part that
+makes the record checkable rather than a claim.
+
+```mermaid
+flowchart LR
+  A["pons v2 factory<br/>TokenLaunched"] -->|"websocket push<br/>or 300 ms poll"| B["detect"]
+  B --> C["enrich<br/>decode the launch tx"]
+  C --> D["features at T+0<br/>nothing later is readable"]
+  D --> E["GBDT"]
+  E --> F["rank against<br/>the last 6 hours"]
+  F --> G["card<br/>score · 3 reasons · tx links"]
+  F --> H{"scored within<br/>5 min of launch?"}
+  H -->|"no"| N["not recorded<br/>its fate was half-known"]
+  H -->|"yes"| L[("prediction log<br/>insert-only")]
+  L -.->|"4 hours later"| M["grade against<br/>the chain"]
+  M --> S["scoreboard · verify"]
+  S -.->|"live correction"| E
+```
 
 ## What you actually see
 
@@ -60,10 +86,19 @@ and says in plain sentences why. It holds no key, signs nothing, and sends nothi
 **`#192 of 6,727`** is the useful half. On its own "1.7%" means little; "192nd best of the last six
 hours" tells you whether to look now or never.
 
-Click through and the card holds everything known about the launch: who really created it, how much
-they bought themselves, which wallets they let in before the 99% opening tax, where the creator fees
-are routed, how many times this exact ticker has launched before and how those ended. Every line
-links to the transaction it came from, so you can check any of it without trusting this tool.
+Or the same feed on a local page, which is the same engine behind `npm run board`:
+
+<img src="docs/img/board-feed.png" alt="the feed">
+
+Click any launch and the card holds everything known about it: who really created it, how much they
+bought themselves, which wallets they let in before the 99% opening tax, where the creator fees are
+routed, how many times this exact ticker has launched before and how those ended.
+
+<img src="docs/img/board-card.png" alt="a launch card">
+
+Every line links to the transaction it came from, so you can check any of it without trusting this
+tool. `Outcome · reached the pool after 3 min` is read back off the chain, not from anything gimlet
+decided.
 
 <br>
 
@@ -250,6 +285,10 @@ later it looks up what happened and grades itself. Two rules keep that log hones
 npm run scoreboard   # the record on your own machine, which is the only one worth anything to you
 npm run verify       # export the log, recompute from the file, hand it to someone who trusts nothing
 ```
+
+The board shows the same thing, including the folds that landed at chance:
+
+<img src="docs/img/board-model.png" alt="the model page">
 
 Every row names a token, the exact moment the score was written, and what happened. All three are on
 chain. You can verify any of it in a block explorer without this tool.
