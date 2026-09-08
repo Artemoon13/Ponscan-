@@ -29,10 +29,24 @@ const SEC_PER_BLOCK = 86400 / BLOCKS_PER_DAY;
  * Small on purpose and cleared wholesale: entries are keyed on a build of the matrix that has
  * already been replaced, so once it turns over none of them can be hit again.
  */
-const feedCache = new Map<string, unknown>();
-function holdFeed(key: string, value: unknown): void {
+const feedCache = new Map<string, string>();
+/**
+ * The finished bytes, not the object they came from.
+ *
+ * The feed is 180 KB, and turning the object into that is the largest thing left on a held answer:
+ * paid once here, it would otherwise be paid again for every reader who receives the identical
+ * body.
+ */
+function holdFeed(key: string, value: unknown): string {
+  const body = JSON.stringify(value);
   if (feedCache.size > 64) feedCache.clear();
-  feedCache.set(key, value);
+  feedCache.set(key, body);
+  return body;
+}
+
+function sendJson(res: import("node:http").ServerResponse, body: string): void {
+  res.writeHead(200, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(body) });
+  res.end(body);
 }
 
 type Influence = Array<{ name: string; value: number }>;
@@ -649,7 +663,7 @@ const server = createServer(async (req, res) => {
     const feedKey = `${datasetVersion()}:${modelId()}:${url.searchParams.get("hours") ?? 6}:` +
       `${url.searchParams.get("sort") ?? "score"}:${url.searchParams.get("min") ?? 0}`;
     const held = feedCache.get(feedKey);
-    if (held) { json(res, held); return; }
+    if (held) { sendJson(res, held); return; }
     const hours = Number(url.searchParams.get("hours") ?? 6);
     const order: FeedOrder = url.searchParams.get("sort") === "new" ? "new" : "score";
     // The reader's floor, as a probability. Clamped rather than trusted: a threshold at or above 1
@@ -731,8 +745,7 @@ const server = createServer(async (req, res) => {
       counts,
       items: rows.map((r) => ({ ...r, meta: byToken.get(r.token) ?? null })),
     };
-    holdFeed(feedKey, payload);
-    json(res, payload);
+    sendJson(res, holdFeed(feedKey, payload));
     return;
   }
 
