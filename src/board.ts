@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildCard } from "./card.ts";
-import { dataset, datasetAgeSec, FEATURES, loadModel, scoreOne, scoreRecent, type FeedOrder } from "./score.ts";
+import { dataset, datasetAgeSec, datasetCachedOnly, FEATURES, loadModel, scoreOne, scoreRecent, type FeedOrder } from "./score.ts";
 import { getMeta, openDb } from "./db.ts";
 import { contributions } from "./model/gbdt.ts";
 import { grade, modelId, pending, score as scoreLog, settled } from "./track.ts";
@@ -22,6 +22,9 @@ let model = loadModel();
 const indexing = new Set<string>();
 
 const SEC_PER_BLOCK = 86400 / BLOCKS_PER_DAY;
+
+/** Feature influence, kept for a minute. Recomputed on a model change regardless of the clock. */
+let importanceCache: { id: string; at: number; value: Array<{ name: string; value: number }> } | null = null;
 
 /**
  * How far behind the chain the data is, and how long since the watcher last said anything.
@@ -314,11 +317,24 @@ const server = createServer(async (req, res) => {
     const id = modelId(path);
     const trainedAt = existsSync(path) ? Math.floor(statSync(path).mtimeMs / 1000) : null;
 
-    // Global influence: mean absolute contribution over the launches currently on the board. The
-    // feed's matrix is already cached, so this costs a pass over a few thousand rows, not a rebuild.
-    let importance: Array<{ name: string; value: number }> = [];
-    if (model) {
-      const rows = dataset(db, Math.floor(Date.now() / 1000) - 6 * 3600).slice(-3000);
+    /**
+     * Global influence: mean absolute contribution over the launches currently on the board.
+     *
+     * Held for a minute, and taken from whatever matrix the feed has already built rather than
+     * asking for a fresh one. Both matter. The pass over three thousand rows is a second and a half,
+     * and rebuilding the matrix is five more — so an uncached model page cost six seconds of a
+     * single-threaded server, and every other request waited behind it. Neither number is worth
+     * paying per page view for a figure that moves over days.
+     *
+     * The sample stays at three thousand: cutting it to a thousand reorders the top eight, and this
+     * page exists to report what the model weighs, not an approximation of it.
+     */
+    const cachedImportance = importanceCache && Date.now() - importanceCache.at < 60_000 && importanceCache.id === id
+      ? importanceCache.value
+      : null;
+    let importance: Array<{ name: string; value: number }> = cachedImportance ?? [];
+    if (model && !cachedImportance) {
+      const rows = (datasetCachedOnly() ?? dataset(db, Math.floor(Date.now() / 1000) - 6 * 3600)).slice(-3000);
       const acc = new Float64Array(FEATURES.length);
       for (const r of rows) {
         const { contribs } = contributions(model, r.x);
@@ -327,6 +343,7 @@ const server = createServer(async (req, res) => {
       importance = FEATURES.map((name, i) => ({ name, value: rows.length ? acc[i] / rows.length : 0 }))
         .sort((a, b) => b.value - a.value)
         .filter((f) => f.value > 0.0005);
+      importanceCache = { id, at: Date.now(), value: importance };
     }
 
     // Two kinds of evidence, kept apart on purpose. Validation is retrospective and comes from
