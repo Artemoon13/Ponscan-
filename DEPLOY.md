@@ -2,14 +2,16 @@
 
 Всё, что ниже, выполняется по порядку. Каждый шаг заканчивается проверкой — если она не прошла, дальше идти нельзя, следующий шаг построится на сломанном.
 
+**Домен нужен только на шаге 8.** Если он ещё не выбран, шаг 2 можно пропустить и вернуться к нему потом: шаги 1 и 3–7 поднимут полностью рабочий сервис, смотреть его до домена — через SSH-туннель, как описано в проверке шага 7.
+
 Обозначения: `[локально]` — на девбоксе `185.194.140.152`, `[сервер]` — на новой машине.
 
 ---
 
 ## 0. Что понадобится заранее
 
-- Аккаунт Hetzner Cloud (или другой провайдер, спека ниже)
-- Домен и доступ к его DNS
+- Аккаунт DigitalOcean
+- Аккаунт Namecheap (домен покупаем на шаге 2)
 - SSH-ключ. Проверить, что он есть:
 
 ```bash
@@ -24,20 +26,26 @@ ssh-keygen -t ed25519 -C "augur"
 
 ---
 
-## 1. Поднять машину
+## 1. Поднять машину — DigitalOcean
 
-**Hetzner Cloud → Add Server:**
+**Create → Droplets:**
 
 | Параметр | Значение |
 |---|---|
-| Location | Nuremberg или Helsinki |
-| Image | Ubuntu 24.04 |
-| Type | **CX22** (2 vCPU, 4 ГБ, 40 ГБ) |
-| Networking | IPv4 включён |
-| SSH keys | **вставить свой публичный ключ прямо здесь** |
-| Name | augur |
+| Region | **Frankfurt** или Amsterdam |
+| Image | Ubuntu 24.04 (LTS) x64 |
+| Type | Basic → Regular (SSD) |
+| Size | **$24/мес — 2 vCPU, 4 ГБ, 80 ГБ** |
+| Authentication | **SSH Key** → добавить свой ключ прямо здесь |
+| Hostname | augur |
 
-Ключ обязательно вставить на этапе создания. Иначе Hetzner пришлёт рутовый пароль почтой и придётся менять его через консоль.
+**Почему именно эта конфигурация.** 4 ГБ нужны не доске, а ночному переобучению: оно держит в памяти матрицу на 170 тысяч строк. На тарифе с 2 ГБ доска и вотчер поживут, а `npm run nightly` в четыре утра упрётся в память и тихо умрёт — а это ровно тот отказ, который никто не заметит неделю. Диск 80 ГБ вместо нужных 40 берётся заодно, отдельно его не выбрать.
+
+Регион — европейский, чтобы перелив базы с девбокса шёл быстро.
+
+**Аутентификация: только SSH Key.** Если выбрать пароль, DigitalOcean пришлёт его почтой, и root с паролем будет торчать наружу до тех пор, пока не дойдёте до шага 3.
+
+Про Cloud Firewall от DigitalOcean: можно не включать, на шаге 3 настраивается `ufw` на самой машине. Если включите оба — не забудьте, что запрещать будут оба, и отлаживать придётся в двух местах.
 
 **Проверка:**
 
@@ -45,36 +53,63 @@ ssh-keygen -t ed25519 -C "augur"
 ssh root@СЕРВЕР_IP "echo ok && lsb_release -ds && nproc && free -g | head -2 && df -h / | tail -1"
 ```
 
-Ожидаем `ok`, `Ubuntu 24.04`, `2`, около 4 ГБ памяти и ~40 ГБ диска.
+Ожидаем `ok`, `Ubuntu 24.04`, `2`, около 4 ГБ памяти и ~80 ГБ диска.
 
 ---
 
-## 2. DNS
+## 2. Домен — Namecheap
 
-В панели домена добавить запись:
+*Этот шаг можно отложить. Он нужен только для шага 8; всё остальное поднимается без него.*
 
-```
-Тип:  A
-Имя:  augur   (или @ для корня домена)
-Value: СЕРВЕР_IP
-TTL:   авто
-```
+### Купить
 
-**У Cloudflare — обязательно серое облако (DNS only), не оранжевое.** С проксированием Caddy не сможет получить сертификат обычным способом, придётся возиться с DNS-челленджем и API-токеном. Включить проксирование можно потом.
+На namecheap.com в поиске проверить свободные варианты. Ориентиры по цене за первый год:
 
-**Проверка** (может занять до пары минут):
+| Зона | Цена | Замечание |
+|---|---|---|
+| `.xyz` | ~$2 | Дешевле всего, к почте и репутации домена придирчивее относятся спам-фильтры |
+| `.com` | ~$10 | Скучно и надёжно |
+| `.app` | ~$15 | В списке HSTS preload: браузеры **вообще** не откроют его по http. Нам подходит, TLS всё равно будет, но знать надо |
+| `.dev` | ~$15 | То же самое |
+
+При оформлении:
+
+- **WhoisGuard / Domain Privacy — включить.** У Namecheap он бесплатный. Иначе телефон и почта уедут в публичный whois.
+- **Auto-renew — включить.** Домен, отвалившийся по забывчивости, уводит сервис молча.
+- От хостинга, почты и SSL, которые Namecheap предлагает в корзине, отказаться. SSL нам выпишет Caddy бесплатно.
+
+### Настроить DNS
+
+Namecheap → **Domain List** → напротив домена **Manage** → вкладка **Advanced DNS**.
+
+Сначала **удалить** записи, которые Namecheap создаёт по умолчанию: там обычно висит `CNAME www → parkingpage.namecheap.com` и `URL Redirect Record`. Они перехватят домен и Caddy не получит сертификат.
+
+Затем **Add New Record**:
+
+| Type | Host | Value | TTL |
+|---|---|---|---|
+| A Record | `@` | `СЕРВЕР_IP` | Automatic |
+| A Record | `www` | `СЕРВЕР_IP` | Automatic |
+
+Вторая запись нужна, только если хотите, чтобы `www.домен` тоже открывался. Тогда её надо будет упомянуть и в Caddyfile на шаге 8.
+
+Убедиться, что вверху страницы в **Nameservers** стоит **Namecheap BasicDNS**. Если там чужие NS, записи на вкладке Advanced DNS просто не работают.
+
+**Проверка.** Namecheap расходится дольше Cloudflare, обычно 5–30 минут:
 
 ```bash
-dig +short augur.ТВОЙ-ДОМЕН
+dig +short ТВОЙ-ДОМЕН
+dig +short ТВОЙ-ДОМЕН @8.8.8.8
 ```
 
-Должен вернуться IP сервера. Пока не вернулся — дальше не идти, шаг 7 упрётся именно в это.
+Оба должны вернуть IP сервера. Пока не вернули — **дальше не идти**: шаг 8 упрётся ровно в это, а Let's Encrypt имеет лимит на неудачные попытки, и слишком ранний запуск Caddy может подвесить выдачу сертификата на час.
 
 ---
 
 ## 3. Пользователь и базовая защита
 
-`[сервер]`, под root:
+`[сервер]`, под root — это последний шаг, который выполняется от root напрямую. В конце его вход
+root по SSH выключается, и дальше всё идёт под `augur` через `sudo`.
 
 ```bash
 adduser --disabled-password --gecos "" augur
@@ -92,6 +127,20 @@ sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd
 systemctl restart ssh
 ```
 
+**Дать `augur` право на sudo — обязательно, и обязательно до того, как закроется эта root-сессия.**
+Вход root по SSH только что выключен, а у нового пользователя пароля нет вообще. Если сейчас закрыть
+окно, рута на машине больше не будет ни у кого:
+
+```bash
+usermod -aG sudo augur
+echo "augur ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/augur
+chmod 440 /etc/sudoers.d/augur
+visudo -c
+```
+
+`NOPASSWD` тут не послабление: у пользователя нет пароля в принципе, вход только по ключу, поэтому
+sudo с паролем не сработал бы никогда.
+
 Файрвол — наружу только SSH и веб:
 
 ```bash
@@ -104,15 +153,30 @@ ufw --force enable
 ufw status
 ```
 
-**Проверка.** Не закрывая текущую сессию, открыть новое окно терминала:
+**Проверка.** Не закрывая root-сессию, открыть новое окно терминала:
 
 ```bash
-ssh augur@СЕРВЕР_IP "whoami && sudo -n true 2>&1 | head -1"
+ssh augur@СЕРВЕР_IP "whoami && sudo -n whoami"
 ```
 
-Должно вывести `augur`. Порт 4663 снаружи должен быть закрыт — проверим на шаге 8.
+Должно вывести `augur` и `root`. Только после этого root-окно можно закрывать.
 
-Если новая сессия не пускает — **не закрывать старую**, чинить из неё.
+Если новая сессия не пускает или sudo просит пароль — **не закрывать старую**, чинить из неё.
+
+### Чтобы не набирать адрес каждый раз
+
+`[локально]`, в `~/.ssh/config`:
+
+```
+Host augur
+    HostName СЕРВЕР_IP
+    User augur
+    IdentityFile ~/.ssh/id_ed25519
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+```
+
+Дальше везде ниже вместо `augur@СЕРВЕР_IP` можно писать просто `augur`.
 
 ---
 
@@ -120,14 +184,18 @@ ssh augur@СЕРВЕР_IP "whoami && sudo -n true 2>&1 | head -1"
 
 Ubuntu 24.04 везёт Node 18, а проект требует 22.6+, потому что исполняет TypeScript напрямую без сборки.
 
-`[сервер]`, под root:
+`[сервер]`, под `augur`. Вход root по SSH отключён на шаге 3, поэтому всё, что требует прав,
+делается через `sudo`:
 
 ```bash
-apt-get update
-apt-get install -y curl ca-certificates git
-curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-apt-get install -y nodejs
+sudo apt-get update
+sudo apt-get install -y curl ca-certificates git
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
 ```
+
+`sudo -E` в третьей строке обязателен: скрипт NodeSource читает переменные окружения, и без `-E`
+sudo их выбросит.
 
 **Проверка:**
 
@@ -145,9 +213,8 @@ node -e "console.log(process.features.typescript)"
 `[сервер]`, под пользователем `augur`:
 
 ```bash
-su - augur
-git clone https://github.com/Artemoon13/Augur-.git augur
-cd augur
+git clone https://github.com/Artemoon13/Augur-.git ~/augur
+cd ~/augur
 npm install
 ```
 
@@ -208,13 +275,19 @@ ls -la data/
 scp data/augur.db augur@СЕРВЕР_IP:~/augur/data/augur.db
 ```
 
-### Вариант Б — собрать на месте (~7 минут)
+### Вариант Б — собрать на месте (~13 минут)
 
 ```bash
 npm run setup
 ```
 
-Медленнее, но заодно проверяет, что установка с нуля работает — а это мы всё равно обещаем в README.
+Медленнее, но заодно проверяет ровно тот путь, который README обещает всем остальным. Замерено на девбоксе под нагрузкой: 12 минут 42 секунды, из них 5 минут бэкфилл и 7.6 минуты расшифровка. На пустой машине быстрее.
+
+После этого стоит догнать остаток недели, уже не торопясь:
+
+```bash
+npm run enrich-window -- --hours 168
+```
 
 **Проверка** `[сервер]`:
 
@@ -228,7 +301,15 @@ npm run stats
 
 ## 7. systemd
 
-Три процесса. `[сервер]`, под root.
+Три процесса. `[сервер]`, под `augur` через `sudo`.
+
+Файлы юнитов создавать так, чтобы `sudo` относился к записи, а не только к `cat`:
+
+```bash
+sudo tee /etc/systemd/system/augur-board.service > /dev/null <<'EOF'
+...содержимое ниже...
+EOF
+```
 
 **Доска** — `/etc/systemd/system/augur-board.service`:
 
@@ -306,12 +387,12 @@ WantedBy=timers.target
 Включить:
 
 ```bash
-systemctl daemon-reload
-systemctl enable --now augur-board augur-watch augur-nightly.timer
-systemctl status augur-board augur-watch --no-pager
+sudo systemctl daemon-reload
+sudo systemctl enable --now augur-board augur-watch augur-nightly.timer
+sudo systemctl status augur-board augur-watch --no-pager
 ```
 
-**Проверка:**
+**Проверка** `[сервер]`:
 
 ```bash
 curl -s localhost:4663/api/health
@@ -333,17 +414,17 @@ curl -s localhost:4663/api/health
 только потом получить свою.
 
 ```bash
-sudo tee /etc/systemd/system/ponscan-recalibrate.service > /dev/null <<'EOF'
+sudo tee /etc/systemd/system/augur-recalibrate.service > /dev/null <<'EOF'
 [Unit]
 Description=Augur live recalibration
 
 [Service]
 Type=oneshot
-User=ponscan
-WorkingDirectory=/home/ponscan/ponscan
+User=augur
+WorkingDirectory=/home/augur/augur
 ExecStart=/usr/bin/npm run --silent recalibrate -- --write
 EOF
-sudo tee /etc/systemd/system/ponscan-recalibrate.timer > /dev/null <<'EOF'
+sudo tee /etc/systemd/system/augur-recalibrate.timer > /dev/null <<'EOF'
 [Unit]
 Description=Augur live recalibration
 
@@ -355,7 +436,7 @@ OnUnitActiveSec=2h
 WantedBy=timers.target
 EOF
 sudo systemctl daemon-reload
-sudo systemctl enable --now ponscan-recalibrate.timer
+sudo systemctl enable --now augur-recalibrate.timer
 ```
 
 Раз в два часа. Команда сама молчит и ничего не пишет, пока под текущей моделью не отстоятся 500
@@ -370,31 +451,43 @@ npm run recalibrate
 
 Без `--write` она только считает и показывает, что сделала бы.
 
+**Посмотреть глазами, ещё без домена.** Доска слушает только localhost, наружу порт закрыт, и так и должно остаться. Пробрасываем туннелем `[локально]`:
+
+```bash
+ssh -N -L 4664:localhost:4663 augur@СЕРВЕР_IP
+```
+
+и открываем `http://localhost:4664`. На этом месте сервис уже полностью рабочий: лента живая, вотчер пишет лог предсказаний. Шаги 2 и 8 добавляют к этому только домен и TLS.
+
 ---
 
 ## 8. Caddy и TLS
 
-`[сервер]`, под root:
+`[сервер]`, под `augur`:
 
 ```bash
-apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
-apt-get update && apt-get install -y caddy
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt-get update && sudo apt-get install -y caddy
 ```
 
 `/etc/caddy/Caddyfile` — целиком заменить на:
 
 ```
-augur.ТВОЙ-ДОМЕН {
+ТВОЙ-ДОМЕН, www.ТВОЙ-ДОМЕН {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:4663
 }
 ```
 
+Строку `www.` оставить, только если добавили вторую A-запись на шаге 2. Если её нет, Caddy будет пытаться выписать сертификат на несуществующее имя и не выпишет ни одного.
+
+Редактировать конфиг: `sudo nano /etc/caddy/Caddyfile`
+
 ```bash
-systemctl reload caddy
-journalctl -u caddy -n 30 --no-pager
+sudo systemctl reload caddy
+sudo journalctl -u caddy -n 30 --no-pager
 ```
 
 Сертификат Caddy получает сам за несколько секунд. В логе должно быть `certificate obtained successfully`.
@@ -402,8 +495,8 @@ journalctl -u caddy -n 30 --no-pager
 **Проверка** `[локально]`:
 
 ```bash
-curl -sI https://augur.ТВОЙ-ДОМЕН | head -3
-curl -s https://augur.ТВОЙ-ДОМЕН/api/health
+curl -sI https://ТВОЙ-ДОМЕН | head -3
+curl -s https://ТВОЙ-ДОМЕН/api/health
 ```
 
 И отдельно — что прямой порт закрыт снаружи:
@@ -420,7 +513,7 @@ curl -s -m 5 http://СЕРВЕР_IP:4663/api/health && echo "ПЛОХО: пор�
 
 ```bash
 for i in $(seq 1 70); do
-  curl -s -o /dev/null -w "%{http_code}\n" https://augur.ТВОЙ-ДОМЕН/api/health
+  curl -s -o /dev/null -w "%{http_code}\n" https://ТВОЙ-ДОМЕН/api/health
 done | sort | uniq -c
 ```
 
@@ -429,9 +522,9 @@ done | sort | uniq -c
 **Переживает ли ребут:**
 
 ```bash
-ssh augur@СЕРВЕР_IP "sudo reboot"
+ssh augur "sudo reboot"
 sleep 45
-curl -s https://augur.ТВОЙ-ДОМЕН/api/health
+curl -s https://ТВОЙ-ДОМЕН/api/health
 ```
 
 Должно ответить без ручного вмешательства. Это главная проверка всего шага 7.
@@ -446,7 +539,7 @@ cd ~/augur && npm run scoreboard
 
 **Финальный чеклист:**
 
-- [ ] `https://augur.ТВОЙ-ДОМЕН` открывается, сертификат валидный
+- [ ] `https://ТВОЙ-ДОМЕН` открывается, сертификат валидный
 - [ ] Лента заполнена, возраст верхних запусков — секунды или минуты
 - [ ] Плашки про отставание нет (или жёлтая, если догоняет)
 - [ ] Переключатель `by chance` / `newest` работает
@@ -469,7 +562,14 @@ systemctl list-timers augur-nightly.timer       # когда следующее 
 
 **Красная плашка «watcher has not reported».** Вотчер упал или не может достучаться до RPC. `journalctl -u augur-watch -n 50`.
 
-**Caddy не берёт сертификат.** Почти всегда DNS: либо запись ещё не разошлась, либо у Cloudflare включено проксирование. Проверить `dig +short`.
+**Caddy не берёт сертификат.** Почти всегда DNS. Проверить по порядку:
+
+```bash
+dig +short ТВОЙ-ДОМЕН @8.8.8.8      # видит ли внешний резолвер IP сервера
+journalctl -u caddy -n 50 --no-pager
+```
+
+Частые причины именно с Namecheap: не удалён `URL Redirect Record` или `CNAME www → parkingpage`; в Nameservers стоит не BasicDNS; запись ещё не разошлась. Если Let's Encrypt уже отбил несколько попыток, подождать час — у него лимит на неудачи.
 
 **Всё встало через несколько дней.** Скорее всего публичный RPC. Это известный и принятый риск: `eth_getLogs` на этой цепи отдаёт ровно один публичный эндпоинт, запасного нет. `npm run doctor` покажет.
 
