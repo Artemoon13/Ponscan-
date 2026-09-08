@@ -26,13 +26,23 @@ export const ago = (sec: number): string =>
   sec < 90 ? `${Math.round(sec)}s` : sec < 5400 ? `${Math.round(sec / 60)}m` : `${(sec / 3600).toFixed(1)}h`;
 
 export const HELP = [
-  "<b>Gimlet</b> — launch alerts from your own machine.",
+  "<b>Gimlet</b> watches every launch on pons v2 and scores it on this machine.",
   "",
-  "/watch <i>n</i> — alert me at or above n% (e.g. <code>/watch 8</code>)",
-  "/stop — stop alerts and delete my record",
-  "/status — is the watcher alive, how old is the model",
-  "/top — the highest scoring launches right now",
-  "/token <i>0x…</i> — the card for one launch",
+  "<b>What the numbers mean</b>",
+  "The percentage is the chance a launch reaches the pool. Most never do: the base rate is about 2%, "
+  + "so 8% is four times typical, not a promise.",
+  "<i>peak market cap</i> is where the model thinks it tops out, against the roughly $4K a launch "
+  + "opens at and the roughly $50K it takes to graduate. A + or a − next to a fact is the model "
+  + "saying that fact pushed the score up or down.",
+  "",
+  "<b>Commands</b>",
+  "/watch <i>n</i> — only alert me at or above n%. <code>/watch 15</code> is quiet, "
+  + "<code>/watch 5</code> is busy. Setting it starts the clock: you get what launches next, not a "
+  + "backlog.",
+  "/top — the strongest launches on the board right now, whatever your threshold.",
+  "/token <i>0x…</i> — everything known about one launch: both peaks, the creator's record, the tax.",
+  "/status — whether the watcher is still keeping up, and how old the model is.",
+  "/stop — no more alerts, and your record here is deleted.",
   "",
   "<i>This bot never asks for a key, a seed or an approval, holds no funds and signs nothing. "
   + "No command here takes a private key: anything claiming to be this bot and asking for one is not.</i>",
@@ -209,7 +219,8 @@ export function alertText(db: DB, s: Scored, m: LaunchMeta, now = Math.floor(Dat
     if (spare.length) out.push("", spare.slice(0, 3).join("\n"));
   }
 
-  out.push("", `<code>${s.token}</code>`, `<a href="${EXPLORER.token(s.token)}">explorer</a>`);
+  // The links live on buttons under the message, so the text ends at the address.
+  out.push("", `<code>${s.token}</code>`);
   return out.join("\n");
 }
 
@@ -297,6 +308,6 @@ export function tokenText(db: DB, raw: string): string {
   }
   blocks.push(who);
 
-  blocks.push([`<code>${t}</code>`, `<a href="${EXPLORER.token(t)}">explorer</a>`]);
+  blocks.push([`<code>${t}</code>`]);
   return blocks.map((b) => b.join("\n")).join("\n\n");
 }
