@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { buildDataset, FEATURES, type Row } from "./features.ts";
+import { advanceCursor, buildDataset, openCursor, FEATURES, type Cursor, type Row } from "./features.ts";
 import { deserialize, predict, type GbdtModel } from "./model/gbdt.ts";
 import { explain, type Reason } from "./model/reasons.ts";
 import { applyLive, liveFor } from "./calibration.ts";
@@ -44,12 +44,32 @@ const REBUILD_AFTER_MS = 15_000;
 /** Rounding `since` keeps a clock that moves every second from invalidating the cache every second. */
 const SINCE_BUCKET_SEC = 60;
 
-let cached: { rows: Row[]; tokens: Set<string>; builtAt: number; since: number } | null = null;
+let cached: { rows: Row[]; tokens: Set<string>; builtAt: number; since: number; cursor: Cursor } | null = null;
 
+/**
+ * Rows for the window, carried forward rather than rebuilt.
+ *
+ * A rebuild is a five-second pass over every launch ever seen, and the board wanted one every
+ * fifteen seconds. On a single thread that is a third of the time spent answering nobody: the feed
+ * swung between half a second and nine, and every other page waited behind it. Advancing the cursor
+ * reads only what arrived since the last pass, which is milliseconds.
+ *
+ * A full open is still needed twice: the first time, and whenever a caller asks for a window wider
+ * than the one in hand, which needs history the cursor has already let go of.
+ */
 function rebuild(db: DB, since: number): Row[] {
-  const rows = buildDataset(db, { since });
-  cached = { rows, tokens: new Set(rows.map((r) => r.token)), builtAt: Date.now(), since };
-  return rows;
+  const cursor = openCursor(db, since);
+  cached = { rows: cursor.rows, tokens: new Set(cursor.rows.map((r) => r.token)), builtAt: Date.now(), since, cursor };
+  return cursor.rows;
+}
+
+function advance(db: DB, since: number): Row[] | null {
+  if (!cached || !advanceCursor(db, cached.cursor, since)) return null;
+  cached.rows = cached.cursor.rows;
+  cached.tokens = new Set(cached.rows.map((r) => r.token));
+  cached.builtAt = Date.now();
+  cached.since = since;
+  return cached.rows;
 }
 
 /** How far behind the matrix is, in seconds. Surfaced so the board can say so out loud. */
@@ -60,30 +80,21 @@ export function datasetAgeSec(): number | null {
 /**
  * For the feed: rows back to `since`, newest data preferred, a few seconds behind is fine.
  *
- * A cache built for a longer reach answers a shorter question too, so it is only rebuilt when the
- * request needs history the cache does not carry.
+ * A cache built for a longer reach answers a shorter question too, so it is only advanced when the
+ * clock says it is worth doing, and only rebuilt when the request needs history the cursor let go.
  */
 export function dataset(db: DB, since: number): Row[] {
   const want = Math.floor(since / SINCE_BUCKET_SEC) * SINCE_BUCKET_SEC;
-  const stale = !cached || Date.now() - cached.builtAt > REBUILD_AFTER_MS;
-  const tooNarrow = !cached || cached.since > want;
-  if (stale || tooNarrow) return rebuild(db, want);
-  return cached.rows;
+  if (!cached) return rebuild(db, want);
+  if (Date.now() - cached.builtAt <= REBUILD_AFTER_MS && cached.since <= want) return cached.rows;
+  return advance(db, want) ?? rebuild(db, want);
 }
 
-/**
- * For a card: rebuild only when this launch is one the matrix has never seen.
- *
- * A launch older than the cached window is not in it and never will be, so that case falls back to
- * a full build rather than looping. It is rare — cards are opened from the feed — and slow, which is
- * the right trade against silently answering "unknown token" for a launch that exists.
- */
 /**
  * Whatever matrix is already in hand, or nothing.
  *
  * For readers that want the rows but do not need them current, and must not be the one paying for a
- * rebuild. The model page is the case: a five-second pass to recompute feature influence that moves
- * over days, triggered by whoever happened to open the tab.
+ * rebuild. The model page is the case: feature influence moves over days.
  */
 export function datasetCachedOnly(): Row[] | null {
   return cached ? cached.rows : null;
@@ -91,6 +102,8 @@ export function datasetCachedOnly(): Row[] | null {
 
 export function datasetWith(db: DB, token: string): Row[] {
   if (cached?.tokens.has(token)) return cached.rows;
+  // Cheap first: a launch this recent is almost always one the cursor has simply not reached yet.
+  if (cached && advance(db, cached.since) && cached.tokens.has(token)) return cached.rows;
   const rows = rebuild(db, cached?.since ?? Math.floor(Date.now() / 1000) - 6 * 3600);
   if (cached?.tokens.has(token)) return rows;
   return rebuild(db, 0);
