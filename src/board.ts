@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { buildCard } from "./card.ts";
-import { dataset, datasetAgeSec, datasetCachedOnly, FEATURES, loadModel, scoreOne, scoreRecent, type FeedOrder } from "./score.ts";
+import { dataset, datasetAgeSec, datasetCachedOnly, datasetVersion, FEATURES, loadModel, scoreOne, scoreRecent, type FeedOrder } from "./score.ts";
 import { getMeta, openDb } from "./db.ts";
 import { contributions, type GbdtModel } from "./model/gbdt.ts";
 import { grade, modelId, pending, score as scoreLog, settled } from "./track.ts";
@@ -22,6 +22,18 @@ let model = loadModel();
 const indexing = new Set<string>();
 
 const SEC_PER_BLOCK = 86400 / BLOCKS_PER_DAY;
+
+/**
+ * Answers held while the matrix they came from is unchanged.
+ *
+ * Small on purpose and cleared wholesale: entries are keyed on a build of the matrix that has
+ * already been replaced, so once it turns over none of them can be hit again.
+ */
+const feedCache = new Map<string, unknown>();
+function holdFeed(key: string, value: unknown): void {
+  if (feedCache.size > 64) feedCache.clear();
+  feedCache.set(key, value);
+}
 
 type Influence = Array<{ name: string; value: number }>;
 
@@ -625,6 +637,19 @@ const server = createServer(async (req, res) => {
   if (url.pathname === "/api/feed") {
     // Reloaded per request so a nightly retrain is picked up without restarting the board.
     model = loadModel();
+    /**
+     * The same answer, not a stale one.
+     *
+     * Ranking the window is two thirds of a second of CPU, and every open tab asks for it every
+     * fifteen seconds. Five tabs on the same settings had the server computing an identical answer
+     * five times, and on a single thread the fifth reader waits for all four. The key carries the
+     * build of the matrix, so a held answer is only ever served while the rows behind it are the
+     * rows it was made from; the moment the cursor advances, the key changes with it.
+     */
+    const feedKey = `${datasetVersion()}:${modelId()}:${url.searchParams.get("hours") ?? 6}:` +
+      `${url.searchParams.get("sort") ?? "score"}:${url.searchParams.get("min") ?? 0}`;
+    const held = feedCache.get(feedKey);
+    if (held) { json(res, held); return; }
     const hours = Number(url.searchParams.get("hours") ?? 6);
     const order: FeedOrder = url.searchParams.get("sort") === "new" ? "new" : "score";
     // The reader's floor, as a probability. Clamped rather than trusted: a threshold at or above 1
@@ -690,7 +715,7 @@ const server = createServer(async (req, res) => {
       SELECT count(*) n, sum(token IN (SELECT token FROM graduations)) g FROM launches WHERE ts >= ?`,
     ).get(now - 3600) as { n: number; g: number | null };
 
-    json(res, {
+    const payload = {
       hasModel: model !== null,
       health: health(),
       order,
@@ -705,7 +730,9 @@ const server = createServer(async (req, res) => {
       minScore: minP,
       counts,
       items: rows.map((r) => ({ ...r, meta: byToken.get(r.token) ?? null })),
-    });
+    };
+    holdFeed(feedKey, payload);
+    json(res, payload);
     return;
   }
 
