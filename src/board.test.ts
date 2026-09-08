@@ -216,6 +216,14 @@ test("the model page answers, and answers faster the second time", async () => {
   assert.ok(second <= Math.max(took, 50), `second call took ${second}ms against ${took}ms; the hold is not holding`);
 });
 
+test("the landing panel is not an empty frame before the feed answers", async () => {
+  // The panel is the largest thing on the page and sits under a title bar that says "live". Empty,
+  // it reads as broken rather than as loading, and that is the first thing a visitor sees.
+  const html = await (await fetch(BASE)).text();
+  const rows = html.match(/class="shot-skel"/g) ?? [];
+  assert.ok(rows.length >= 5, `only ${rows.length} placeholder rows in the served page`);
+});
+
 test("reports its own health", async () => {
   const r = await fetch(`${BASE}/api/health`);
   assert.equal(r.status, 200);
