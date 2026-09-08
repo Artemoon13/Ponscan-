@@ -718,6 +718,6 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(CFG.boardPort, CFG.boardHost, () => {
-  console.log(`gimlet board on http://${CFG.boardHost}:${CFG.boardPort}`);
+  console.log(`augur board on http://${CFG.boardHost}:${CFG.boardPort}`);
   if (!model) console.log("no model yet. Run: npm run train");
 });

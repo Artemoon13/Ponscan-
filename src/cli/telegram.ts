@@ -5,7 +5,7 @@ import { claimsFor } from "../alerts.ts";
 import { alertText, HELP, statusText, tokenText, topText, type LaunchMeta } from "../tgtext.ts";
 
 /**
- * gimlet telegram — the board's alerts, in a chat.
+ * augur telegram — the board's alerts, in a chat.
  *
  * This is the one part of the project that speaks to a third party, so it is worth being plain about
  * what that costs. Everything else here reads a public RPC and writes to a file on your disk; this
@@ -19,7 +19,7 @@ import { alertText, HELP, statusText, tokenText, topText, type LaunchMeta } from
  * never asks for a key or a seed, because there is no command that takes one. It holds nothing and
  * signs nothing: every reply is built from the same local database the board reads.
  *
- * gimlet telegram [--min N] [--window-hours N] [--interval-sec N] [--once]
+ * augur telegram [--min N] [--window-hours N] [--interval-sec N] [--once]
  */
 
 const argv = process.argv.slice(2);
@@ -290,7 +290,7 @@ await tg("setMyCommands", {
   ],
 });
 
-console.log(`gimlet telegram — @${me.username}`);
+console.log(`augur telegram — @${me.username}`);
 console.log(`  default threshold ${DEFAULT_MIN}%, window ${WINDOW_HOURS}h`);
 console.log(`  alerting on each claim as the watcher writes it, with a full pass every ${INTERVAL_SEC}s`);
 console.log(`  ${(db.prepare("SELECT count(*) c FROM tg_subs").get() as { c: number }).c} chat(s) subscribed`);

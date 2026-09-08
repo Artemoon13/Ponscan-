@@ -26,7 +26,7 @@ export const ago = (sec: number): string =>
   sec < 90 ? `${Math.round(sec)}s` : sec < 5400 ? `${Math.round(sec / 60)}m` : `${(sec / 3600).toFixed(1)}h`;
 
 export const HELP = [
-  "<b>Gimlet</b> watches every launch on pons v2 and scores it on this machine.",
+  "<b>Augur</b> watches every launch on pons v2 and scores it on this machine.",
   "",
   "<b>What the numbers mean</b>",
   "The percentage is the chance a launch reaches the pool. Most never do: the base rate is about 2%, "

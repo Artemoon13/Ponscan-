@@ -12,7 +12,7 @@ import { join } from "node:path";
  * the launch somebody wanted to be told about.
  */
 
-const dir = mkdtempSync(join(tmpdir(), "gimlet-alerts-"));
+const dir = mkdtempSync(join(tmpdir(), "augur-alerts-"));
 process.env.DB_PATH = join(dir, "test.db");
 
 const { openDb } = await import("./db.ts");

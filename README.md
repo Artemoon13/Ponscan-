@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="src/ui/icon-128.png" width="88" alt="gimlet">
+<img src="src/ui/icon-128.png" width="88" alt="augur">
 
-# gimlet
+# augur
 
 **a prediction engine for pons v2 launches on Robinhood Chain**<br>
 two models · 23 leak-free features · every call logged before its outcome exists<br>
@@ -24,11 +24,11 @@ local · open · no wallet · no key · nothing leaves your machine
 
 <br>
 
-<!-- $GIMLET: when the token launches, replace `not launched yet` with the contract address.
+<!-- $AUGUR: when the token launches, replace `not launched yet` with the contract address.
      This line and the "The token" section near the bottom are the only two places to change. -->
-**$GIMLET** · `not launched yet`
+**$AUGUR** · `not launched yet`
 
-<sub>No address has been published. Anything claiming to be $GIMLET before one appears here is not ours.</sub>
+<sub>No address has been published. Anything claiming to be $AUGUR before one appears here is not ours.</sub>
 
 <br>
 
@@ -42,7 +42,7 @@ local · open · no wallet · no key · nothing leaves your machine
 Uniswap pool, and half of those decide inside **two minutes**. No one reads that stream. Almost
 nobody has ever measured it.
 
-gimlet is a quantitative research stack pointed at it. As each launch transaction lands it is
+augur is a quantitative research stack pointed at it. As each launch transaction lands it is
 decoded, turned into a 23-dimensional feature vector built strictly from what is knowable at that
 instant, and put through two gradient-boosted models: one for the **probability it reaches the
 pool**, one for **how high it climbs** if it does. The result is a rank against every other launch
@@ -65,11 +65,11 @@ is a file you can export and recompute without trusting a line of this code.
 
 <br>
 
-<img src="docs/img/board-hero.png" alt="gimlet board">
+<img src="docs/img/board-hero.png" alt="augur board">
 
 <br>
 
-| What you would otherwise do by hand | What gimlet does instead | Command |
+| What you would otherwise do by hand | What augur does instead | Command |
 |---|---|---|
 | 24,000 launches a day, 530 graduate | scores every one at the moment it lands and ranks it against the last six hours | `board` · `watch` |
 | a bare "4%" means nothing | gives you `#3 of 412` instead, and the rank is the part you can act on | `board` |
@@ -107,7 +107,7 @@ flowchart LR
 
 ## What you actually see
 
-<img src="docs/img/term-watch.png" alt="gimlet watch">
+<img src="docs/img/term-watch.png" alt="augur watch">
 
 **`#175 of 6,176`** is the useful half. On its own "1.8%" means little; "175th best of the last six
 hours" tells you whether to look now or never. The line reading *"not logged: seen too late for the
@@ -125,7 +125,7 @@ routed, how many times this exact ticker has launched before and how those ended
 <img src="docs/img/board-card.png" alt="a launch card">
 
 Every line links to the transaction it came from, so you can check any of it without trusting this
-tool. `Outcome · reached the pool after 3 min` is read back off the chain, not from anything gimlet
+tool. `Outcome · reached the pool after 3 min` is read back off the chain, not from anything augur
 decided.
 
 <br>
@@ -161,27 +161,30 @@ of it should divide to 1.00, and they do.
 
 | cohort | launches | win rate | median | mean |
 |---|---|---|---|---|
-| everything | 30,434 | 6.2% | 0.83x | **0.92x** |
-| top half | 13,986 | 8.1% | 0.79x | **0.97x** |
-| shortlist (top 10%) | 2,741 | 13.8% | 0.68x | **1.17x** |
-| top 1% | 322 | 27.8% | 0.67x | **1.92x** |
+| everything | 35,313 | 6.1% | 0.83x | **0.93x** |
+| top half | 18,350 | 7.8% | 0.80x | **0.96x** |
+| shortlist (top 10%) | 3,816 | 12.0% | 0.66x | **1.09x** |
+| top 1% | 400 | 29.5% | 0.76x | **1.74x** |
 
 Read that carefully, because the honest parts are the ones that don't fit on a poster:
 
-- **The predictions are the whole product.** Buying everything returns 0.92x. Buying the shortlist
-  returns 1.17x, and the top percentile 1.92x. That gap is what the models are worth.
-- **You still lose on 86% of positions.** The median one is 0.68x. The return lives in a tail, and if
+- **The predictions are the whole product.** Buying everything returns 0.93x. Buying the shortlist
+  returns 1.09x, and the top percentile 1.74x, where three launches in ten win. That gap is what the
+  models are worth.
+- **You still lose on 88% of positions.** The median one is 0.66x. The return lives in a tail, and if
   that ratio does not fit how you trade, nothing here fixes it.
-- **Resampling the 2,701 shortlist positions puts the mean between 1.12x and 1.22x nine times out of
-  ten.** Remove the ten best and it is still 1.14x, so it is not one lucky token. It is still an edge
-  measured over twenty-seven hours, not a week.
+- **Resampling the 3,717 shortlist positions puts the mean between 1.05x and 1.13x nine times out of
+  ten.** Remove the ten best and it is still 1.07x, so it is not one lucky token. It is still an edge
+  measured over thirty hours, not a week.
 - **This number moves, and you should watch it move.** The first run of this backtest, on fourteen
   hours and an older model, read 1.12x and lost all of it when the ten best positions were removed.
-  Two things changed since: the sample roughly doubled and the model was refit. Both matter, neither
-  can be credited alone, and the figure will move again. The reason to trust the direction is not
-  this paragraph, it is that `npm run backtest` recomputes it on your own data in six seconds.
-- **Speed past the tax window buys little.** Entering at +3.5 s returns 1.17x; at +60 s, 1.08x. The
-  whole minute is worth about nine percent, so being 200 ms faster than the next person is worth
+  Since then the sample has more than doubled and the models have been refit three times; the
+  shortlist has read 1.07x, 1.17x and 1.09x across those runs while its robustness improved every
+  time. The level is noisy, the direction is not, and neither is a promise. The reason to trust
+  anything here is not this paragraph, it is that `npm run backtest` recomputes it on your own data
+  in six seconds.
+- **Speed past the tax window buys little.** Entering at +3.5 s returns 1.09x; at +60 s, 1.06x. The
+  whole minute is worth about three percent, so being 200 ms faster than the next person is worth
   nothing measurable. The opening tax has already eaten that race, which is why this predicts rather
   than races.
 
@@ -194,13 +197,13 @@ search run on shuffled outcomes**, which is what the search invents from nothing
 
 <img src="docs/img/term-patterns.png" alt="npm run patterns">
 
-The noise line sits at 3.45x lift. What clears it, on the half that did not propose it:
+The noise line sits at 3.63x lift. What clears it, on the half that did not propose it:
 
 | pattern (first 30 s) | held-out | n |
 |---|---|---|
-| `snipers ≥ 10` and `priceMove ≥ 2.55` | **8.87x** | 77 |
-| `snipers ≥ 10` and `buys ≥ 49` | **7.40x** | 96 |
-| `priceMove ≥ 7.27` | **6.75x** | 81 |
+| `snipers ≥ 10` and `priceMove ≥ 2.59` | **8.45x** | 89 |
+| `snipers ≥ 10` and `buys ≥ 64` | **8.39x** | 68 |
+| `priceMove ≥ 7.18` | **7.24x** | 111 |
 
 The `--` row in that screenshot is the point of the whole exercise: a pattern that scored 4.52x
 where it was found and 1.61x where it was tested is not a finding, and the tool says so rather than
@@ -208,7 +211,7 @@ printing the first number and stopping.
 
 `snipers` is the number of wallets that **paid the 99% opening tax** to get in during the first three
 seconds. Ten of them is ten wallets each burning almost their whole entry for the privilege, which
-is the most expensive vote of confidence this chain allows anyone to cast. Against a base rate of 3.7%
+is the most expensive vote of confidence this chain allows anyone to cast. Against a base rate of 3.9%
 tripling from the 30-second price, those launches triple about a third of the time.
 
 None of this is in the score today. It is measured, not shipped.
@@ -220,7 +223,7 @@ None of this is in the score today. It is measured, not shipped.
 Node 22.6 or newer. No Python, no build step, no database to install. One runtime dependency.
 
 ```bash
-git clone https://github.com/Artemoon13/Ponscan-.git gimlet && cd gimlet
+git clone https://github.com/Artemoon13/Ponscan-.git augur && cd augur
 npm install
 cp .env.example .env
 npm run doctor
@@ -292,7 +295,7 @@ Nothing here needs a key, because nothing here signs.
 - **It has not lived through a regime change.** Launch tactics drift, and a scanner that works this
   month can quietly stop working next month. The live scoreboard is what will tell you. Watch that,
   not the numbers in this file.
-- **The money section is twenty-seven hours, not a week.** Curve trades are read on demand, so only hours
+- **The money section is thirty hours, not a week.** Curve trades are read on demand, so only hours
   where nearly every launch was read can be tested at all. `npm run curves` widens that.
 - **It knows nothing about anything except pons v2 launches.** Not price, not safety, not whether a
   token is a scam. It answers one question and has no opinion on any other.
@@ -302,10 +305,10 @@ Nothing here needs a key, because nothing here signs.
 
 ## The token
 
-**$GIMLET** · `not launched yet`
+**$AUGUR** · `not launched yet`
 
 There is no contract address yet, and this file is where one will appear. Anything claiming to be
-$GIMLET before an address is published here is not ours.
+$AUGUR before an address is published here is not ours.
 
 When it does launch it will go through the same factory as every other token on pons, and its card
 on the board will read the same on-chain facts as any other card: what the creator bought, which
@@ -321,12 +324,12 @@ this repository changes when an address exists.
 
 You can, and you should not trust it otherwise.
 
-gimlet writes down every score at the moment it gives it, **before the outcome exists**. Four hours
+augur writes down every score at the moment it gives it, **before the outcome exists**. Four hours
 later it looks up what happened and grades itself. Two rules keep that log honest:
 
 - **A launch older than five minutes is never recorded.** Half of graduations are decided by then, so
   scoring late would flatter the record with launches whose fate was already half-known.
-- **A score cannot be edited afterwards.** The first thing gimlet says about a launch is the thing it
+- **A score cannot be edited afterwards.** The first thing augur says about a launch is the thing it
   gets graded on.
 
 ```bash

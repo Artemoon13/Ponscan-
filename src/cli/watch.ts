@@ -10,7 +10,7 @@ import { loadModel, scoreOne, scoreRecent, type Scored } from "../score.ts";
 import { grade, modelId, record } from "../track.ts";
 
 /**
- * gimlet watch — the live feed in a terminal.
+ * augur watch — the live feed in a terminal.
  *
  * Two renderings of the same feed. On a real terminal it is a 120×40 screen: launches on the left,
  * the selected launch's card on the right, keys along the bottom. Anywhere else — a systemd unit, a
@@ -196,7 +196,7 @@ function frame(): Seg[][] {
   /* status bar */
   const head = Number(getMeta(db, "live_head_block") ?? 0);
   const trained = existsSync("./data/model.json") ? new Date(statSync("./data/model.json").mtimeMs).toISOString().slice(11, 16) : "--:--";
-  const status = ` gimlet watch | Robinhood Chain 4663 | block ${head.toLocaleString("en-US")} | model ${MODEL_ID} . ${trained} | ${launchesPerMinute()} launches/min | ${wsClient ? "ws *" : "poll"}` +
+  const status = ` augur watch | Robinhood Chain 4663 | block ${head.toLocaleString("en-US")} | model ${MODEL_ID} . ${trained} | ${launchesPerMinute()} launches/min | ${wsClient ? "ws *" : "poll"}` +
     (state.paused ? " | PAUSED" : "") + (state.fireOnly ? " | TOP DECILE ONLY" : "") + (state.flash ? ` | ${state.flash}` : "");
   const lines: Seg[][] = [[seg(fit(status, W), LIME_BG + BOLD)], [seg(" ")]];
 

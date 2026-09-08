@@ -19,7 +19,7 @@ ls -la ~/.ssh/id_ed25519.pub
 Если нет — создать:
 
 ```bash
-ssh-keygen -t ed25519 -C "gimlet"
+ssh-keygen -t ed25519 -C "augur"
 ```
 
 ---
@@ -35,7 +35,7 @@ ssh-keygen -t ed25519 -C "gimlet"
 | Type | **CX22** (2 vCPU, 4 ГБ, 40 ГБ) |
 | Networking | IPv4 включён |
 | SSH keys | **вставить свой публичный ключ прямо здесь** |
-| Name | gimlet |
+| Name | augur |
 
 Ключ обязательно вставить на этапе создания. Иначе Hetzner пришлёт рутовый пароль почтой и придётся менять его через консоль.
 
@@ -55,7 +55,7 @@ ssh root@СЕРВЕР_IP "echo ok && lsb_release -ds && nproc && free -g | head 
 
 ```
 Тип:  A
-Имя:  gimlet   (или @ для корня домена)
+Имя:  augur   (или @ для корня домена)
 Value: СЕРВЕР_IP
 TTL:   авто
 ```
@@ -65,7 +65,7 @@ TTL:   авто
 **Проверка** (может занять до пары минут):
 
 ```bash
-dig +short gimlet.ТВОЙ-ДОМЕН
+dig +short augur.ТВОЙ-ДОМЕН
 ```
 
 Должен вернуться IP сервера. Пока не вернулся — дальше не идти, шаг 7 упрётся именно в это.
@@ -77,11 +77,11 @@ dig +short gimlet.ТВОЙ-ДОМЕН
 `[сервер]`, под root:
 
 ```bash
-adduser --disabled-password --gecos "" gimlet
-install -d -m 700 -o gimlet -g gimlet /home/gimlet/.ssh
-cp /root/.ssh/authorized_keys /home/gimlet/.ssh/
-chown gimlet:gimlet /home/gimlet/.ssh/authorized_keys
-chmod 600 /home/gimlet/.ssh/authorized_keys
+adduser --disabled-password --gecos "" augur
+install -d -m 700 -o augur -g augur /home/augur/.ssh
+cp /root/.ssh/authorized_keys /home/augur/.ssh/
+chown augur:augur /home/augur/.ssh/authorized_keys
+chmod 600 /home/augur/.ssh/authorized_keys
 ```
 
 Запретить вход root по SSH и вход по паролю:
@@ -107,10 +107,10 @@ ufw status
 **Проверка.** Не закрывая текущую сессию, открыть новое окно терминала:
 
 ```bash
-ssh gimlet@СЕРВЕР_IP "whoami && sudo -n true 2>&1 | head -1"
+ssh augur@СЕРВЕР_IP "whoami && sudo -n true 2>&1 | head -1"
 ```
 
-Должно вывести `gimlet`. Порт 4663 снаружи должен быть закрыт — проверим на шаге 8.
+Должно вывести `augur`. Порт 4663 снаружи должен быть закрыт — проверим на шаге 8.
 
 Если новая сессия не пускает — **не закрывать старую**, чинить из неё.
 
@@ -142,12 +142,12 @@ node -e "console.log(process.features.typescript)"
 
 ## 5. Репозиторий
 
-`[сервер]`, под пользователем `gimlet`:
+`[сервер]`, под пользователем `augur`:
 
 ```bash
-su - gimlet
-git clone https://github.com/Artemoon13/Gimlet-.git gimlet
-cd gimlet
+su - augur
+git clone https://github.com/Artemoon13/Augur-.git augur
+cd augur
 npm install
 ```
 
@@ -202,10 +202,10 @@ console.log("WAL слит в базу");
 ls -la data/
 ```
 
-`data/gimlet.db-wal` должен стать нулевого размера. Теперь копировать:
+`data/augur.db-wal` должен стать нулевого размера. Теперь копировать:
 
 ```bash
-scp data/gimlet.db gimlet@СЕРВЕР_IP:~/gimlet/data/gimlet.db
+scp data/augur.db augur@СЕРВЕР_IP:~/augur/data/augur.db
 ```
 
 ### Вариант Б — собрать на месте (~7 минут)
@@ -230,18 +230,18 @@ npm run stats
 
 Три процесса. `[сервер]`, под root.
 
-**Доска** — `/etc/systemd/system/gimlet-board.service`:
+**Доска** — `/etc/systemd/system/augur-board.service`:
 
 ```ini
 [Unit]
-Description=gimlet board
+Description=augur board
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=gimlet
-WorkingDirectory=/home/gimlet/gimlet
+User=augur
+WorkingDirectory=/home/augur/augur
 ExecStart=/usr/bin/node --no-warnings src/board.ts
 Restart=always
 RestartSec=5
@@ -252,18 +252,18 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-**Вотчер** — `/etc/systemd/system/gimlet-watch.service`:
+**Вотчер** — `/etc/systemd/system/augur-watch.service`:
 
 ```ini
 [Unit]
-Description=gimlet live watcher
+Description=augur live watcher
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=gimlet
-WorkingDirectory=/home/gimlet/gimlet
+User=augur
+WorkingDirectory=/home/augur/augur
 ExecStart=/usr/bin/node --no-warnings src/cli/watch.ts
 Restart=always
 RestartSec=10
@@ -274,24 +274,24 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-**Ночное переобучение** — `/etc/systemd/system/gimlet-nightly.service`:
+**Ночное переобучение** — `/etc/systemd/system/augur-nightly.service`:
 
 ```ini
 [Unit]
-Description=gimlet nightly retrain
+Description=augur nightly retrain
 
 [Service]
 Type=oneshot
-User=gimlet
-WorkingDirectory=/home/gimlet/gimlet
+User=augur
+WorkingDirectory=/home/augur/augur
 ExecStart=/usr/bin/npm run nightly
 ```
 
-и таймер `/etc/systemd/system/gimlet-nightly.timer`:
+и таймер `/etc/systemd/system/augur-nightly.timer`:
 
 ```ini
 [Unit]
-Description=gimlet nightly retrain
+Description=augur nightly retrain
 
 [Timer]
 OnCalendar=*-*-* 04:30:00
@@ -307,8 +307,8 @@ WantedBy=timers.target
 
 ```bash
 systemctl daemon-reload
-systemctl enable --now gimlet-board gimlet-watch gimlet-nightly.timer
-systemctl status gimlet-board gimlet-watch --no-pager
+systemctl enable --now augur-board augur-watch augur-nightly.timer
+systemctl status augur-board augur-watch --no-pager
 ```
 
 **Проверка:**
@@ -317,7 +317,7 @@ systemctl status gimlet-board gimlet-watch --no-pager
 curl -s localhost:4663/api/health
 ```
 
-Ждём `watcherSeenSecAgo` в пределах пары секунд и небольшое `behindSec`. Если `watcherSeenSecAgo` равно `null` — вотчер не стартовал, смотреть `journalctl -u gimlet-watch -n 50`.
+Ждём `watcherSeenSecAgo` в пределах пары секунд и небольшое `behindSec`. Если `watcherSeenSecAgo` равно `null` — вотчер не стартовал, смотреть `journalctl -u augur-watch -n 50`.
 
 ---
 
@@ -335,7 +335,7 @@ apt-get update && apt-get install -y caddy
 `/etc/caddy/Caddyfile` — целиком заменить на:
 
 ```
-gimlet.ТВОЙ-ДОМЕН {
+augur.ТВОЙ-ДОМЕН {
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:4663
 }
@@ -351,8 +351,8 @@ journalctl -u caddy -n 30 --no-pager
 **Проверка** `[локально]`:
 
 ```bash
-curl -sI https://gimlet.ТВОЙ-ДОМЕН | head -3
-curl -s https://gimlet.ТВОЙ-ДОМЕН/api/health
+curl -sI https://augur.ТВОЙ-ДОМЕН | head -3
+curl -s https://augur.ТВОЙ-ДОМЕН/api/health
 ```
 
 И отдельно — что прямой порт закрыт снаружи:
@@ -369,7 +369,7 @@ curl -s -m 5 http://СЕРВЕР_IP:4663/api/health && echo "ПЛОХО: пор�
 
 ```bash
 for i in $(seq 1 70); do
-  curl -s -o /dev/null -w "%{http_code}\n" https://gimlet.ТВОЙ-ДОМЕН/api/health
+  curl -s -o /dev/null -w "%{http_code}\n" https://augur.ТВОЙ-ДОМЕН/api/health
 done | sort | uniq -c
 ```
 
@@ -378,9 +378,9 @@ done | sort | uniq -c
 **Переживает ли ребут:**
 
 ```bash
-ssh gimlet@СЕРВЕР_IP "sudo reboot"
+ssh augur@СЕРВЕР_IP "sudo reboot"
 sleep 45
-curl -s https://gimlet.ТВОЙ-ДОМЕН/api/health
+curl -s https://augur.ТВОЙ-ДОМЕН/api/health
 ```
 
 Должно ответить без ручного вмешательства. Это главная проверка всего шага 7.
@@ -388,14 +388,14 @@ curl -s https://gimlet.ТВОЙ-ДОМЕН/api/health
 **Лог предсказаний наполняется** `[сервер]`, через несколько минут после старта:
 
 ```bash
-cd ~/gimlet && npm run scoreboard
+cd ~/augur && npm run scoreboard
 ```
 
 Первые оценённые claims появятся через 4 часа — столько настаивается горизонт. До этого команда честно скажет, сколько заявок ждёт своей очереди.
 
 **Финальный чеклист:**
 
-- [ ] `https://gimlet.ТВОЙ-ДОМЕН` открывается, сертификат валидный
+- [ ] `https://augur.ТВОЙ-ДОМЕН` открывается, сертификат валидный
 - [ ] Лента заполнена, возраст верхних запусков — секунды или минуты
 - [ ] Плашки про отставание нет (или жёлтая, если догоняет)
 - [ ] Переключатель `by chance` / `newest` работает
@@ -408,15 +408,15 @@ cd ~/gimlet && npm run scoreboard
 ## Если что-то сломалось
 
 ```bash
-journalctl -u gimlet-board -n 100 --no-pager     # доска
-journalctl -u gimlet-watch -f                    # вотчер, живой лог
+journalctl -u augur-board -n 100 --no-pager     # доска
+journalctl -u augur-watch -f                    # вотчер, живой лог
 journalctl -u caddy -n 50 --no-pager              # сертификаты и проксирование
-systemctl list-timers gimlet-nightly.timer       # когда следующее переобучение
+systemctl list-timers augur-nightly.timer       # когда следующее переобучение
 ```
 
 **Доска отвечает, но лента пустая.** Нет модели или нет данных за последние 6 часов. Проверить `ls -la data/model.json` и `npm run stats`.
 
-**Красная плашка «watcher has not reported».** Вотчер упал или не может достучаться до RPC. `journalctl -u gimlet-watch -n 50`.
+**Красная плашка «watcher has not reported».** Вотчер упал или не может достучаться до RPC. `journalctl -u augur-watch -n 50`.
 
 **Caddy не берёт сертификат.** Почти всегда DNS: либо запись ещё не разошлась, либо у Cloudflare включено проксирование. Проверить `dig +short`.
 

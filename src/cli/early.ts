@@ -8,7 +8,7 @@ import { FEATURES } from "../features.ts";
 /**
  * Is the opening seconds' evidence worth adding to the peak model?
  *
- * gimlet early [--at 30] [--folds 4] [--coverage 0.98]
+ * augur early [--at 30] [--folds 4] [--coverage 0.98]
  *
  * `patterns` answers whether a shape exists. This answers the question that matters afterwards:
  * whether feeding that shape to the model that already exists makes it better, measured the way the
@@ -54,7 +54,7 @@ for (const r of base) {
   if (e) rows.push({ ...r, e });
 }
 
-console.log("\ngimlet early — does the first half-minute improve the peak model?\n");
+console.log("\naugur early — does the first half-minute improve the peak model?\n");
 console.log(`window     ${hours.size} covered hours, ${rows.length.toLocaleString()} launches with both a peak and a price path`);
 console.log(`sees       launch-time features, plus the first ${atSec}s of trading`);
 console.log("predicts   two targets, because only one of them is honest:");

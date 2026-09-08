@@ -45,7 +45,7 @@ class Gate {
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 const gate = new Gate(CFG.inFlight, CFG.spacingMs);
-const headers = { "user-agent": "gimlet/0.1 (+https://github.com/Artemoon13/Ponscan-)" };
+const headers = { "user-agent": "augur/0.1 (+https://github.com/Artemoon13/Ponscan-)" };
 
 /**
  * Retries throttling and transient network errors with exponential backoff; surfaces everything else.

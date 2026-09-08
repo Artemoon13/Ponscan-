@@ -11,7 +11,7 @@ import { contentBox, crop, decode, encode, resize, type Image } from "./png.ts";
  * of averaging still produces an image, and a trim measured wrongly still crops something.
  */
 
-const dir = mkdtempSync(join(tmpdir(), "gimlet-png-"));
+const dir = mkdtempSync(join(tmpdir(), "augur-png-"));
 process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
 
 /** A lime disc on black, which is roughly what the mark is. */

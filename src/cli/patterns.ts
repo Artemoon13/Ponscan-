@@ -9,7 +9,7 @@ import {
 /**
  * Looks for a shape in the opening seconds after which launches run.
  *
- * gimlet patterns [--at 30] [--target x5] [--min-support 40] [--runs 100] [--coverage 0.98]
+ * augur patterns [--at 30] [--target x5] [--min-support 40] [--runs 100] [--coverage 0.98]
  *
  * `--at` is how many seconds of trading the pattern is allowed to see; `--target` what it is trying
  * to predict — `x3`, `x5`, `x10` for peaks, `grad` for graduation.
@@ -68,7 +68,7 @@ for (const [token, e] of early) {
 
 const pct = (v: number): string => `${(100 * v).toFixed(1)}%`;
 const key = (k: string): string => dim(k.padEnd(11));
-console.log(`\n${bold(lime("gimlet patterns"))}  ${dim("what the opening seconds are worth")}\n`);
+console.log(`\n${bold(lime("augur patterns"))}  ${dim("what the opening seconds are worth")}\n`);
 console.log(key("window") + white(`${hours.size} covered hours`) + dim(`, ${rows.length.toLocaleString()} launches with a price path`));
 console.log(key("sees") + dim("the first ") + white(`${atSec}s`) + dim(" of trading, and nothing after it"));
 console.log(key("measures") + dim("the peak reached ") + white("AFTER") + dim(` those ${atSec}s, over the price at the end of them`));

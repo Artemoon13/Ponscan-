@@ -10,7 +10,7 @@ import {
 /**
  * What following the board would have returned.
  *
- * gimlet backtest [--entry-sec 3.5] [--size 0.05] [--tp 2] [--sl 0.5] [--hold-hours 4]
+ * augur backtest [--entry-sec 3.5] [--size 0.05] [--tp 2] [--sl 0.5] [--hold-hours 4]
  *                 [--no-tp] [--no-sl] [--no-pool] [--coverage 0.98] [--sweep]
  *
  * The plain run prints one rule across four cohorts. `--sweep` searches exit rules, and does it the
@@ -62,7 +62,7 @@ const started = Date.now();
 const ctx = prepare(db, model, { minCoverage: coverage, settleSec });
 
 const label = (k: string): string => dim(k.padEnd(11));
-console.log(`\n${bold(lime("gimlet backtest"))}  ${dim("what the ranking is worth in money")}\n`);
+console.log(`\n${bold(lime("augur backtest"))}  ${dim("what the ranking is worth in money")}\n`);
 console.log(label("window") + white(`${ctx.hours.length} covered hours`) + dim(`, ${iso(ctx.hours[0] * 3600)} to ${iso((ctx.hours[ctx.hours.length - 1] + 1) * 3600)} UTC`));
 console.log(label("coverage") + dim(`>=${pct(coverage)} of each hour's launches had their curve read`));
 console.log(label("eligible") + white(`${ctx.rows.length.toLocaleString()} launches`) + dim(`, each settled at least ${settleSec / 3600}h`));

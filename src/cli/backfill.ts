@@ -3,7 +3,7 @@ import { BLOCKS_PER_DAY } from "../config.ts";
 import { openDb, setMeta } from "../db.ts";
 import { backfillRange } from "../ingest.ts";
 
-/** gimlet backfill [--hours N | --blocks N | --from BLOCK] */
+/** augur backfill [--hours N | --blocks N | --from BLOCK] */
 const argv = process.argv.slice(2);
 const arg = (name: string): number | undefined => {
   const i = argv.indexOf(`--${name}`);

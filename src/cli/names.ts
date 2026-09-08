@@ -12,7 +12,7 @@ import { normaliseName } from "../features.ts";
  * Newest first, deliberately: a "?" on a launch from four days ago is a cosmetic gap in history, and
  * a "?" at the top of the live feed is the tool failing to say what a trader is looking at.
  *
- * gimlet names [--limit N] [--workers N]
+ * augur names [--limit N] [--workers N]
  */
 const argv = process.argv.slice(2);
 const arg = (n: string, d: number): number => {

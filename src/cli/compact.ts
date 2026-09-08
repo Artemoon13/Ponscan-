@@ -24,7 +24,7 @@ import { CFG } from "../config.ts";
  * interrupted run leaves summaries without their trades gone rather than trades gone without a
  * summary.
  *
- * gimlet compact [--older-than-days N] [--older-than-hours N] [--limit N] [--dry-run] [--vacuum]
+ * augur compact [--older-than-days N] [--older-than-hours N] [--limit N] [--dry-run] [--vacuum]
  */
 const argv = process.argv.slice(2);
 const arg = (name: string, dflt: number): number => {

@@ -121,7 +121,7 @@ test("a correction fitted on one model is not handed to another", () => {
   // has some twenty hours in which its own claims can correct it. Meanwhile the relaxed version
   // handed a twofold correction to a successor that needed none, and would have printed 0.35% where
   // 1.40% happened.
-  const dir = mkdtempSync(join(tmpdir(), "gimlet-cal-"));
+  const dir = mkdtempSync(join(tmpdir(), "augur-cal-"));
   const path = join(dir, "calibration.json");
   try {
     saveLive({ modelId: "aaaaaaaaaaaa", a: 1.17, b: -0.69, n: 2217,
