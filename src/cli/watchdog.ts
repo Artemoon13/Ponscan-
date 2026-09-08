@@ -32,7 +32,7 @@ const str = (name: string, dflt: string): string => {
 const BEHIND_SEC = arg("behind-sec", 300);
 /** Silence past which the watcher is not merely behind but gone. */
 const SILENT_SEC = arg("silent-sec", 180);
-const UNIT = str("unit", "ponscan-watch");
+const UNIT = str("unit", "augur-watch");
 /** Without this the check reports and changes nothing, which is what a first run should do. */
 const RESTART = argv.includes("--restart");
 

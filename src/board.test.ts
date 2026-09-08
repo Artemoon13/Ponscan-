@@ -216,6 +216,47 @@ test("the model page answers, and answers faster the second time", async () => {
   assert.ok(second <= Math.max(took, 50), `second call took ${second}ms against ${took}ms; the hold is not holding`);
 });
 
+test("the landing panel is not an empty frame before the feed answers", async () => {
+  // The panel is the largest thing on the page and sits under a title bar that says "live". Empty,
+  // it reads as broken rather than as loading, and that is the first thing a visitor sees.
+  const html = await (await fetch(BASE)).text();
+  const rows = html.match(/class="shot-skel"/g) ?? [];
+  assert.ok(rows.length >= 5, `only ${rows.length} placeholder rows in the served page`);
+});
+
+test("the same feed is not computed twice for the same rows", async () => {
+  // Ranking the window is two thirds of a second, every open tab asks for it every fifteen seconds,
+  // and on one thread the fifth reader waits for the four identical answers before it.
+  const first = Date.now();
+  assert.equal((await fetch(`${BASE}/api/feed?hours=6`)).status, 200);
+  const cold = Date.now() - first;
+
+  const second = Date.now();
+  const r = await fetch(`${BASE}/api/feed?hours=6`);
+  const warm = Date.now() - second;
+  assert.equal(r.status, 200);
+  const d = await r.json() as { items?: unknown[] };
+  assert.ok(Array.isArray(d.items), "a held answer must still be a whole answer");
+  assert.ok(warm <= Math.max(cold, 50), `held answer took ${warm}ms against ${cold}ms`);
+});
+
+test("a card does not rescore the window to find its rank", async () => {
+  // Where a launch stands among the window is what the feed just computed. Working it out again per
+  // card was 588ms of CPU each: thirty cards took seventeen seconds, and on one thread that is the
+  // whole site for seventeen seconds.
+  await fetch(`${BASE}/api/feed?hours=6`);
+  const first = Date.now();
+  const r = await fetch(`${BASE}/api/token/${TOKEN}`);
+  assert.equal(r.status, 200);
+  const d = await r.json() as { score?: { rank?: number; of?: number } };
+  const cold = Date.now() - first;
+  assert.equal(typeof d.score?.rank, "number", "a card must still know its place");
+
+  const second = Date.now();
+  assert.equal((await fetch(`${BASE}/api/token/${TOKEN}`)).status, 200);
+  assert.ok(Date.now() - second <= Math.max(cold, 60), "the second card paid for the ranking again");
+});
+
 test("reports its own health", async () => {
   const r = await fetch(`${BASE}/api/health`);
   assert.equal(r.status, 200);
