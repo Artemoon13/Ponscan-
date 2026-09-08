@@ -297,6 +297,10 @@ CREATE TABLE IF NOT EXISTS predictions (
 ) STRICT;
 CREATE INDEX IF NOT EXISTS ix_pred_pending ON predictions(graded_at, launch_ts);
 CREATE INDEX IF NOT EXISTS ix_pred_model   ON predictions(model_id, probability DESC);
+-- The alert path asks this several times a minute, forever, against a table that grows by about
+-- twenty-four thousand rows a day. Unindexed it was a 6.7ms scan at thirteen thousand rows, which
+-- is nothing now and a third of a second by the end of the month.
+CREATE INDEX IF NOT EXISTS ix_pred_recent  ON predictions(launch_ts, probability DESC);
 
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
